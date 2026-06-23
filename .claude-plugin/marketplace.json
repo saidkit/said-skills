@@ -1,0 +1,27 @@
+{
+  "name": "saidkit",
+  "owner": {
+    "name": "Viktor Shpak",
+    "url": "https://saidkit.dev"
+  },
+  "metadata": {
+    "description": "SAIDkit (saidkit.dev) — Software AI Development methodology for Claude Code. Stack-agnostic context engine; pair it with a per-stack starter.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "said",
+      "source": "./plugins/said",
+      "description": "SAID engine - Scope -> Architect -> Implement -> Debrief: 10 skills + 3 subagents driving a feature from idea to shipped under spec, task-log, and quality-gate discipline.",
+      "category": "workflow",
+      "tags": [
+        "methodology",
+        "feature-development",
+        "spec-driven",
+        "qa",
+        "code-review",
+        "saidkit"
+      ]
+    }
+  ]
+}
