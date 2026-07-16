@@ -32,8 +32,8 @@ The engine runs without a starter — you just fill the binding yourself (the [a
 | `said-python`  | Python (FastAPI) / MCP      | reference | TBD  |
 | `said-go`      | Go services / MCP           | reference | TBD  |
 | `said-web`     | React + Vite + TS           | reference | TBD  |
-| `said-rust-dx` | Rust Apps (Dioxus)          | roadmap   | -    |
-| `said-tauri`   | Tauri Apps                  | roadmap   | -    |
+| `said-flg`     | Flutter/LiquidGlass         | roadmap   | -    |
+| `said-fda`     | Flutter/Desktop App         | roadmap   | -    |
 | `said-swift`   | Native iOS / OSX apps       | roadmap   | -    |
 | `said-kotlin`  | Native Android apps         | roadmap   | -    |
 
