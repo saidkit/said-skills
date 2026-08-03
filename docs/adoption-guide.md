@@ -57,7 +57,6 @@ Add a section your skills can read. Minimum contents:
 | feature-structure-ADR  | docs/adr/ADR-XXX-feature-structure.md  |
 | service-adapter-ADR    | docs/adr/ADR-XXX-service-adapter.md    |
 | earn-its-place-ADR     | docs/adr/ADR-XXX-no-mega-components.md |
-| entity-granularity-ADR | docs/adr/ADR-XXX-entity-triad.md       |
 | <add your own>         | ...                                    |
 
 ### Rule-label scheme (optional)
