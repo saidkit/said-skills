@@ -14,4 +14,4 @@ Initial public release — the stack-agnostic SAID engine.
 
 ## [0.1.1] - 2026-07-30
 
-Added Flow skill - a cross-lane orchestrator for multi-repo setup of several said-* sub-projects
+Added Flow skill - a cross-lane orchestrator for multi-repo setup of several said-* sub-projects.
