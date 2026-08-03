@@ -24,18 +24,18 @@ The engine runs without a starter — you just fill the binding yourself (the [a
 
 ### Ready-made starters 
 
-| Starter        | Stack                       | Status    | Repo |
-| -------------- | --------------------------- | --------- | ---- |
-| `said-next`    | Next.js + TS monorepo       | reference | TBD  |
-| `said-saas`    | Next.js + Supabase for SaaS | roadmap   | -    |
-| `said-ts`      | TS services / Bun / MCP     | reference | TBD  |
-| `said-python`  | Python (FastAPI) / MCP      | reference | TBD  |
-| `said-go`      | Go services / MCP           | reference | TBD  |
-| `said-web`     | React + Vite + TS           | reference | TBD  |
-| `said-rust-dx` | Rust Apps (Dioxus)          | roadmap   | -    |
-| `said-tauri`   | Tauri Apps                  | roadmap   | -    |
-| `said-swift`   | Native iOS / OSX apps       | roadmap   | -    |
-| `said-kotlin`  | Native Android apps         | roadmap   | -    |
+| Starter        | Stack                       | Status    | Repo                                  |
+| -------------- | --------------------------- | --------- | ------------------------------------- |
+| `said-next`    | Next.js / TS                | reference | https://github.com/saidkit/said-next  |
+| `said-ts`      | TS services / Bun / MCP     | reference | https://github.com/saidkit/said-ts    |
+| `said-python`  | Python (FastAPI) / MCP      | reference | TBD                                   |
+| `said-go`      | Go services / MCP           | reference | TBD                                   |
+| `said-web`     | React + Vite + TS           | reference | TBD                                   |
+| `said-saas`    | Next.js + Supabase for SaaS | roadmap   | -                                     |
+| `said-flg`     | Flutter/LiquidGlass         | roadmap   | -                                     |
+| `said-fda`     | Flutter/Desktop App         | roadmap   | -                                     |
+| `said-swift`   | Native iOS / OSX apps       | roadmap   | -                                     |
+| `said-kotlin`  | Native Android apps         | roadmap   | -                                     |
 
 ## Install
 
