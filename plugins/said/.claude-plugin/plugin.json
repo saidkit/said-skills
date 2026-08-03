@@ -1,8 +1,8 @@
 {
   "name": "said",
   "displayName": "SAID",
-  "version": "0.1.0",
-  "description": "SAID: Software AI Development - methodology for Claude Code. 10 skills + 3 subagents that drive a feature from idea to shipped under spec, task-log, and quality-gate discipline. The stack-agnostic context engine; pair with a per-stack starter from saidkit.dev.",
+  "version": "0.2.0",
+  "description": "SAID: Software AI Delivery - methodology for Claude Code. 12 skills + 3 subagents that drive a feature from idea to shipped under spec, task-log, and quality-gate discipline. The stack-agnostic context engine; pair with a per-stack starter from saidkit.dev.",
   "author": {
     "name": "Viktor Shpak",
     "url": "https://saidkit.dev"

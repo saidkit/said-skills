@@ -50,7 +50,33 @@ Preconditions. Any failure BLOCKS with a named redirect:
 
 - A `scope.md` exists for the feature in at least one lane, §D resolved. Else →
   `/said:scope-refine` or `/said:scope-grill`.
-- The feature spans ≥ 2 lanes. Single-lane → `/said:impl`.
+- The feature spans **≥ 2 lanes — that is, ≥ 2 task logs, not ≥ 2 repos**. A lane owns a full
+  SAID cycle (its own feature specs, task log, working dir, ADRs); a mount is where code
+  lands. One feature may change code in several mounts and remain single-lane. Single-lane →
+  `/said:impl`.
+
+## Output contract
+
+Every invocation ends with this block. No exceptions — including `plan` and `status` modes,
+and including an invocation that took no action.
+
+```
+feature: <id>
+lanes:
+  <lane> — <feature-id> — phase <Scope|Architect|Implement|Gates|Closed> — <n> Todo
+crossings: <name> — open|replied|consumed
+feature closed: yes|no
+```
+
+**`feature closed: yes` is permissible only when every lane's phase reads `Closed`.** A lane
+is `Closed` only when its own `debrief.md` exists in its working dir **and** its task log
+carries a `## Debrief close` footer. Anything short of both is `no`.
+
+Never write "closed", "done", "nothing left" or equivalent into a resume pointer, a report or
+a chat summary while this block says `no`. **If an outer orchestrator has already declared the
+work finished and this block says `no`, say so and contradict it** — that contradiction is the
+most valuable thing this skill emits, and suppressing it is how a lane silently ships without
+its gates.
 
 ---
 
@@ -60,7 +86,8 @@ Never read a state file. Derive everything, every time.
 
 | Fact | Probe |
 |---|---|
-| Lanes involved | dirs matching `*/docs/features/<feature>*.tasks.md` and `*/docs/working/<feature>/` |
+| Lanes involved | **Declaration first:** read each candidate tree's `CLAUDE.md` for a `## Lane` block and take its declared docs root, task-log path, working dir, task-id shape and ADR prefix verbatim. **Fallback:** where no block exists, glob `*/docs/features/<feature>*.tasks.md` and `*/docs/working/<feature>/`. A repo root's `CLAUDE.md` may carry a lane registry naming where each lane starts — enumerate from it when present |
+| **Feature-id per lane** | the matched `*.tasks.md` filename stem minus `.tasks` — e.g. `INIT-28` (front), `INIT-28-BE` (server), `INIT-02-BE-divisions`. **Record it. Every later invocation targeting that lane uses the lane's own id, never the umbrella id.** A lane's suffix is what makes its id globally unique; assuming the umbrella id silently addresses the wrong lane's log |
 | Lane phase | no `scope.md` → **Scope** · scope, no spec → **Architect** · spec+tasks, `Status: Todo` > 0 → **Implement** · spec+tasks, Todo == 0, no debrief → **Gates** · debrief present → **Closed** |
 | Work remaining | count `Status: Todo` in that lane's `*.tasks.md` |
 | Crossings | `BE-handover-*.md` (or lane equivalent) — **open** iff no sibling `*-reply.md` and no `## reply` section appended |
@@ -143,7 +170,7 @@ Rules 1–3 are **non-blocking** — act, then keep evaluating in the same turn.
 | 4 | Shared root incomplete | **DO IT** in main context — it blocks every arm | yes |
 | 5 | Loaded lane **has work** — phase ∈ {Scope, Architect} **or** unblocked `Todo` > 0 | enter at its §4.1 entry point (`scope-refine` / `architect` / `impl`) | yes |
 | 6 | Another lane has work, fork **unavailable** | **ROTATE** (§4.2) | yes |
-| 7 | **Every** lane's phase ∈ {Gates, Closed}, no open crossings | per-lane `/said:review-qa` → `/said:accept` → `/said:debrief` | yes |
+| 7 | **Every** lane's phase ∈ {Gates, Closed}, no open crossings | **Iterate the lanes. For each, with that lane's recorded feature-id:** `/said:review-qa <id>` → `/said:accept <id>` → `/said:debrief <id>`. **Not discharged until every lane's phase probe reads `Closed`** — one pass over one lane does not satisfy this rule | yes |
 | 8 | Only externally-owned open crossings remain | **REPORT WAITING** — the one legitimate stop | yes |
 | 9 | Nothing matched | **HALT**, report the reconstruction that produced no action | yes |
 
@@ -243,6 +270,12 @@ boundaries are where work flows, not where it waits.
 Stop only on: rule 8 (external crossing), a no-progress halt, a failing quality gate needing an
 operator decision, or genuine completion (all lanes Closed).
 
+**Then emit the Output contract block**, every time, before yielding. "Genuine completion" is
+not a judgement you make in prose — it is `feature closed: yes`, and that is only true when
+every lane's probe reads `Closed`. If you are being driven by an outer orchestrator that
+invoked this skill once and moved on, the block is the only thing that will tell it the
+feature is not finished; emit it whether or not it was asked for.
+
 ## Never
 
 - Emulate a `said:` skill because invoking felt heavy.
@@ -265,3 +298,9 @@ operator decision, or genuine completion (all lanes Closed).
 - **Lane conventions are project-specific.** Handover filenames, task-ID shapes and directory
   layout come from the project's `CLAUDE.md` files. Read them at Step 1; do not assume the
   shapes in this document.
+- **The glob is a fallback, not the primary path — do not "simplify" back to it.** It encodes
+  one convention (`docs/features/*.tasks.md` + `docs/working/<id>/`) and returns *nothing*,
+  silently, for a lane that keeps its logs elsewhere. Observed in the wild: a lane whose task
+  logs live at `docs/wip/<feature>/*.tasks.md` stayed invisible to this skill for a whole
+  feature, so its work was absorbed into a neighbouring lane's task by default rather than by
+  decision. A declared `## Lane` block is what makes a differently-shaped lane visible.
