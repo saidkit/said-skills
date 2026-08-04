@@ -50,10 +50,12 @@ Preconditions. Any failure BLOCKS with a named redirect:
 
 - A `scope.md` exists for the feature in at least one lane, §D resolved. Else →
   `/said:scope-refine` or `/said:scope-grill`.
-- The feature spans **≥ 2 lanes — that is, ≥ 2 task logs, not ≥ 2 repos**. A lane owns a full
-  SAID cycle (its own feature specs, task log, working dir, ADRs); a mount is where code
-  lands. One feature may change code in several mounts and remain single-lane. Single-lane →
-  `/said:impl`.
+- The feature spans **≥ 2 lanes carrying their own SAID artifacts (a `scope.md`, spec, or
+  task log) — not ≥ 2 repos, and NOT counted by task-log presence**. Count lanes by the
+  Step-1 declaration-first enumeration: a lane still at Scope or Architect has no task log
+  yet but is a full lane. A lane owns a full SAID cycle (its own feature specs, task log,
+  working dir, ADRs); a mount is where code lands. One feature may change code in several
+  mounts and remain single-lane. Single-lane → `/said:impl`.
 
 ## Output contract
 
@@ -69,14 +71,22 @@ feature closed: yes|no
 ```
 
 **`feature closed: yes` is permissible only when every lane's phase reads `Closed`.** A lane
-is `Closed` only when its own `debrief.md` exists in its working dir **and** its task log
-carries a `## Debrief close` footer. Anything short of both is `no`.
+is `Closed` only when its own `debrief.md` exists in its working dir, its task log carries a
+`## Debrief close` footer, **and** no crossing addressed to it is still open. `debrief.md`
+alone is NOT `Closed` — it is written at debrief Phase A, before the footer. Anything short of
+all three is `no`.
 
 Never write "closed", "done", "nothing left" or equivalent into a resume pointer, a report or
 a chat summary while this block says `no`. **If an outer orchestrator has already declared the
 work finished and this block says `no`, say so and contradict it** — that contradiction is the
 most valuable thing this skill emits, and suppressing it is how a lane silently ships without
 its gates.
+
+**This skill is a loop, not a one-shot.** A caller that invoked it once — including an outer
+planner such as `/magic:think-deep` that scheduled "invoke `/said:flow`" as a single step —
+has **not** run it to completion; it has taken one step of an N-step loop. While this block
+reads `feature closed: no`, the only correct next action is to **re-invoke `/said:flow
+<feature-id>`**, never to tick a step done or move on.
 
 ---
 
@@ -88,9 +98,9 @@ Never read a state file. Derive everything, every time.
 |---|---|
 | Lanes involved | **Declaration first:** read each candidate tree's `CLAUDE.md` for a `## Lane` block and take its declared docs root, task-log path, working dir, task-id shape and ADR prefix verbatim. **Fallback:** where no block exists, glob `*/docs/features/<feature>*.tasks.md` and `*/docs/working/<feature>/`. A repo root's `CLAUDE.md` may carry a lane registry naming where each lane starts — enumerate from it when present |
 | **Feature-id per lane** | the matched `*.tasks.md` filename stem minus `.tasks` — e.g. `INIT-28` (front), `INIT-28-BE` (server), `INIT-02-BE-divisions`. **Record it. Every later invocation targeting that lane uses the lane's own id, never the umbrella id.** A lane's suffix is what makes its id globally unique; assuming the umbrella id silently addresses the wrong lane's log |
-| Lane phase | no `scope.md` → **Scope** · scope, no spec → **Architect** · spec+tasks, `Status: Todo` > 0 → **Implement** · spec+tasks, Todo == 0, no debrief → **Gates** · debrief present → **Closed** |
+| Lane phase | no `scope.md` → **Scope** · scope, no spec → **Architect** · spec+tasks, `Status: Todo` > 0 → **Implement** · spec+tasks, Todo == 0, no `## Debrief close` footer in the tasks log → **Gates** (a `debrief.md` may already exist mid-debrief — it is written at debrief Phase A, before the footer; `debrief.md` presence alone is NOT `Closed`) · `## Debrief close` footer present **and no open inbound crossing addressed to the lane** → **Closed** |
 | Work remaining | count `Status: Todo` in that lane's `*.tasks.md` |
-| Crossings | `BE-handover-*.md` (or lane equivalent) — **open** iff no sibling `*-reply.md` and no `## reply` section appended |
+| Crossings | `BE-handover-*.md` (or lane equivalent) — **open** iff no sibling `*-reply.md` and no `## Reply` section appended (match the heading **case-insensitively** — canonical form is `## Reply`) |
 | Blocked tasks | task entries whose Approach or Out-of-scope names an open crossing |
 | Shared root | does scope name an upstream both lanes clone (e.g. an engine étalon)? is it complete? |
 
@@ -170,7 +180,7 @@ Rules 1–3 are **non-blocking** — act, then keep evaluating in the same turn.
 | 4 | Shared root incomplete | **DO IT** in main context — it blocks every arm | yes |
 | 5 | Loaded lane **has work** — phase ∈ {Scope, Architect} **or** unblocked `Todo` > 0 | enter at its §4.1 entry point (`scope-refine` / `architect` / `impl`) | yes |
 | 6 | Another lane has work, fork **unavailable** | **ROTATE** (§4.2) | yes |
-| 7 | **Every** lane's phase ∈ {Gates, Closed}, no open crossings | **Iterate the lanes. For each, with that lane's recorded feature-id:** `/said:review-qa <id>` → `/said:accept <id>` → `/said:debrief <id>`. **Not discharged until every lane's phase probe reads `Closed`** — one pass over one lane does not satisfy this rule | yes |
+| 7 | **Every** lane's phase ∈ {Gates, Closed}, no open crossings | **Iterate the lanes not yet `Closed`. For each, from that lane's own docs root (§4.1), with that lane's recorded feature-id:** `/said:review-qa <id>` → **halt on FAIL** → `/said:accept <id>` → **halt on FAIL** → `/said:debrief <id>` (drive it through Phase C so the `## Debrief close` footer lands). **Not discharged until every lane's phase probe reads `Closed`** (footer present) — one pass over one lane does not satisfy this rule | yes |
 | 8 | Only externally-owned open crossings remain | **REPORT WAITING** — the one legitimate stop | yes |
 | 9 | Nothing matched | **HALT**, report the reconstruction that produced no action | yes |
 
@@ -182,6 +192,12 @@ exhausted, which is the serialization this skill exists to remove.
 an incomplete root — so rule 3 cannot fire for a root-dependent arm. Root-independent arms fork
 immediately; root-dependent ones fork on the next pass.
 
+**A crossing addressed to a lane that has otherwise reached `Gates`/`Closed` reopens that
+lane.** An open inbound crossing is an owed reply — real work, not an external wait. Such a
+lane is not `Closed` (per the Output-contract definition); treat it as a lane with work for
+Rules 3/5/6 (an owed reply is unblocked work) and route it to its §4.1 entry (or a JOIN/reply). An open *internal* crossing must never fall
+through to Rule 9 HALT.
+
 ## Step 4 — Execute the selected action
 
 ### 4.1 Lane entry points
@@ -189,12 +205,18 @@ immediately; root-dependent ones fork on the next pass.
 Entering a lane — by fork, rotation, or because it is already loaded — the phase determines
 which skill starts it. **Never guess, never hand-roll the phase's work.**
 
+**Invoke every lane skill from that lane's own docs root** (the docs root recorded in Step 1
+from its `## Lane` block) — `cd` into it or pass lane-rooted paths. `impl` / `review-qa` /
+`accept` / `debrief` resolve `docs/features/<id>` from the current working directory and take
+no path argument, so an invocation from the umbrella root (or another lane's root) resolves
+against the wrong tree — silently the wrong lane's files, or none.
+
 | Lane phase | Entry point |
 |---|---|
 | **Scope** | `/said:scope-refine <handoff-path>` — the handover plus audit findings are the handoff. `/said:scope-grill` only for a genuinely thin idea |
 | **Architect** | `/said:architect <scope-path>` |
 | **Implement** | `/said:impl <feature-id>` — whole-feature mode |
-| **Gates** | `/said:review-qa <feature-id>` then `/said:accept <feature-id>` |
+| **Gates** | `/said:review-qa <feature-id>` → (halt on FAIL) → `/said:accept <feature-id>` → (halt on FAIL) → `/said:debrief <feature-id>` through Phase C — the `## Debrief close` footer is the Gates→Closed transition (matches Rule 7) |
 | **Closed** | nothing — do not re-enter |
 
 ### 4.2 Fork vs rotate
