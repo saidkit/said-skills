@@ -67,14 +67,14 @@ feature: <id>
 lanes:
   <lane> — <feature-id> — phase <Scope|Architect|Implement|Gates|Closed> — <n> Todo
 crossings: <name> — open|replied|consumed
+feature e2e/UAT: passed|pending|skipped(recorded)|n/a(no UI)
 feature closed: yes|no
 ```
 
-**`feature closed: yes` is permissible only when every lane's phase reads `Closed`.** A lane
+**`feature closed: yes` is permissible only when every lane's phase reads `Closed` AND `feature e2e/UAT` is not `pending`.** A lane
 is `Closed` only when its own `debrief.md` exists in its working dir, its task log carries a
 `## Debrief close` footer, **and** no crossing addressed to it is still open. `debrief.md`
-alone is NOT `Closed` — it is written at debrief Phase A, before the footer. Anything short of
-all three is `no`.
+alone is NOT `Closed` — it is written at debrief Phase A, before the footer. **`feature e2e/UAT`** is the integrated, cross-lane run that only becomes possible once every lane is `Closed` — per-lane `accept` verified each lane in isolation and cannot cover it: `passed` when the feature's UAT result artifact carries a pass verdict, `skipped(recorded)` when an operator-confirmed skip is written into that artifact, `n/a(no UI)` for a feature with no user-visible surface, `pending` otherwise — and a `pending` UAT holds the feature open exactly as an unclosed lane does. Anything short of all of this is `no`.
 
 Never write "closed", "done", "nothing left" or equivalent into a resume pointer, a report or
 a chat summary while this block says `no`. **If an outer orchestrator has already declared the
@@ -103,6 +103,7 @@ Never read a state file. Derive everything, every time.
 | Crossings | `BE-handover-*.md` (or lane equivalent) — **open** iff no sibling `*-reply.md` and no `## Reply` section appended (match the heading **case-insensitively** — canonical form is `## Reply`) |
 | Blocked tasks | task entries whose Approach or Out-of-scope names an open crossing |
 | Shared root | does scope name an upstream both lanes clone (e.g. an engine étalon)? is it complete? |
+| **Feature e2e/UAT** | the integrated cross-lane run (only meaningful once **all** lanes `Closed`). **Declaration first:** honor a feature-UAT artifact location declared in the repo-root `CLAUDE.md`. **Fallback:** glob the feature working dir(s) for a UAT result artifact (`*QA-UAT*.md` / `*uat*.md`) carrying a filled result matrix. `passed` = pass verdict present · `skipped(recorded)` = an operator skip recorded in it · `n/a` = scope declares no UI behavior (Developer-Story) · else `pending` |
 
 > **`Todo == 0` is ambiguous — never key an action on it alone.** A lane with zero tasks
 > because it was never architected looks identical to one that finished. Always pair the count
@@ -180,7 +181,7 @@ Rules 1–3 are **non-blocking** — act, then keep evaluating in the same turn.
 | 4 | Shared root incomplete | **DO IT** in main context — it blocks every arm | yes |
 | 5 | Loaded lane **has work** — phase ∈ {Scope, Architect} **or** unblocked `Todo` > 0 | enter at its §4.1 entry point (`scope-refine` / `architect` / `impl`) | yes |
 | 6 | Another lane has work, fork **unavailable** | **ROTATE** (§4.2) | yes |
-| 7 | **Every** lane's phase ∈ {Gates, Closed}, no open crossings | **Iterate the lanes not yet `Closed`. For each, from that lane's own docs root (§4.1), with that lane's recorded feature-id:** `/said:review-qa <id>` → **halt on FAIL** → `/said:accept <id>` → **halt on FAIL** → `/said:debrief <id>` (drive it through Phase C so the `## Debrief close` footer lands). **Not discharged until every lane's phase probe reads `Closed`** (footer present) — one pass over one lane does not satisfy this rule | yes |
+| 7 | **Every** lane's phase ∈ {Gates, Closed}, no open crossings | **CLOSE — two stages.** (i) **Lanes:** for each lane not yet `Closed`, from that lane's own docs root with its recorded feature-id, run its **Gates entry (§4.1)** — halt on any FAIL. (ii) **Feature:** once **every** lane reads `Closed`, if `feature e2e/UAT` is still `pending`, run the **feature-level e2e/UAT (§4.4)** — the integrated cross-lane gate per-lane `accept` cannot be. **Not discharged until every lane reads `Closed` AND `feature e2e/UAT` ∈ {`passed`, `skipped(recorded)`, `n/a`}** — one pass over one lane, or a `pending` UAT, does not satisfy this rule | yes |
 | 8 | Only externally-owned open crossings remain | **REPORT WAITING** — the one legitimate stop | yes |
 | 9 | Nothing matched | **HALT**, report the reconstruction that produced no action | yes |
 
@@ -216,7 +217,7 @@ against the wrong tree — silently the wrong lane's files, or none.
 | **Scope** | `/said:scope-refine <handoff-path>` — the handover plus audit findings are the handoff. `/said:scope-grill` only for a genuinely thin idea |
 | **Architect** | `/said:architect <scope-path>` |
 | **Implement** | `/said:impl <feature-id>` — whole-feature mode |
-| **Gates** | `/said:review-qa <feature-id>` → (halt on FAIL) → `/said:accept <feature-id>` → (halt on FAIL) → `/said:debrief <feature-id>` through Phase C — the `## Debrief close` footer is the Gates→Closed transition (matches Rule 7) |
+| **Gates** | `/said:review-qa <feature-id>` → (halt on FAIL) → `/said:accept <feature-id>` → (halt on FAIL) → `/said:debrief <feature-id>` through Phase C — the `## Debrief close` footer is the Gates→Closed transition. **This is the single source for the per-lane gate chain; Rule 7 invokes it per lane** |
 | **Closed** | nothing — do not re-enter |
 
 ### 4.2 Fork vs rotate
@@ -260,6 +261,20 @@ pushback real — an agent that never saw your reasoning cannot rubber-stamp it.
 
 Skip the audit only for a purely MECHANICAL handover — then ask why it is a crossing at all.
 
+### 4.4 Feature-level e2e/UAT (the integrated close)
+
+Runs **once, after every lane reads `Closed`** — never before: the integrated feature does not exist until then, and per-lane `accept` verified each lane only in isolation. This is the cross-lane gate the per-lane gates cannot be.
+
+Drive it in main context where the environment provides the tooling (Playwright MCP where there is UI): exercise the feature end-to-end across all lanes and record **real** results — failures recorded as failures, never as "not run" — into the feature's UAT result artifact (the one Step 1 probes).
+
+- **Pass** → the probe reads `passed`; the feature may close.
+- **Fail** → record it; re-open the owning lane via `/said:add-task` + `/said:impl`, which drops that lane out of `Closed` — the loop reconverges.
+- **No UI behavior** (scope declares a Developer-Story / no user-visible surface) → `n/a`.
+- **Operator-confirmed skip** → allowed only on explicit operator word, written into the UAT artifact as `skipped(recorded)`, never silent. Under an autonomy macro this skip is a **hard blocker** — the one wait autonomy cannot self-approve.
+- **Tooling unavailable** (environment-gated, like peer-session forking) → do not fabricate a pass; REPORT the owed UAT (`feature e2e/UAT: pending` → `feature closed: no`) and name the exact run to perform, as Rule 8 reports an external wait.
+
+Never emit `feature closed: yes` while this reads `pending`.
+
 ## Step 5 — Gate before any fork, rotation, or end of turn
 
 Both hard. Neither skippable under an autonomy macro — autonomy removes waits, not gates.
@@ -267,7 +282,7 @@ Both hard. Neither skippable under an autonomy macro — autonomy removes waits,
 1. **Unfiled decisions.** Every decision made this turn is written to an artifact. The resume
    pointer's last line must read `decisions not yet in a file: none`. If it does not, file them
    before doing anything else.
-2. **Resume pointer refreshed** at `<lane>/docs/working/<feature>/_resume.md`:
+2. **Resume pointer refreshed** at `<lane>/docs/working/<feature>/_resume.md` — **write-only output**: a human / outer-orchestrator pointer, re-derived from inspection every turn and **never read back as state** (Step 1: *"Never read a state file"*). It is not the parallel state file the Never-list forbids — that means a file the skill would *trust in place of re-deriving*:
 
 ```markdown
 # <feature> — resume pointer
@@ -307,7 +322,7 @@ feature is not finished; emit it whether or not it was asked for.
 - Claim in a handover that work "is authored into" a file that does not exist. Future tense,
   or name the gap.
 - Carry a decision only in conversation across a compaction.
-- Maintain a state file parallel to the artifacts.
+- Maintain a state file the skill **reads back** as truth parallel to the artifacts (`_resume.md` is write-only output, re-derived each turn — Step 5.2 — not this).
 - Treat "context is getting long" as a stage boundary.
 
 ## Known limits
