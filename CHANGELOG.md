@@ -2,6 +2,15 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.3.1] — 2026-08-08
+
+**Fixed — `said:status` dot-only working dirs.** The empty-dir probe counted any directory entry
+as work-in-progress, so a reserved working dir holding only a dotfile (`.gitkeep`, `.DS_Store`)
+misread as `Scope · scope pending` instead of `Scope · not started`. It now ignores dotfiles when
+probing for content. (This also lets the private eval fixture keep its reserved-but-empty dirs as
+`.gitkeep` placeholders — empty dirs don't survive a `git clone` — without shifting their golden
+classification.)
+
 ## [0.3.0] — 2026-08-08
 
 Two observability skills join the engine: a read-only status board in the terminal and its

@@ -349,7 +349,8 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
         specs = [q for q in glob.glob(os.path.join(feats_dir, fid + "*.md")) if not q.endswith(".tasks.md")]
         tasks = glob.glob(os.path.join(feats_dir, fid + "*.tasks.md"))
         scope = has_scope(fid)
-        dir_content = os.path.isdir(workdir) and bool(os.listdir(workdir))
+        # dotfiles (.gitkeep, .DS_Store) are not SAID artifacts — a dir holding only them is "empty"
+        dir_content = os.path.isdir(workdir) and any(not e.startswith(".") for e in os.listdir(workdir))
         t = parse_tasks(tasks) if tasks else {"counts": {"Done": 0, "Todo": 0, "Canceled": 0, "Backlog": 0},
                                               "dates": [], "todo_items": [], "footer": False, "integrity": None}
         c = t["counts"]
