@@ -1,0 +1,191 @@
+*{box-sizing:border-box}
+/* SAID brand: three tokens (ink · paper · cobalt) + alpha neutrals; two faces (Inter Tight · JetBrains Mono) */
+:root{--ink:#0A0B0D;--paper:#FAFAF7;--cobalt:#435AF6;--ok:#1FB47A;--alert:#E53E3E;
+  --font-ui:'Inter Tight',system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:var(--paper);--surface:#fff;--panel:#F2F2EE;--border:rgba(10,11,13,.11);--track:rgba(10,11,13,.11);
+  --text:var(--ink);--muted:rgba(10,11,13,.58);--faint:rgba(10,11,13,.38);--accent:var(--cobalt);--accent-deep:#2C3CC4;
+  --ph-scope:rgba(10,11,13,.30);--ph-architect:rgba(10,11,13,.58);--ph-implement:var(--cobalt);
+  --ph-delivery:#2C3CC4;--ph-closed:var(--ok);--warn:var(--alert);}
+[data-theme="dark"]{--bg:var(--ink);--surface:#131519;--panel:#101215;--border:rgba(250,250,247,.13);--track:rgba(250,250,247,.15);
+  --text:var(--paper);--muted:rgba(250,250,247,.60);--faint:rgba(250,250,247,.40);--accent:#6579FF;--accent-deep:#4658E6;
+  --ph-scope:rgba(250,250,247,.32);--ph-architect:rgba(250,250,247,.60);--ph-implement:#6579FF;
+  --ph-delivery:#4658E6;--ph-closed:#2ECC8F;--warn:#FF6B6B;}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;
+  font:14px/1.5 var(--font-ui);letter-spacing:-.011em;-webkit-font-smoothing:antialiased}
+code,.rid,.mono,.d-files{font-family:var(--font-mono)}
+header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+.brand{font-weight:650;display:flex;align-items:baseline;gap:9px}.brand b{color:var(--accent)}
+.brand .sub{font-weight:400;color:var(--muted);font-size:12.5px}
+.ctrls{display:flex;align-items:center;gap:14px}
+.stamp{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.switch{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12.5px;cursor:pointer;user-select:none}
+#main{flex:1;min-height:0;display:flex;flex-direction:column}
+#listwrap.cols{flex:1;display:grid;grid-template-columns:minmax(370px,430px) 1fr;min-height:0}
+#kanbanwrap{display:none;flex:1;min-height:0}
+body[data-view="kanban"] #listwrap{display:none}
+body[data-view="kanban"] #kanbanwrap{display:flex}
+.kanban-only{display:none}body[data-view="kanban"] .kanban-only{display:flex}
+.vtoggle .btn{height:1.55rem;min-height:1.55rem;font-size:11px}
+.kanban{flex:1;display:flex;gap:14px;overflow-x:auto;padding:16px 18px;align-items:stretch}
+.kcol{flex:1 1 0;min-width:212px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:12px;max-height:100%}
+.kcol[data-phase="Scope"]{--kc:var(--ph-scope)}.kcol[data-phase="Architect"]{--kc:var(--ph-architect)}
+.kcol[data-phase="Implement"]{--kc:var(--ph-implement)}.kcol[data-phase="Delivery"]{--kc:var(--ph-delivery)}
+.kcol[data-phase="Closed"]{--kc:var(--ph-closed)}
+.kcol-h{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--border);
+  border-top:3px solid var(--kc,var(--border));border-radius:12px 12px 0 0}
+.kcol-name{font-weight:650;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--kc,var(--muted))}
+.kcol-n{font-size:11px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
+.kcol-body{padding:10px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px}
+.kcol-empty{color:var(--muted);font-size:12px;text-align:center;padding:16px 0;opacity:.55}
+.kcard{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:7px;padding:11px 12px;background:var(--surface);
+  border:1px solid var(--border);border-left:3px solid var(--kc,var(--border));border-radius:9px;transition:transform .12s,border-color .12s,box-shadow .12s}
+.kcard:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 3px 10px rgba(16,24,40,.08)}
+.kcard:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kcard.selected{border-color:var(--accent);box-shadow:0 0 0 1.5px var(--accent)}
+.kc-id{font-weight:650;font-size:13px;flex:none}
+/* id + name on one line; min-width:0 lets the name ellipsis-clip instead of forcing overflow */
+.kc-idrow{display:flex;align-items:baseline;gap:7px;min-width:0}
+.kc-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-weight:450;font-size:11.5px;color:var(--muted)}
+.kc-mid{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kc-bar{width:68px;height:6px;border-radius:5px}
+.kc-nm,.kc-todo{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.kc-flag{font-size:11.5px}
+.kanban.hide-closed .kcol[data-phase="Closed"]{display:none}
+#drawer{position:fixed;top:0;right:0;height:100vh;width:min(540px,94vw);background:var(--surface);border-left:1px solid var(--border);
+  transform:translateX(101%);transition:transform .22s ease;z-index:50;display:flex;flex-direction:column;box-shadow:-10px 0 30px rgba(0,0,0,.18)}
+body.drawer-open #drawer{transform:translateX(0)}
+.drawer-h{display:flex;justify-content:flex-end;padding:9px 12px;border-bottom:1px solid var(--border)}
+.drawer-content{flex:1;overflow:auto;padding:22px 26px}
+#backdrop{position:fixed;inset:0;background:rgba(0,0,0,.32);opacity:0;visibility:hidden;transition:.22s;z-index:40}
+body.drawer-open #backdrop{opacity:1;visibility:visible}
+.roster{padding:14px;overflow:auto;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:7px}
+.detail{padding:26px 30px;overflow:auto}
+.row{all:unset;box-sizing:border-box;display:grid;grid-template-columns:74px 94px 1fr auto auto;align-items:center;gap:11px;
+  padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--bd,var(--border));
+  border-radius:11px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s}
+.row:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 3px 10px rgba(16,24,40,.08)}
+.row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row.selected{border-color:var(--accent);box-shadow:0 0 0 1.5px var(--accent)}
+.row[data-phase="Implement"]{--bd:var(--ph-implement)} .row[data-phase="Delivery"]{--bd:var(--ph-delivery)}
+.row[data-phase="Architect"]{--bd:var(--ph-architect)} .row[data-phase="Scope"]{--bd:var(--ph-scope)}
+.row[data-phase="Closed"]{--bd:var(--ph-closed)}
+.rid{font-weight:650;font-size:13px}.rid.big{font-size:22px;font-weight:750}
+.mid{display:flex;align-items:center;gap:9px;min-width:0}
+.prog{width:84px;height:7px;border-radius:5px}.prog.empty{opacity:.45}
+.nm{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.todo{color:var(--muted);font-size:11.5px;white-space:nowrap;text-align:right}
+.rflag{font-size:12px;text-align:right;white-space:nowrap}
+.muted{color:var(--muted)}.warn{color:var(--warn);font-weight:550}.shipped{color:var(--muted);font-size:11.5px}
+.lanehead{font-weight:650;margin:10px 3px 3px;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.legacy{color:var(--muted);font-size:12px;padding:8px 3px 3px}
+.empty-state{color:var(--muted);padding:34px 20px;text-align:center;font-size:13.5px}.detail .empty-state{margin-top:14vh}
+.d-head{display:flex;align-items:center;gap:13px;margin-bottom:6px;flex-wrap:wrap}
+/* the feature name below the id in the detail header — full text, wraps freely */
+.d-name{font-size:16px;font-weight:550;line-height:1.3;color:var(--text);margin:0 0 22px}
+.d-steps{margin:2px 0 24px;overflow-x:auto}
+.d-gates{font-family:ui-monospace,monospace;font-size:12.5px;color:var(--muted);background:var(--panel);
+  border:1px solid var(--border);border-radius:10px;padding:10px 13px;margin-bottom:18px}
+.d-prog{display:flex;align-items:center;gap:12px;margin-bottom:18px}.d-prog .progress{width:230px;height:9px}
+.d-dates{font-size:12.5px;color:var(--muted);margin-bottom:20px;font-variant-numeric:tabular-nums}
+.d-tasks{margin-bottom:22px}.d-tasks-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.d-tasks-h h4{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.th-left{display:flex;align-items:center;gap:12px}
+.tfilter .btn{height:1.55rem;min-height:1.55rem;font-size:11px}
+.d-tasks[data-filter="todo"] .task:not(.t-todo){display:none}
+.tempty{display:none;color:var(--muted);font-size:12.5px;padding:12px 2px}
+.d-tasks[data-filter="todo"][data-todo="0"] .tempty{display:block}
+.task{border:1px solid var(--border);border-radius:9px;margin-bottom:6px;background:var(--panel);overflow:hidden}
+.task[open]{border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
+.task summary{list-style:none;display:grid;grid-template-columns:8px 84px 1fr auto auto;align-items:center;gap:11px;
+  padding:9px 13px;cursor:pointer;user-select:none}
+.task summary::-webkit-details-marker{display:none}
+.task summary:hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.t-dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.t-done .t-dot{background:var(--ph-closed)}.t-todo .t-dot{background:var(--ph-implement)}
+.t-canceled .t-dot{background:var(--muted)}.t-backlog .t-dot{background:var(--ph-scope)}
+.t-id{font-size:12px;color:var(--accent);white-space:nowrap}
+.t-title{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-canceled .t-title{text-decoration:line-through;color:var(--muted)}
+.t-date{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.t-status{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;min-width:56px;text-align:right}
+.task-body{padding:6px 15px 13px;border-top:1px solid var(--border)}
+.sec{margin:9px 0}.sec-h{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:3px}
+.sec-b{font-size:12.5px;white-space:pre-wrap;line-height:1.6;color:var(--text)}
+.sec-b .ic{background:color-mix(in srgb,var(--muted) 16%,transparent);border-radius:4px;padding:1px 5px;font-size:11.5px;font-family:ui-monospace,monospace}
+.d-next{display:flex;align-items:center;gap:11px;margin-bottom:18px;flex-wrap:wrap}
+.d-next .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+.d-next code{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px}
+.d-files{font-size:11.5px;color:var(--muted);word-break:break-all;line-height:1.8}
+footer{padding:10px 20px;border-top:1px solid var(--border);color:var(--muted);font-size:11.5px;
+  display:flex;justify-content:space-between;gap:10px;background:var(--surface)}
+#cdnwarn{display:none;background:#7c2d12;color:#fff;font-size:12px;padding:6px 20px;text-align:center}
+@media (max-width:860px){#listwrap.cols{grid-template-columns:1fr}.roster{border-right:none;border-bottom:1px solid var(--border);max-height:48vh}
+  .detail{padding:20px}.detail .empty-state{margin-top:3vh}}
+.row.cursor,.kcard.cursor{outline:2px solid var(--accent);outline-offset:2px}
+#detail:focus-visible{outline:2px dashed color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:-6px;border-radius:10px}
+.khint{color:var(--muted);font-size:11px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center}
+.khint kbd,kbd.k{font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--panel);border:1px solid var(--border);
+  border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--text);min-width:15px;text-align:center;display:inline-block}
+#help{position:fixed;right:16px;bottom:46px;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  box-shadow:0 12px 34px rgba(0,0,0,.24);padding:13px 16px 11px;display:none;width:270px}
+#help.open{display:block}
+#help h5{margin:0 0 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+#help .krow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:3.5px 0;font-size:12.5px}
+#help .krow .keys{display:flex;gap:4px;align-items:center}
+@media (max-width:680px){.khint{display:none}}
+@media (max-width:720px){header{flex-wrap:wrap;row-gap:9px}.ctrls{margin-left:auto;flex-wrap:wrap;justify-content:flex-end;gap:9px 11px}}
+
+/* ---- SAID brand layer (colour, type, the mark — geometry stays daisyUI's) ---- */
+/* The brand book's square panels are slide/editorial layout, not a UI-control rule:
+   rounding is left to daisyUI and the base CSS. Brand comes from colour + type + the mark. */
+.progress-success::-webkit-progress-value,.progress-success::-moz-progress-bar{background:var(--ph-closed)}
+.progress::-webkit-progress-bar{background:var(--track)}
+/* Eyebrows — JetBrains Mono, uppercase, wide tracking (brand book: labels are always mono) */
+.kcol-name,.lanehead,.d-tasks-h h4,.d-next .lbl,.sec-h,.t-status,.brand .sub,.legacy,#help h5{font-family:var(--font-mono)}
+.kcol-name,.d-tasks-h h4,.d-next .lbl,.sec-h,#help h5{letter-spacing:.14em}
+.rid,.kc-id,.t-id,.nm,.kc-nm,.kc-todo,.todo,.stamp,.t-date,.d-dates,.kcol-n{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.rid,.kc-id{font-weight:600;letter-spacing:-.01em}
+.rid.big{font-family:var(--font-ui);font-weight:700;letter-spacing:-.045em;font-size:26px}
+/* Brand lockup — mark (cobalt) + wordmark (Inter Tight 700 / -0.04em), clear space preserved */
+.brand{gap:11px;align-items:center}
+.brand .lockup{display:inline-flex;align-items:center;gap:11px;text-decoration:none;color:inherit;
+  border-radius:6px;transition:opacity .12s}
+.brand .lockup:hover{opacity:.72}
+.brand .lockup:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.brand .mark{color:var(--accent);display:block;flex:none}
+.brand .wm{font-family:var(--font-ui);font-weight:700;letter-spacing:-.04em;font-size:19px;line-height:1;color:var(--text)}
+.brand .proj{font-weight:500;letter-spacing:-.02em;color:var(--muted);padding-left:11px;border-left:1px solid var(--border)}
+.brand .sub{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.tagline{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+header{border-bottom:1px solid var(--border)}
+footer{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+footer a{color:var(--accent);text-decoration:none}
+.kcol-name{font-size:11px}
+.d-steps .step-primary:after{background:var(--accent);color:var(--paper)}
+.d-gates{font-family:var(--font-mono);letter-spacing:.01em}
+.shipped{color:var(--ph-closed)}
+.empty-state code{font-family:var(--font-mono)}
+/* Phase pill — the brand ramp (neutral → cobalt → green), never daisyUI's semantic hues.
+   Outlined by default; the live phase (Implement) is the one that earns a fill. */
+.ph{display:inline-flex;align-items:center;font-family:var(--font-mono);font-size:10px;line-height:1;
+  letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;white-space:nowrap;border-radius:999px;
+  border:1px solid var(--pc,var(--border));color:var(--pc,var(--muted));background:transparent}
+.ph[data-phase="Scope"]{--pc:var(--ph-scope)}
+.ph[data-phase="Architect"]{--pc:var(--ph-architect)}
+.ph[data-phase="Implement"]{--pc:var(--ph-implement);background:var(--ph-implement);color:var(--paper);border-color:var(--ph-implement)}
+.ph[data-phase="Delivery"]{--pc:var(--ph-delivery)}
+.ph[data-phase="Closed"]{--pc:var(--ph-closed)}
+.d-head .ph{font-size:11px;padding:5px 10px}
+/* Task status — bold, and colour-matched to its own dot so label and dot never disagree.
+   600 is the heaviest JetBrains Mono weight loaded; 700 would render as faux-bold. */
+.t-status{font-weight:600}
+.task.t-done .t-status{color:var(--ph-closed)}
+.task.t-todo .t-status{color:var(--ph-implement)}
+.task.t-backlog .t-status{color:var(--ph-scope)}
+.task.t-canceled .t-status{color:var(--faint)}
+.task.t-canceled .t-dot{background:var(--faint)}   /* dimmest of the set — the title is struck through too */
+.task.t-none .t-status{color:var(--faint)}

@@ -1,5 +1,8 @@
 .DS_Store
 *.log
 node_modules/
+__pycache__/
+*.pyc
 .claude/settings.local.json
-docs/
+# docs/ is a symlink to the private said-skills-docs companion — never track it in the public repo
+/docs

@@ -15,6 +15,7 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 | **3.5 — Gates** | `said:review-qa` (hygiene), `said:accept` (acceptance contract) | pass/fail reports |
 | **4 — Debrief** | `said:debrief` | retrospective + backports + shipping reports |
 | **Helper** | `said:triage` | read-only root-cause investigation |
+| **Observe** | `said:status` (terminal), `said:board` (local web dashboard) | read-only status board — where every feature sits in the phase chain, what's stalled, and the exact command that advances it |
 
 ### Subagents (spawned by the skills)
 

@@ -2,6 +2,28 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.3.0] — 2026-08-08
+
+Two observability skills join the engine: a read-only status board in the terminal and its
+local-web sibling. Both are derive-never-store reporters — they reconstruct every feature's
+position in the SAID phase chain from on-disk artifacts on each run, and drive nothing.
+
+**Added — `said:status`.** Terminal status board: a roster, a single-feature deep-dive, or a
+cross-lane board, derived from the same Step-1 reconstruction `said:flow` uses. A bundled
+`said_status.py` owns the mechanical derivation (enumerate → classify phase → count `Status:`
+lines → dates + git idle → gate files) and emits JSON or rendered text, deterministic under
+`--today`; the skill adds the judgment a script can't. Read-only — never writes, never invokes a
+downstream skill.
+
+**Added — `said:board`.** The browser sibling of `said:status`: a self-contained stdlib server
+(htmx + daisyUI from a CDN, GET-only, `127.0.0.1`-only) that imports `said:status`'s `analyze()`
+and serves List + Kanban views with a click-through deep-dive. One deterministic core, two
+surfaces — the web numbers match the terminal board exactly. `/said:board stop` kills it.
+
+Both ported from the `hypercommand` prototype. Their evaluation package (SUT-by-role harness,
+hermetic fixture, five-verification EVAL) and design docs live in the private `said-skills-docs`
+companion, not in the shipped plugin.
+
 ## [0.2.0] — 2026-08-03
 
 `said:flow` — the multi-lane orchestrator — gains an assertable stop condition. Found by a
