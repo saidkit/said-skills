@@ -55,7 +55,7 @@ Initial public release — the stack-agnostic SAID engine.
 - 10 skills: `said:scope-grill`, `said:scope-refine`, `said:architect`, `said:add-task`, `said:impl`, `said:review-ux`, `said:review-qa`, `said:accept`, `said:debrief`, `said:triage`.
 - 3 subagents: `scope-refine-agent`, `scope-audit`, `review-ux-agent`.
 - Marketplace-of-one (`saidkit`) — install via `claude plugin marketplace add saidkit/said-skills` then `claude plugin install said@saidkit`.
-- Adoption guide (`docs/adoption-guide.md`) + starter contract (`starters/README.md`) for the engine + per-stack-starter model.
+- Adoption guide (`guides/adoption-guide.md`) + starter contract (`starters/README.md`) for the engine + per-stack-starter model.
 
 ## [0.1.1] - 2026-07-30
 

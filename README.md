@@ -20,7 +20,7 @@ A **starter** is a per-stack kit that pre-fills the binding the engine expects, 
 - `docs/adr/` — ADR templates + seed decisions
 - `CLAUDE.md` binding — command resolution, ADR shortname map, rule vocabulary
 
-The engine runs without a starter — you just fill the binding yourself (the [adoption guide](docs/adoption-guide.md) walks it). A starter is the fast path. The starter contract — what files a starter must provide — is in [`starters/README.md`](starters/README.md).
+The engine runs without a starter — you just fill the binding yourself (the [adoption guide](guides/adoption-guide.md) walks it). A starter is the fast path. The starter contract — what files a starter must provide — is in [`starters/README.md`](starters/README.md).
 
 ### Ready-made starters 
 
@@ -47,7 +47,7 @@ claude plugin install said@saidkit
 
 Or in an active Claude Code session: `/plugin marketplace add saidkit/said-skills` → `/plugin install said@saidkit` → `/reload-plugins`.
 
-For your project, clone a per-stack **starter** (or fill the binding by hand — see the [adoption guide](docs/adoption-guide.md)); a `saidkit` scaffolding CLI is on the roadmap.
+For your project, clone a per-stack **starter** (or fill the binding by hand — see the [adoption guide](guides/adoption-guide.md)); a `saidkit` scaffolding CLI is on the roadmap.
 
 Skills are then invoked as `said:scope-refine`, `said:architect`, `said:impl`, `said:debrief`, etc.
 
@@ -68,7 +68,7 @@ said/                                 (engine repo + marketplace-of-one)
 │   ├── agents/                       3 subagents
 │   └── README.md
 ├── starters/                         per-stack kits (contract + roadmap)
-├── docs/adoption-guide.md            fill the binding by hand (starter-free path)
+├── guides/adoption-guide.md            fill the binding by hand (starter-free path)
 ├── LICENSE                           MIT
 └── README.md
 ```

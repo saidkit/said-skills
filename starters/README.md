@@ -2,7 +2,7 @@
 
 A **starter** is a per-stack kit that pre-fills everything the `said` engine needs, so a project adopts SAID with batteries included. The engine (the `said` plugin) is stack-agnostic; a starter is the stack-specific other half. Home: **https://saidkit.dev**.
 
-A starter is the inverse of the [adoption guide](../docs/adoption-guide.md): the guide tells a human how to fill the binding by hand; a starter ships it already filled for one stack.
+A starter is the inverse of the [adoption guide](../guides/adoption-guide.md): the guide tells a human how to fill the binding by hand; a starter ships it already filled for one stack.
 
 ## The starter contract
 

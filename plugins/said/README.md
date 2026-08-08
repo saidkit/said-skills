@@ -25,7 +25,7 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 ## Quick start
 
 1. Install the plugin (see the [marketplace README](../../README.md)).
-2. Set up the repo: clone a [starter](../../starters/README.md) for your stack (scaffolding pre-filled), or supply the binding by hand per the [adoption guide](../../docs/adoption-guide.md). **The skills need this scaffolding to be useful.**
+2. Set up the repo: clone a [starter](../../starters/README.md) for your stack (scaffolding pre-filled), or supply the binding by hand per the [adoption guide](../../guides/adoption-guide.md). **The skills need this scaffolding to be useful.**
 3. Start a feature: `/said:scope-grill <your idea>` (or `/said:scope-refine <handoff-doc>`), then walk the chain.
 
 ## Scope honesty (read this)
