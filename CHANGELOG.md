@@ -2,6 +2,19 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.4.0] — 2026-08-09
+
+**Added — `said:retrieval`.** Precedent/decision-record search, relocated from `magic:lumos` — it is
+decision-investigation inside the SAID setup, not a context-hygiene macro, and was already built
+against SAID's artifact layout. Before proposing a default, accepting a spawned-agent's framing, or
+answering "what's the default for X", it exhausts five precedent sources in order (`CLAUDE.md` ·
+memory · ADRs · prior working dirs · probe/wire captures) and reports per-source with citations.
+Proactive (fires at `§D` walks, "did we decide this before?", about-to-propose-a-default) and
+directly invocable via `/said:retrieval` (operator alias `lumos!`). Read-only. Each run closes with a
+**loop-ready status signal** — `coverage` (complete/partial) + `goal` (achieved/open/none) +
+`retrieval complete: yes|no` — so a driver (or a reserved `--exhaustive` loop-until-dry sweep) can
+decide whether another pass is worth it. Self-contained SKILL.md.
+
 ## [0.3.1] — 2026-08-08
 
 **Fixed — `said:status` dot-only working dirs.** The empty-dir probe counted any directory entry
