@@ -17,6 +17,7 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 | **Helper** | `said:triage` | read-only root-cause investigation |
 | **Observe** | `said:status` (terminal), `said:board` (local web dashboard) | read-only status board — where every feature sits in the phase chain, what's stalled, and the exact command that advances it |
 | **Recall** | `said:retrieval` | precedent/decision-record search: what the project already decided (`CLAUDE.md` · memory · ADRs · working dirs · probes), before you propose a default |
+| **Orchestrate** | `said:said` (single feature), `said:flow` (multi-lane) | drive a feature through the whole chain in one session to a printed `goal: done` signal — invoked by the `said!` / `flow!` operator macros |
 
 ### Subagents (spawned by the skills)
 

@@ -2,6 +2,18 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.5.0] — 2026-08-09
+
+**Added — `said:said`.** Single-feature SAID orchestrator: drives ONE feature through the full phase
+chain (Scope → Architect → Implement → gates → Debrief) in one session, invoking the real `said:*`
+skill at each phase and self-publishing a `goal: done|continue|stop` control line every turn — so a
+plain `/goal implement <id> as said!` runs it to closure with no hand-written condition. The
+single-lane twin of `said:flow`; backs the `said!` operator macro (whose closure signal was previously
+a debrief *file* footer, invisible to `/goal`'s transcript-only evaluator). Route precondition
+redirects a ≥2-lane feature to `said:flow`; main-context and depth-safe (never spawns to decide).
+Reconstructs phase by inspection (re-entrant across compaction); omission is never silent (→
+`goal: stop`). PRD: `docs/specs/said/REQUIREMENTS.md`.
+
 ## [0.4.0] — 2026-08-09
 
 **Added — `said:retrieval`.** Precedent/decision-record search, relocated from `magic:lumos` — it is

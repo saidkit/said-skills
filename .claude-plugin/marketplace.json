@@ -12,7 +12,7 @@
     {
       "name": "said",
       "source": "./plugins/said",
-      "description": "SAID engine - Scope -> Architect -> Implement -> Debrief: 12 skills + 3 subagents driving a feature from idea to shipped under spec, task-log, and quality-gate discipline.",
+      "description": "SAID engine - Scope -> Architect -> Implement -> Debrief: 16 skills + 3 subagents driving a feature from idea to shipped under spec, task-log, and quality-gate discipline.",
       "category": "workflow",
       "tags": [
         "methodology",
