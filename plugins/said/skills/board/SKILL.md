@@ -11,14 +11,23 @@ description: >
 
 # said:board — the SAID status board as a local web dashboard
 
-The browser sibling of `/said:status`: it reuses `said:status`'s `analyze()` and serves it as a live
-local page — **List + Kanban** views, filters, click-through deep-dive.
+The browser sibling of `/said:status`: reuse `said:status`'s `analyze()` and serve it as a live local
+page — **List + Kanban** views, filters, click-through deep-dive. One deterministic core, two
+surfaces; the web numbers match the terminal board exactly because it imports the same `analyze()`.
 
-Read-only by contract: GET-only, `127.0.0.1`-only, derive-never-store, and `Next` is copyable text
-(never a button that runs `/said:impl`). It **depends on the sibling `said:status` skill** (imports
-its `said_status.py`) — that skill must be present.
+## Contract — holds every run
 
-## When this fires
+- **Read-only, GET-only, loopback.** Bind `127.0.0.1` only; no write/POST routes, no mutation, no
+  downstream skill invoked, nothing on the network.
+- **Derive, never store.** Every request re-runs `analyze()`; no server-side board cache. `Next` is
+  copyable text, never a button that runs `/said:impl`.
+- **Depends on `said:status`.** Import its `said_status.py` (`analyze()`, `feature_tasks()`) — never
+  reimplement the derivation; the web numbers must match the terminal board. If that analyzer or
+  `python3` is missing, say so and stop — never hand-render a web page.
+- **Hard exit.** Launch (or stop) the server, report URL + pid, hand back. Never block on it, never
+  proceed into a phase, never mutate an artifact.
+
+## Invocation
 
 - `/said:board` — launch the dashboard and open the browser.
 - `/said:board stop` — stop the running server (by its pidfile / port).
@@ -43,18 +52,10 @@ python3 <skill-dir>/serve.py stop [--port <n>]
 
 - On launch it binds `127.0.0.1:<port>`, **prints the URL + pid**, writes a state file
   (`$TMPDIR/said-board.json` = `{pid, port, url, started}`), and opens the browser.
-- **Report the URL + pid to the operator.** The server runs until stopped — do not block on it or
-  tail it; hand back the URL and stop.
+- **Report the URL + pid to the operator**, then hand back — the server runs until stopped; do not
+  block on it or tail it.
 - **`stop`** reads that state file (or falls back to the port's listener) and kills the server;
   report what was stopped. Prefer `/said:board stop` over a manual `pkill`.
-- If `python3` or the sibling `said:status` analyzer is missing, say so and stop — never hand-render
-  a web page.
-
-## Architecture
-
-One deterministic core, two surfaces (terminal + web); htmx + daisyUI from a CDN, loaded
-non-blocking. The web surface never re-derives status — it imports `said:status`'s `analyze()`, so
-the numbers match the terminal board exactly.
 
 ## Anti-patterns
 
@@ -67,9 +68,3 @@ the numbers match the terminal board exactly.
 - **Don't reimplement `analyze()`.** Import `said:status`'s — the numbers must match the terminal
   board exactly.
 - **Don't hardcode `docs/features` / a project prefix / a project name.** Resolve in Step 0.
-
-## Hard exit
-
-The skill launches (or stops) the server and reports the URL + pid. The operator drives the browser;
-`/said:board stop` (or Ctrl-C) stops it. The skill never proceeds into a phase and never mutates an
-artifact.
