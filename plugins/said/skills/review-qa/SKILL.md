@@ -52,7 +52,7 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 
 1. **Resolve mode + inputs:**
    - Single arg matching project's task-id regex → task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
-   - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) → feature-mode (bare or suffixed per-lane feature-id, e.g. `INIT-28-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `INIT-28-FE-16` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
+   - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) → feature-mode (bare or suffixed per-lane feature-id, e.g. `PROJ-01-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `PROJ-01-FE-07` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
 2. **Status check:**
    - Task-mode: the named task must be `Status: Done (YYYY-MM-DD)`. Otherwise BLOCK + redirect to `/said:impl`.
    - Feature-mode: any task with `Status: Todo` / `Status: In progress` → BLOCK with list; operator confirms in-scope-vs-out-of-scope or closes first. (Backlog passes — intentional non-gating per SAID convention; matches `/said:debrief` preflight.)

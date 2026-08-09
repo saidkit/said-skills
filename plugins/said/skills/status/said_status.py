@@ -56,7 +56,7 @@ SPEC_H1_RE = re.compile(r"^#\s+([A-Z]+-\d+(?:-[A-Za-z0-9]+)*)\s*[:：]\s*(.+?)\s
 
 
 def feature_name(spec_path):
-    """The human name from a feature spec's H1: '# APP-04: Foo bar' -> 'Foo bar'.
+    """The human name from a feature spec's H1: '# PROJ-01: Foo bar' -> 'Foo bar'.
 
     Returns None when the spec is unreadable, has no heading, or the first heading is
     not the `# <id>: <name>` form — the display layer falls back accordingly.
@@ -81,7 +81,7 @@ def feature_name(spec_path):
 def feature_short_name(spec_path, fid):
     """The slug suffixed after the feature id in the filename.
 
-    'APP-03-daily-driver.md' -> 'daily-driver'; a bare 'APP-04.md' -> None.
+    'PROJ-02-widgets.md' -> 'widgets'; a bare 'PROJ-01.md' -> None.
     """
     if not spec_path:
         return None
@@ -250,7 +250,7 @@ def worktree_date(root, files, git_available):
 
     `git log` only sees commits, so work sitting in the working tree — the normal
     state while a feature is being implemented — otherwise reads as no activity at
-    all: APP-04 showed "10d idle" while its task log was being edited that hour.
+    all: PROJ-01 showed "10d idle" while its task log was being edited that hour.
 
     Gated on the tree actually being dirty, because a fresh clone stamps every file
     with checkout time and would make every feature look worked-on. With no git at

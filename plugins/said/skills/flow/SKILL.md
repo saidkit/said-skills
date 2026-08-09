@@ -69,12 +69,15 @@ lanes:
 crossings: <name> — open|replied|consumed
 feature e2e/UAT: passed|pending|skipped(recorded)|n/a(no UI)
 feature closed: yes|no
+goal: done | continue | stop — <reason>   # /goal reads this line: done|stop end the run, continue = re-invoke
 ```
 
 **`feature closed: yes` is permissible only when every lane's phase reads `Closed` AND `feature e2e/UAT` is not `pending`.** A lane
 is `Closed` only when its own `debrief.md` exists in its working dir, its task log carries a
 `## Debrief close` footer, **and** no crossing addressed to it is still open. `debrief.md`
 alone is NOT `Closed` — it is written at debrief Phase A, before the footer. **`feature e2e/UAT`** is the integrated, cross-lane run that only becomes possible once every lane is `Closed` — per-lane `accept` verified each lane in isolation and cannot cover it: `passed` when the feature's UAT result artifact carries a pass verdict, `skipped(recorded)` when an operator-confirmed skip is written into that artifact, `n/a(no UI)` for a feature with no user-visible surface, `pending` otherwise — and a `pending` UAT holds the feature open exactly as an unclosed lane does. Anything short of all of this is `no`.
+
+**The `goal:` line is the loop oracle** — self-describing, so a `/goal` driving this skill needs **no** hand-written completion condition; a plain directive (`/goal flow! implement <id>`) is enough. `done` = `feature closed: yes`. `stop` = the run is blocked or needs an operator decision — an externally-owned open crossing (Rule 8), a no-progress HALT (Step 6 / Rule 9), a failing lane gate, or an owed operator decision (e.g. a UAT skip). `continue` = everything else. `done` and `stop` both end the `/goal` loop (`stop` hands the operator the `<reason>`); `continue` is what re-invokes.
 
 Never write "closed", "done", "nothing left" or equivalent into a resume pointer, a report or
 a chat summary while this block says `no`. **If an outer orchestrator has already declared the
@@ -84,8 +87,8 @@ its gates.
 
 **This skill is a loop, not a one-shot.** A caller that invoked it once — including an outer
 planner such as `/magic:think-deep` that scheduled "invoke `/said:flow`" as a single step —
-has **not** run it to completion; it has taken one step of an N-step loop. While this block
-reads `feature closed: no`, the only correct next action is to **re-invoke `/said:flow
+has **not** run it to completion; it has taken one step of an N-step loop. While the `goal:`
+line reads `continue`, the only correct next action is to **re-invoke `/said:flow
 <feature-id>`**, never to tick a step done or move on.
 
 ---
@@ -97,7 +100,7 @@ Never read a state file. Derive everything, every time.
 | Fact | Probe |
 |---|---|
 | Lanes involved | **Declaration first:** read each candidate tree's `CLAUDE.md` for a `## Lane` block and take its declared docs root, task-log path, working dir, task-id shape and ADR prefix verbatim. **Fallback:** where no block exists, glob `*/docs/features/<feature>*.tasks.md` and `*/docs/working/<feature>/`. A repo root's `CLAUDE.md` may carry a lane registry naming where each lane starts — enumerate from it when present |
-| **Feature-id per lane** | the matched `*.tasks.md` filename stem minus `.tasks` — e.g. `INIT-28` (front), `INIT-28-BE` (server), `INIT-02-BE-divisions`. **Record it. Every later invocation targeting that lane uses the lane's own id, never the umbrella id.** A lane's suffix is what makes its id globally unique; assuming the umbrella id silently addresses the wrong lane's log |
+| **Feature-id per lane** | the matched `*.tasks.md` filename stem minus `.tasks` — e.g. `PROJ-01` (front), `PROJ-01-BE` (server), `PROJ-02-BE-widgets`. **Record it. Every later invocation targeting that lane uses the lane's own id, never the umbrella id.** A lane's suffix is what makes its id globally unique; assuming the umbrella id silently addresses the wrong lane's log |
 | Lane phase | no `scope.md` → **Scope** · scope, no spec → **Architect** · spec+tasks, `Status: Todo` > 0 → **Implement** · spec+tasks, Todo == 0, no `## Debrief close` footer in the tasks log → **Gates** (a `debrief.md` may already exist mid-debrief — it is written at debrief Phase A, before the footer; `debrief.md` presence alone is NOT `Closed`) · `## Debrief close` footer present **and no open inbound crossing addressed to the lane** → **Closed** |
 | Work remaining | count `Status: Todo` in that lane's `*.tasks.md` |
 | Crossings | `BE-handover-*.md` (or lane equivalent) — **open** iff no sibling `*-reply.md` and no `## Reply` section appended (match the heading **case-insensitively** — canonical form is `## Reply`) |

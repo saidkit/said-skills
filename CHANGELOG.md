@@ -61,7 +61,7 @@ orchestrator that has already declared the work finished.
 **Fixed — per-lane feature-id.** Step 1 discovered a lane's task log and then discarded its
 id, so downstream `/said:debrief`, `/said:review-qa`, `/said:accept` and `/said:impl` calls
 used the umbrella id and silently addressed the wrong lane's log. Step 1 now records the id
-(the `*.tasks.md` stem minus `.tasks` — `INIT-28-BE`, `INIT-02-BE-divisions`), and every later
+(the `*.tasks.md` stem minus `.tasks` — `PROJ-01-BE`, `PROJ-02-BE-widgets`), and every later
 invocation targeting a lane uses that lane's own id.
 
 **Fixed — rule 7 under-specified.** *"per-lane review-qa → accept → debrief"* was satisfiable

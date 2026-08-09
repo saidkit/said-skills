@@ -50,8 +50,8 @@ operator most needs to see (scoped-but-unarchitected, reserved-but-empty). Inclu
 - every `<working>/<id>/` directory whose name matches an issued prefix.
 
 **Foreign / legacy prefixes** — a `<working>/<id>/` whose prefix the repo doesn't issue and which
-has no current spec — never render per-row; collapse to one footer line `legacy: …`. (This repo:
-`FEAT-01..10`, `CONF-01` — pre-fork Hyperflow history.)
+has no current spec — never render per-row; collapse to one footer line `legacy: …`. (e.g. a
+`LEGACY-01..10` block whose prefix the repo no longer issues.)
 
 ## Step 1 — Run the analyzer
 
@@ -173,7 +173,7 @@ Markdown (keep `file:line` paths clickable) — the "position in the SAID cycle"
 Resolve lanes via `/said:flow` Step 1 (declaration-first `## Lane` blocks; glob fallback), then run
 the script with one `--lane NAME:root=…;docs=…;working=…;prefixes=…` per lane. One roster section
 per lane under a `lane: <name>  (<root>)` heading, columns aligned across lanes. A `<feature-id>`
-spanning lanes matches the umbrella id + suffixed lane ids together (`INIT-28`, `INIT-28-BE`),
+spanning lanes matches the umbrella id + suffixed lane ids together (`PROJ-01`, `PROJ-01-BE`),
 labelling each with its `lane:` and its own phase. (Phase is per-lane; cross-lane `Closed` / crossing
 semantics stay `/said:flow`'s job — this skill reports, it doesn't gate.)
 
