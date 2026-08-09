@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "SAIDkit (saidkit.dev) - Software AI Delivery methodology for Claude Code. Stack-agnostic context engine; pair it with a per-stack starter.",
-    "version": "0.2.2"
+    "version": "0.3.3"
   },
   "plugins": [
     {
