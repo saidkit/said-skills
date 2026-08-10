@@ -19,6 +19,7 @@ Drives one feature through its whole SAID cycle in a single session, each phase 
 - **Closure = footer AND gates, published as the `goal:` line every turn.** `said closed: yes` (⇔ `goal: done`) ONLY when the tasks log has a `## Debrief close` footer AND every gate passed (or a recorded, operator-confirmed skip). Emit the Output contract — the `goal:` line especially — on every invocation, including `status` mode and a no-action turn.
 - **Contradict a premature "done".** Never write "done"/"closed"/"nothing left" while the block says `no`; if an outer orchestrator declared the work finished and the block says `no`, say so and contradict it.
 - **Loop, not one-shot.** While the `goal:` line reads `continue`, the only correct next action is to re-invoke `/said:said <feature-id>` — never tick a step done or move on.
+- **`stop` is surfaced, not enforced — announce once, then hold.** `/goal`'s evaluator is binary (only *met* ends the loop); it **re-fires after a `goal: stop`** because the feature is not `done`. So an owed operator decision the agent must not fake — a UAT/aesthetic sign-off, an ambiguous reopen-vs-new, any human judgment — is announced **exactly once**: the owed verdict, the options, and how to unblock (reply the verdict, or `/goal clear` to release the loop). On every re-fire after that, **hold** — no new work, no manufactured verdict, no repeated "still waiting". Faking the judgment, or re-emitting until the Stop-hook block-cap force-kills the turn, is the failure this rule prevents (the HITL livelock).
 - **The SAID map is authoritative, not this file.** Phase→skill selection, gate order, and branch points come from the plugin README + each skill's description (Step 2). Project conventions (task-id shape, tasks-file location, QA-artifact names) come from the project's `CLAUDE.md` / stencils — read them at Step 1; never assume shapes.
 
 ## Invocation
@@ -49,7 +50,7 @@ The `goal:` line is the loop oracle — a plain directive (`/goal implement <id>
 - `done` = `said closed: yes` (footer present AND gates passed).
 - `stop` = blocked / needs an operator decision — an unconfirmed omission (mandatory stage skipped without a recorded confirmation), a failing gate (`review-qa`/`review-ux`/`accept` FAIL), an owed operator decision (e.g. a UAT skip on a UI feature), or a no-progress HALT (Step 5).
 - `continue` = a phase still has work.
-`done` and `stop` end the `/goal` loop (`stop` hands over the `<reason>`); `continue` re-invokes.
+`done` ends the `/goal` loop — the evaluator, reading the transcript, sees closure. `stop` is your **terminal intent**, but `/goal` is binary and **re-fires anyway**: phrase the `<reason>` so the evaluator can release (state the block is operator-owned and autonomous progress is exhausted) and the operator can act (reply the verdict, or `/goal clear`). On a re-fire, **hold** — announce once, then no new work (Contract). `continue` re-invokes.
 
 ---
 
@@ -148,3 +149,4 @@ Otherwise return to Step 1 and continue. Stop only on: `goal: done` (footer + ga
 - Re-run Scope+Architect for a change that fits an existing feature — that is the short path (`triage → add-task`).
 - Answer a new ask on a Closed feature with `goal: done` — classify it (Step 0), never dismiss it.
 - Silently pick reopen vs new-feature for a change to a Closed feature — propose both and let the operator decide (under autonomy: `goal: stop`, unless the directive named the choice).
+- Re-do work, fake the verdict, or re-emit "still waiting" when `/goal` re-fires after you already declared `goal: stop` on an owed operator decision — announce once, then hold; only the operator's reply or `/goal clear` releases it (the HITL livelock).
