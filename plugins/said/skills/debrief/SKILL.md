@@ -8,8 +8,7 @@ description: >
   C (Close — append `## Lessons` section + `## Debrief close` footer + optional
   shipping reports). Triggered ONLY by the explicit command "/said:debrief
   <feature-id> [--no-reports]". NOT for per-task verification — that's
-  `/said:review-ux`, Phase 3. NOT for spec authoring — that's
-  `/said:architect`, Phase 2. NOT for backlog additions — that's
+  `/said:review-ux`, `/said:review-qa`, Phase 3. NOT for spec authoring — that's `/said:architect`, Phase 2. NOT for backlog additions — that's
   `/said:add-task`.
 ---
 

@@ -12,7 +12,10 @@ single-lane twin of `said:flow`; backs the `said!` operator macro (whose closure
 a debrief *file* footer, invisible to `/goal`'s transcript-only evaluator). Route precondition
 redirects a ≥2-lane feature to `said:flow`; main-context and depth-safe (never spawns to decide).
 Reconstructs phase by inspection (re-entrant across compaction); omission is never silent (→
-`goal: stop`). PRD: `docs/specs/said/REQUIREMENTS.md`.
+`goal: stop`). A **Step-0 request classifier** picks the entry (RESUME · SHORT · NEW · TINY · DONE) so a
+bug/tweak/follow-up that fits an existing feature takes the short `triage → add-task → impl → gates`
+path (Scope+Architect skipped), and a new ask on a Closed feature is never a silent `goal: done`. PRD:
+`docs/specs/said/REQUIREMENTS.md`.
 
 ## [0.3.2] — 2026-08-09
 
