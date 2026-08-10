@@ -1,7 +1,7 @@
 ---
 name: said
 description: >
-  Single-feature SAID orchestrator. Drives ONE feature through the full SAID phase chain — Scope → Architect → Implement → gates → Debrief — in one session, invoking the real said:* skill at each phase and self-publishing a `goal: done|continue|stop` control line every turn so a plain `/goal implement <id> as said!` runs it to closure with no hand-written condition.
+  Single-feature SAID orchestrator. Drives ONE feature through the full SAID phase chain — Scope → Architect → Implement → Deliver — in one session, invoking the real said:* skill at each phase and self-publishing a `goal: done|continue|stop` control line every turn so a plain `/goal implement <id> as said!` runs it to closure with no hand-written condition.
   Triggered ONLY by the explicit command "/said:said <feature-id>", or by the `said!` operator macro (which calls Skill(said:said)). Do NOT trigger on general implementation, planning, or orchestration requests. For a feature spanning ≥2 SAID lanes use said:flow, not this.
 ---
 
@@ -15,7 +15,7 @@ Drives one feature through its whole SAID cycle in a single session, each phase 
 - **Reconstruct the phase by inspection, every invocation** (Step 1). Never read a stored phase/state file back as truth — re-derive from the feature's artifacts. This is what makes the skill re-entrant across compaction: a compaction is not a stop; re-enter and continue.
 - **Main-context; never spawn to decide.** The governed cycle runs in the main context; verify inline. Correct whether the top agent or a depth-1 subagent (e.g. `said!` under `/goal auror!`); the `said:*` skills it invokes do their own read-only spawning at depth 0.
 - **Single-lane only.** ≥2 lanes carry the feature's SAID artifacts → **BLOCK + redirect to `flow!` / `/said:flow`** (Step-1 route guard). A mount is not a lane.
-- **Classify the request first (Step 0).** A bug / tweak / follow-up that fits an existing feature takes the SHORT path (`triage → add-task → impl → gates`), never a from-scratch Scope→Architect walk. A Closed feature + a new ask is never `goal: done` — and where that change lands (reopen vs new feature) is the **operator's** decision: propose both, never pick silently.
+- **Classify the request first (Step 0).** A bug / tweak / follow-up that fits an existing feature takes the SHORT path (`triage → add-task → impl → deliver`), never a from-scratch Scope→Architect walk. A Closed feature + a new ask is never `goal: done` — and where that change lands (reopen vs new feature) is the **operator's** decision: propose both, never pick silently.
 - **Closure = footer AND gates, published as the `goal:` line every turn.** `said closed: yes` (⇔ `goal: done`) ONLY when the tasks log has a `## Debrief close` footer AND every gate passed (or a recorded, operator-confirmed skip). Emit the Output contract — the `goal:` line especially — on every invocation, including `status` mode and a no-action turn.
 - **Contradict a premature "done".** Never write "done"/"closed"/"nothing left" while the block says `no`; if an outer orchestrator declared the work finished and the block says `no`, say so and contradict it.
 - **Loop, not one-shot.** While the `goal:` line reads `continue`, the only correct next action is to re-invoke `/said:said <feature-id>` — never tick a step done or move on.
@@ -37,8 +37,8 @@ Every invocation ends with this block. No exceptions — including `status` mode
 
 ```
 feature: <id>
-phase: <Scope|Architect|Implement|Gates|Closed> — <n> Todo
-gates: review-qa <pass|fail|—> · accept <pass|fail|—> · UAT <passed|pending|n/a>
+phase: <Scope|Architect|Implement|Deliver|Closed> — <n> Todo
+gates: review-qa <pass|fail|—> · review-ux <pass|fail|—> · accept <pass|fail|—> · Eval <passed|pending|n/a>
 said closed: yes|no
 goal: done | continue | stop — <reason>   # /goal reads this line: done|stop end the run, continue = re-invoke
 ```
@@ -47,7 +47,7 @@ goal: done | continue | stop — <reason>   # /goal reads this line: done|stop e
 
 The `goal:` line is the loop oracle — a plain directive (`/goal implement <id> as said!`) drives it, no hand-written condition:
 - `done` = `said closed: yes` (footer present AND gates passed).
-- `stop` = blocked / needs an operator decision — an unconfirmed omission (mandatory stage skipped without a recorded confirmation), a failing gate (`review-qa`/`accept` FAIL), an owed operator decision (e.g. a UAT skip on a UI feature), or a no-progress HALT (Step 5).
+- `stop` = blocked / needs an operator decision — an unconfirmed omission (mandatory stage skipped without a recorded confirmation), a failing gate (`review-qa`/`review-ux`/`accept` FAIL), an owed operator decision (e.g. a UAT skip on a UI feature), or a no-progress HALT (Step 5).
 - `continue` = a phase still has work.
 `done` and `stop` end the `/goal` loop (`stop` hands over the `<reason>`); `continue` re-invokes.
 
@@ -82,13 +82,13 @@ Derive the phase, every time, from the feature's own artifacts (rooted at the fe
 |---|---|
 | **Lane count** (route guard) | Declaration-first: count trees whose `CLAUDE.md` declares a `## Lane` carrying this feature's SAID artifacts; glob fallback `*/docs/features/<feature>*.tasks.md` + `*/docs/working/<feature>/`. **≥ 2 → BLOCK, redirect to `flow!`.** |
 | **Feature-id** | the arg, normalized UPPERCASE; the tasks-file stem minus `.tasks` once one exists |
-| **Phase** | no `scope.md` → **Scope** · `scope.md`, no spec → **Architect** · spec + `Status: Todo` > 0 → **Implement** · spec, `Todo == 0`, **no** `## Debrief close` footer → **Gates** · footer present → **Closed** |
+| **Phase** | no `scope.md` → **Scope** · `scope.md`, no spec → **Architect** · spec + `Status: Todo` > 0 → **Implement** · spec, `Todo == 0`, **no** `## Debrief close` footer → **Deliver** · footer present → **Closed** |
 | **Work remaining** | count `Status: Todo` in `docs/features/<id>.tasks.md` (bare or slug-suffixed) |
-| **Gate results** | `review-qa` / `accept` verdicts recorded in the tasks log / QA checklist for this feature; `—` if that gate hasn't run |
-| **UAT** | `passed` when the feature's UAT result artifact (`*QA-UAT*.md` / `*uat*.md`) carries a pass verdict · `n/a` when scope declares no user-visible surface (Developer-Story) · else `pending` |
-| **Closure** | the `## Debrief close` footer in the tasks log — the single Gates→Closed transition |
+| **Gate results** | `review-qa` / `review-ux` / `accept` verdicts recorded in the tasks log / QA checklist for this feature; `—` if that gate hasn't run |
+| **Eval** | `passed` when the feature's Eval result artifact (`*QA-UAT*.md` / `*QA-eval*.md` / `*evaluation*.md`) carries a pass verdict · `n/a` when scope declares no user-visible surface (Developer-Story) · else `pending` |
+| **Closure** | the `## Debrief close` footer in the tasks log — the single Deliver→Closed transition |
 
-> **`Todo == 0` is ambiguous — never key an action on it alone.** A feature never architected looks identical to one that finished. Always pair the count with the phase: **Scope** and **Architect** have work; **Gates** does not.
+> **`Todo == 0` is ambiguous — never key an action on it alone.** A feature never architected looks identical to one that finished. Always pair the count with the phase: **Scope** and **Architect** have work; **Deliver** does not.
 
 **Report probe results literally** — actual output, not a summary — so a later invocation or a compaction resume can reproduce the reconstruction. If two probes disagree, trust the **artifact** and say so.
 
@@ -101,7 +101,7 @@ SAID cycle for <id> — resolved from the map:
   [ ] Scope      → /said:scope-refine (handoff) | /said:scope-grill (thin idea)
   [ ] Architect  → /said:architect
   [ ] Implement  → /said:impl (+ /said:review-ux per web task)
-  [ ] Gates      → /said:review-qa → /said:accept → /said:debrief
+  [ ] Deliver    → /said:review-qa → /said:review-ux → /said:accept → /said:debrief
 ```
 
 **Interactive default: confirm the checklist before proceeding.** Under `/goal` / `auror!` / `expelliarmus` this relaxes to report-and-proceed (no wait) — but every stage and gate still runs.
@@ -115,12 +115,12 @@ Deterministic: the same reconstructed phase always yields the same entry. **Neve
 | **Scope** | `/said:scope-refine <handoff>` — a discovery handoff/branch state is the input. `/said:scope-grill` only for a genuinely thin idea. → produces `scope.md` (§D resolved). |
 | **Architect** | `/said:architect <scope-path>` → produces the spec + `*.tasks.md`. |
 | **Implement** | `/said:impl <feature-id>` (whole-feature mode). On a web/UI task, compose `/said:review-ux` at task close. Adapt or skip the UX gate on non-web — recorded, never silent. |
-| **Gates** | `/said:review-qa <id>` → (FAIL → `goal: stop`) → `/said:accept <id>` → (FAIL → `goal: stop`) → **UAT** (below) → `/said:debrief <id>` through Phase C. The `## Debrief close` footer is the Gates→Closed transition. |
+| **Deliver** | `/said:review-qa <id>` → (FAIL → `goal: stop`) → `/said:review-ux <id>` (if present) → (FAIL → `goal: stop`) → `/said:accept <id>` → (FAIL → `goal: stop`) → **Eval** (below) → `/said:debrief <id>` through Phase C. The `## Debrief close` footer is the Deliver→Closed transition. |
 | **Closed** | no in-flight work → `said closed: yes` → `goal: done`. **A new ask on a Closed feature is a Step-0 SHORT/NEW, not `done`.** |
 
 **Change front door (Step-0 SHORT / TINY).** `said:triage <what>` (skip if the location is named) → `said:add-task <owning-feat> [bug]`. `add-task` creates the `Todo`, so Step 1 then reconstructs **Implement** and the table above drives it — **Scope + Architect skipped**. If the owning feature is **Closed**, do not take this door on your own: **ask first (Step 0)** — the operator picks reopen (`add-task`, reopens `Todo>0`; `debrief` re-appends a close) vs a new small feature.
 
-**UAT at Gates.** For a feature with a user-visible surface, run the e2e/UAT (Playwright MCP where available) before `debrief` and record a real verdict into the UAT artifact — failures as failures, never "not run". `n/a` for a Developer-Story with no UI. An operator-confirmed **skip** is allowed only on explicit word, written as `skipped(recorded)`; under an autonomy macro that skip is a **hard blocker** (`goal: stop`) — the one wait autonomy cannot self-approve. Tooling unavailable → do not fabricate a pass; emit `UAT pending` → `goal: stop` naming the exact run owed.
+**Eval at Deliver.** For a feature with a user-visible surface, run the UAT/eval/e2e (Playwright MCP where available) before `debrief` and record a real verdict into the eval artifact — failures as failures, never "not run". `n/a` for a Developer-Story with no UI. An operator-confirmed **skip** is allowed only on explicit word, written as `skipped(recorded)`; under an autonomy macro that skip is a **hard blocker** (`goal: stop`) — the one wait autonomy cannot self-approve. Tooling unavailable → do not fabricate a pass; emit `UAT pending` → `goal: stop` naming the exact run owed.
 
 **Omission is never silent.** A mandatory stage skipped or deferred without an explicit, recorded operator confirmation → **withhold `said closed: yes` and emit `goal: stop — unconfirmed omission: <stage>`**. Never present a mandatory stage as an optional offer ("if you want…"). Under autonomy this is the one wait that cannot be dropped — it forces the confirmation.
 

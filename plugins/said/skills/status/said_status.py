@@ -2,7 +2,7 @@
 """said_status.py — deterministic SAID feature-state analyzer.
 
 Read-only. Reconstructs every feature's position in the SAID phase chain
-(Scope -> Architect -> Implement -> Delivery -> Closed) by INSPECTING on-disk
+(Scope -> Architect -> Implement -> Deliver -> Closed) by INSPECTING on-disk
 artifacts, and emits either JSON (a stable data interface) or a rendered
 terminal roster / single-feature deep-dive. Stores nothing.
 
@@ -31,8 +31,8 @@ FOOTER_RE = re.compile(r"^##\s+Debrief close\b", re.I)
 IDDIR_RE = re.compile(r"^([A-Z]+)-(\d+)$")
 
 # attention-first ordering; staleness thresholds (days idle) per phase
-PHASE_RANK = {"Implement": 0, "Delivery": 1, "Architect": 2, "Scope": 3, "Closed": 4}
-STALE_DEFAULT = {"Implement": 7, "Delivery": 7, "Architect": 14, "Scope": 14}
+PHASE_RANK = {"Implement": 0, "Deliver": 1, "Architect": 2, "Scope": 3, "Closed": 4}
+STALE_DEFAULT = {"Implement": 7, "Deliver": 7, "Architect": 14, "Scope": 14}
 
 GLYPH = {"done": "█", "empty": "░", "none": "·",
          "ok": "✓", "pending": "○", "warn": "⚠", "block": "⛔"}
@@ -197,7 +197,7 @@ def classify(has_spec, has_tasks, todo, footer, has_scope, dir_has_content):
     if footer:
         return "Closed", None
     if has_tasks and todo == 0:
-        return "Delivery", None
+        return "Deliver", None
     if has_tasks and todo > 0:
         return "Implement", None
     if has_scope or has_spec:
@@ -227,7 +227,7 @@ def next_action(fid, phase, workdir, gates, sub):
         return "/said:architect %s" % os.path.join(workdir, "scope.md")
     if phase == "Implement":
         return "/said:impl %s" % fid
-    if phase == "Delivery":
+    if phase == "Deliver":
         if not gates["qa"]:
             return "/said:review-qa %s" % fid
         if not gates["accept"]:
@@ -548,7 +548,7 @@ def render_roster(data, stale_only=False):
 
 
 def _feature_block(f, lane_label=None):
-    seq = ["Scope", "Architect", "Implement", "Delivery", "Closed"]
+    seq = ["Scope", "Architect", "Implement", "Deliver", "Closed"]
     cur = f["phase"]
     ci = seq.index(cur) if cur in seq else -1
     pipe = []

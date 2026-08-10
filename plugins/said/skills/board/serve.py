@@ -38,7 +38,7 @@ except Exception as exc:  # pragma: no cover
 
 ID_RE = re.compile(r"^[A-Za-z]+-\d+(?:-[A-Za-z0-9]+)*$")
 CFG = {}
-PHASE_SEQ = ["Scope", "Architect", "Implement", "Delivery", "Closed"]
+PHASE_SEQ = ["Scope", "Architect", "Implement", "Deliver", "Closed"]
 
 # --- CDN (pinned) ------------------------------------------------------------
 HTMX = "https://unpkg.com/htmx.org@2.0.3"

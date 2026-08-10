@@ -2,6 +2,10 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.3.4] — 2026-08-09
+Unified phases names - "Gates"/"Delivery" -> "Deliver" across all skills
+Unified gates - added "review-ux" next to "review-qa"
+
 ## [0.3.3] — 2026-08-09
 
 **Added — `said:said`.** Single-feature SAID orchestrator: drives ONE feature through the full phase
