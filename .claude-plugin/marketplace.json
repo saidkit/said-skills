@@ -5,7 +5,7 @@
     "url": "https://saidkit.dev"
   },
   "metadata": {
-    "description": "SAIDkit (saidkit.dev) - Software AI Delivery methodology for Claude Code. Stack-agnostic context engine; pair it with a per-stack starter.",
+    "description": "SAIDkit (saidkit.dev) - Structured AI Delivery methodology for Claude Code. Stack-agnostic context engine; pair it with a per-stack starter.",
     "version": "0.3.4"
   },
   "plugins": [
