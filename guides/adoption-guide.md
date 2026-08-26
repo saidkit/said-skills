@@ -71,15 +71,15 @@ Add a section your skills can read. Minimum contents:
 
 That table is the contract. The skills resolve every `<ADR-ID>` / `<RULE-LABEL>` / command through it.
 
-## Step 4 — (Web projects) confirm the UX-gate prerequisites
+## Step 4 — confirm the UX-gate prerequisites for your `surface-type`
 
-`said:review-ux` runs Playwright-driven visual parity and curl wire-probes. For those tasks to pass, ensure:
+`said:review-ux` branches on the lane's `surface-type` (see the engine README). For a **`visual`** surface it runs Playwright-driven visual parity + curl wire-probes; for those tasks to pass, ensure:
 
 - a running dev server URL the task ships to,
 - a **seeded reference fixture** (visual-parity walks fail against an empty/404 backend — provision seed data first),
 - a way to mint a dev auth token if your app is gated (document the recipe in your binding section).
 
-Server/CLI/library projects: skip this step and run the spine without the UX gate.
+For an **`api` / `mcp` / `cli`** surface the gate runs schema / contract / invocation checks instead — no browser or seeded visual fixture needed; provide whatever its `docs/qa` `verify:` actions call for (a reachable endpoint, a schema, a built binary). Non-visual lanes run the gate in their surface's check-mode — they do **not** skip it.
 
 ## Step 5 — Smoke-test
 

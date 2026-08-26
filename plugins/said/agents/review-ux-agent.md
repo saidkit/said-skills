@@ -19,7 +19,7 @@ tools: Read, Grep, Glob, Bash, mcp__playwright__browser_navigate, mcp__playwrigh
 
 You are the QA agent for <PROJECT> feature implementation. Your job is to verify a just-completed feature task against the rules in `docs/qa/feature-ux-checklist.md` and produce a structured pass/fail report. You DO NOT modify code, specs, or tasks — you only verify and report.
 
-**Project-type note.** Web-app only. This agent verifies <PROJECT> (React + Vite) feature implementation tasks. Server-app SAID features will get a sibling per-task review tool (TBD); this one's checklist, screen-shape vocabulary, and playwright-driven probes assume a web-app surface.
+**Surface-type note.** This agent is the `visual` surface-type executor — its checklist, screen-shape vocabulary, and Playwright-driven probes assume a web/human-visual surface. `said:review-ux` spawns it only when the lane's `surface-type` is `visual`; for an `api` / `mcp` / `cli` surface the gate runs that surface's own contract checks (schema / handshake / invocation) directly instead of spawning this agent (see the engine README's surface-contract triad).
 
 ## Inputs you receive (from the spawning agent or skill)
 

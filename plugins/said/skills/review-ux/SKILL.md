@@ -9,7 +9,7 @@ description: >
 
 Run the `said:review-ux-agent` agent on a just-completed feature task, **before** the task is closed in the FEATURE.tasks.md log file. The QA agent reads `docs/qa/feature-ux-checklist.md`, filters rules by screen shape, runs each `verify:` action, and returns a structured report.
 
-**Project-type note.** Web-app only. This skill gates UX verification for <PROJECT> (React + Vite) feature work; server-app SAID features will have a sibling review tool (TBD).
+**Surface-type branch.** This gate reads the lane's `surface-type` (declared in the project binding; see the engine README) and picks its check-mode from it. `visual` (the default when `docs/ux/` is present) → spawn the Playwright-driven `said:review-ux-agent` for screen-shape + visual parity, as detailed below. `api` / `mcp` / `cli` → run the lane's `docs/qa` checklist `verify:` actions in that surface's mode — schema conformance / contract-tests / curl for an API, handshake + schema probes for an MCP tool, invocation + output assertions for a CLI — instead of a browser walk; the agent's screen-shape + Playwright steps below do not apply. The load-bearing rule: `surface-type`, not a hardcoded browser assumption, decides Playwright vs schema/contract checks — so an `api` lane is never reported "env-blocked" for lacking a dev server it never needed. The procedure below (Steps 1–4) is the **`visual`** arm; the non-visual path above is intentionally thin here (config, not a second heavy procedure) and thickens as surface-contract checklists land.
 
 ## When this fires
 

@@ -22,9 +22,9 @@ UI stacks additionally provide:
 | --------------------------------- | ---------------------------------------------- | ---------------------------------------- |
 | `docs/qa/feature-ux-checklist.md` | UX-gate rules + the gate/wire label convention | `said:review-ux`, `said:review-ux-agent` |
 | `docs/ux/`                        | interaction / spec rules                       | `said:architect`, `said:review-ux`       |
-| `docs/screens/` (optional)        | per-screen spec template                       | `said:uxgen`                             |
+| `docs/screens/` (optional)        | per-screen spec template (author by hand)      | `said:uxtoc` (seed / inspect)            |
 
-Server / CLI / library starters omit the UX pieces and run the spine (Scope → Architect → Implement → Debrief) without the UX gate.
+Server / CLI / library starters omit the **visual** UX pieces (`docs/ux/`, the visual checklist) and set their lane's `surface-type` to a non-visual value — `said:review-ux` then gates against that surface's contract (schema / handshake / invocation) instead of a browser walk. A lane that ships no evaluable surface contract runs the spine (Scope → Architect → Implement → Debrief) alone.
 
 ## Starters
 

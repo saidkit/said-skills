@@ -23,7 +23,7 @@ A feature spec is a **recreation contract**. A fresh implementer reading the spe
 
 This principle drives every authoring decision in Pass 2. If a paragraph describes HOW (file paths, function signatures, sequencing, folder-tree diagrams, past-tense work-log), it doesn't serve recreation and belongs in the tasks file by construction.
 
-**Project-type duality.** Web-app projects (`docs/ux/` exists) get UI/UX Requirements + visual parity per piece; server-app projects drop UI/UX and expand API Integration. Auto-detected in Step 0 or overridden via `project-type=` flag.
+**Surface-type duality.** The design step authors each piece's requirements against the lane's surface — a binary the skill detects from `docs/ux/`: a **`visual`** surface (`docs/ux/` present; `project-type=web`) gets UI/UX Requirements + visual parity per piece; a **non-visual** surface (`project-type=server` — an `api` / `mcp` / `cli` lane) drops UI/UX and expands API Integration against that surface's contract. `surface-type ∈ {visual, api, mcp, cli}` (see the engine README) is the finer per-lane parameter this generalizes toward; until a lane declares it, `project-type=web|server` (Step 0 or the flag) is the switch — `web ≡ visual`, `server ≡ non-visual`.
 
 ## When this fires
 
