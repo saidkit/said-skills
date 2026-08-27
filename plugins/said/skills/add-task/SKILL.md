@@ -86,7 +86,7 @@ Resolve inputs and ground in existing context:
    | Bespoke layout | + `docs/ux/form-custom.md` |
    | Data-layer-only | `docs/ux/errors.md` only |
 
-   Read in parallel; extract applicable frozen-rule anchors (rule numbers only, no verbatim paraphrase). Non-visual surfaces: fall back to `docs/ux/evaluation.md` filtered by `applies-to`.
+   Read in parallel; extract applicable frozen-rule anchors (rule numbers only, no verbatim paraphrase). Non-visual surfaces: fall back to `docs/ux/feature-ux-checklist.md` filtered by `applies-to`.
 
 ## Step 1 — Single-batch interactive Q&A
 

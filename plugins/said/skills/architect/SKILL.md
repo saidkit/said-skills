@@ -23,7 +23,7 @@ A feature spec is a **recreation contract**. A fresh implementer reading the spe
 
 This principle drives every authoring decision in Pass 2. If a paragraph describes HOW (file paths, function signatures, sequencing, folder-tree diagrams, past-tense work-log), it doesn't serve recreation and belongs in the tasks file by construction.
 
-**Surface-type duality.** The design step reads the lane's declared `surface-type ∈ {visual, api, mcp, cli}` (from the project binding; see the engine README) and authors each piece's requirements against that surface: a **`visual`** lane gets UI/UX Requirements + visual parity per piece; an **`api` / `mcp` / `cli`** lane drops UI/UX and expands API Integration against its surface's contract.
+**Surface-type duality.** The design step reads `SAID.surface-type:` (`visual | api | mcp | cli`, from the `## Lane` block; see the engine README) and authors each piece's requirements against that surface: a **`visual`** lane gets UI/UX Requirements + visual parity per piece; an **`api` / `mcp` / `cli`** lane drops UI/UX and expands API Integration against its surface's contract.
 
 ## When this fires
 
@@ -47,7 +47,7 @@ Resolve inputs and ground in calibration sources before the operator interaction
    - Path given as arg → verify with `ls <path>`. If missing, BLOCK and ask operator.
    - No path given → list `docs/working/*/scope.md`; if exactly one, use it; if multiple or zero, ASK the operator which feature.
 2. **Verify §D empty.** Read scope.md, locate `## §D`, confirm it's empty (or every item explicitly marked "defer to Phase 2 (Architect)" with reasoning). Otherwise BLOCK.
-3. **Resolve surface-type.** Read the lane's declared `surface-type` from the `## Lane` block (`visual | api | mcp | cli`; last-resort `visual`). Not inferred from `docs/ux` presence — `docs/ux` is universal.
+3. **Resolve surface-type.** Read `SAID.surface-type:` from the `## Lane` block (`visual | api | mcp | cli`; last-resort `visual`). Not inferred from `docs/ux` presence — `docs/ux` is universal.
 4. **Derive feature name.** Take the leaf segment of the working dir (`docs/working/<feature>/scope.md` → `<feature>`). Confirm with operator only if ambiguous.
 5. **Resolve output paths.**
    - Default spec: `docs/features/<feature>.md`. Default tasks: `docs/features/<feature>.tasks.md`.
@@ -285,7 +285,7 @@ Procedure:
    | Bespoke layout | + `docs/ux/form-custom.md` |
    | Data-layer-only | `docs/ux/errors.md` only |
 
-   Non-visual surfaces: fall back to `docs/ux/evaluation.md` filtered by `applies-to`.
+   Non-visual surfaces: fall back to `docs/ux/feature-ux-checklist.md` filtered by `applies-to`.
 
 7. **Read source UX specs in parallel; extract applicable frozen rules.** For each resolved spec, read in full and pull every numbered/anchored frozen-rule entry (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`, `<RULE-LABEL>`). Capture: rule number / verbatim one-line summary / source anchor. This list IS the per-task acceptance gate that step 8 pastes into the Frozen rules section.
 

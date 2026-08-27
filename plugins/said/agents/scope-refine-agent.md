@@ -88,7 +88,7 @@ Issue all reads in one assistant message (parallel tool calls):
 - `docs/conventions.md`.
 - `docs/features/template.md`.
 - `docs/features/template-tasks.md`.
-- `docs/ux/evaluation.md` (full).
+- `docs/ux/feature-ux-checklist.md` (full).
 - `docs/adr/README.md`, then every ADR the handoff names or the work
   touches.
 - Every UX spec under `docs/ux/` the work touches.

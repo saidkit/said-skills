@@ -69,7 +69,7 @@ Never read a state file. Derive everything, every time.
 
 | Fact | Probe |
 |---|---|
-| Lanes involved | **Declaration first:** read each candidate tree's `CLAUDE.md` for a `## Lane` block and take its declared docs root, task-log path, working dir, task-id shape and ADR prefix verbatim. **Fallback:** where no block exists, glob `*/docs/features/<feature>*.tasks.md` and `*/docs/working/<feature>/`. A repo root's `CLAUDE.md` may carry a lane registry naming where each lane starts — enumerate from it when present |
+| Lanes involved | **Declaration first:** read each candidate tree's `CLAUDE.md` `## Lane` block and take its `SAID.docs-root:` / `SAID.task-log:` / `SAID.working:` / `SAID.id-shape:` / `SAID.adr-prefix:` keys verbatim. **Fallback:** where no block exists, glob `*/docs/features/<feature>*.tasks.md` and `*/docs/working/<feature>/`. A repo root's `CLAUDE.md` may carry a lane registry naming where each lane starts — enumerate from it when present |
 | **Feature-id per lane** | the matched `*.tasks.md` filename stem minus `.tasks` — e.g. `PROJ-01` (front), `PROJ-01-BE` (server), `PROJ-02-BE-widgets`. **Record it. Every later invocation targeting that lane uses the lane's own id, never the umbrella id.** A lane's suffix is what makes its id globally unique; assuming the umbrella id silently addresses the wrong lane's log |
 | Lane phase | no `scope.md` → **Scope** · scope, no spec → **Architect** · spec+tasks, `Status: Todo` > 0 → **Implement** · spec+tasks, Todo == 0, no `## Debrief close` footer in the tasks log → **Deliver** (a `debrief.md` may already exist mid-debrief — it is written at debrief Phase A, before the footer; `debrief.md` presence alone is NOT `Closed`) · `## Debrief close` footer present **and no open inbound crossing addressed to the lane** → **Closed** |
 | Work remaining | count `Status: Todo` in that lane's `*.tasks.md` |
@@ -151,7 +151,7 @@ Rules 1–3 are **non-blocking** — act, then keep evaluating in the same turn.
 
 Entering a lane — by fork, rotation, or because it is already loaded — the phase determines which skill starts it. **Never guess, never hand-roll the phase's work.**
 
-**Invoke every lane skill from that lane's own docs root** (the docs root recorded in Step 1 from its `## Lane` block) — `cd` into it or pass lane-rooted paths. `impl` / `review-qa` / `review-ux` / `accept` / `debrief` resolve `docs/features/<id>` from the current working directory and take no path argument, so an invocation from the umbrella root (or another lane's root) resolves against the wrong tree — silently the wrong lane's files, or none.
+**Invoke every lane skill from that lane's own docs root** (the `SAID.docs-root:` recorded in Step 1 from its `## Lane` block) — `cd` into it or pass lane-rooted paths. `impl` / `review-qa` / `review-ux` / `accept` / `debrief` resolve `docs/features/<id>` from the current working directory and take no path argument, so an invocation from the umbrella root (or another lane's root) resolves against the wrong tree — silently the wrong lane's files, or none.
 
 | Lane phase | Entry point |
 |---|---|

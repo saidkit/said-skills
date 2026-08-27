@@ -115,7 +115,7 @@ Deterministic: the same reconstructed phase always yields the same entry. **Neve
 |---|---|
 | **Scope** | `/said:scope-refine <handoff>` — a discovery handoff/branch state is the input. `/said:scope-grill` only for a genuinely thin idea. → produces `scope.md` (§D resolved). |
 | **Architect** | `/said:architect <scope-path>` → produces the spec + `*.tasks.md`. |
-| **Implement** | `/said:impl <feature-id>` (whole-feature mode). Compose `/said:review-ux` at task close; it branches on the lane's `surface-type` — Playwright walk for `visual`, schema/contract/invocation checks for `api`/`mcp`/`cli`. A genuine no-surface-contract skip is recorded, never silent. |
+| **Implement** | `/said:impl <feature-id>` (whole-feature mode). Compose `/said:review-ux` at task close; it branches on `SAID.surface-type:` — Playwright walk for `visual`, schema/contract/invocation checks for `api`/`mcp`/`cli`. A genuine no-surface-contract skip is recorded, never silent. |
 | **Deliver** | `/said:review-qa <id>` → (FAIL → `goal: stop`) → `/said:review-ux <id>` (if present) → (FAIL → `goal: stop`) → `/said:accept <id>` → (FAIL → `goal: stop`) → **Eval** (below) → `/said:debrief <id>` through Phase C. The `## Debrief close` footer is the Deliver→Closed transition. |
 | **Closed** | no in-flight work → `said closed: yes` → `goal: done`. **A new ask on a Closed feature is a Step-0 SHORT/NEW, not `done`.** |
 

@@ -32,10 +32,10 @@ Never hardcode paths or id shapes. Resolve in this order, and state what resolve
 
 | Fact | Declaration (first) | Fallback (second) |
 |---|---|---|
-| Docs root · working root | repo `CLAUDE.md` SAID doc paths / a `## Lane` block's declared roots | `docs/features/` and `docs/working/` |
+| Docs root · working root | a `## Lane` block's `SAID.docs-root:` + `SAID.working:` keys | `docs/features/` and `docs/working/` |
 | Issued id-prefixes | `CLAUDE.md` (e.g. *"issues `PROJ-NN` only"*) | stems of `<docs>/features/*.md` |
 | Id shape | `CLAUDE.md` / `template-tasks.md` (`<PREFIX>-<NN>`, sub-phase `-<slug>`, multi-target `-<APP>-<NN>`) | regex `[A-Z]+-[0-9]+` |
-| Lanes | `## Lane` blocks / a repo-root lane registry | single lane |
+| Lanes | `## Lane` blocks (`SAID.lanes:` registry when multi-lane) | single lane |
 
 **Enumerate the registry as a union** (dedup by feature-id) — a spec-only list hides the states an operator most needs to see (scoped-but-unarchitected, reserved-but-empty). Include:
 

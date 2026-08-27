@@ -57,7 +57,7 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
    - Task-mode: the named task must be `Status: Done (YYYY-MM-DD)`. Otherwise BLOCK + redirect to `/said:impl`.
    - Feature-mode: any task with `Status: Todo` / `Status: In progress` → BLOCK with list; operator confirms in-scope-vs-out-of-scope or closes first. (Backlog passes — intentional non-gating per SAID convention; matches `/said:debrief` preflight.)
 3. **Resolve project quality-gate commands.** Same chain as `/said:impl` Step 0 #8 (first-match wins):
-   - **Primary** — `CLAUDE.md` § Development Commands table: identify umbrella target (`pre-commit`, `qa`, `check`, `all`).
+   - **Primary** — the `## Lane` `SAID.commands:` key (in `CLAUDE.md`): the umbrella target (`pre-commit`, `qa`, `check`, `all`).
    - **Secondary** — if `Makefile` present: prefer `make pre-commit`; fall back to `make qa` / `check` / `all`.
    - **Tertiary** — if `package.json` present (JS/TS only): scripts named `pre-commit` / `qa` / `check` / `validate`; invoke via `npm run` or `bun run` per lockfile.
    - **Quaternary** — operator-prompt: "What's this project's full quality-gate command + per-step typecheck / test / lint commands?" Cache for session.
@@ -66,7 +66,7 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
    - `<quality-gates-umbrella>` — full chain (e.g., `make pre-commit`).
    - `<typecheck>`, `<tests>`, `<lint>` — per-gate fallback if no umbrella resolves.
 
-4. **Read `docs/qa/feature-qa-checklist.md`** — the non-UX QA contract (companion to `docs/ux/evaluation.md`). Parse every rule entry's 5 fields (`id`, `source`, `applies-to`, `summary`, `verify`). The rule set the skill executes composes from three triggers (union) per Phase A: `applies-to: any` always-on + screen-shape filter (when known) + Refs-cite-driven match. Rules with no matching trigger are skipped; rules without `verify:` content surface as WARN.
+4. **Read `docs/qa/feature-qa-checklist.md`** — the non-UX QA contract (companion to `docs/ux/feature-ux-checklist.md`). Parse every rule entry's 5 fields (`id`, `source`, `applies-to`, `summary`, `verify`). The rule set the skill executes composes from three triggers (union) per Phase A: `applies-to: any` always-on + screen-shape filter (when known) + Refs-cite-driven match. Rules with no matching trigger are skipped; rules without `verify:` content surface as WARN.
 
 ## Phase A — Resolve plan (STOP for operator review)
 
@@ -183,7 +183,7 @@ Gate effect for `/said:debrief`:
 - **Don't run partial quality gates in task-mode.** Q4=a — full umbrella always. Partial gating risks missing cross-cutting regressions; the cost is acceptable.
 - **Don't strict-equal gate test counts.** Q1=b — `actual ≥ claim` is correct. Test growth is expected; deletion shows up elsewhere (failed lint, removed test files visible in diff).
 - **Don't grow `docs/qa/feature-qa-checklist.md` from the skill side.** Project owns its rule corpus; skill reads. Operator adds entries as patterns earn their place per the earn-its-place-ADR. Skill stays rule-agnostic.
-- **Don't run UX rules.** UX rules (`<RULE-LABEL>`, `<RULE-LABEL>`, `<RULE-LABEL>`, `<RULE-LABEL>`) live in `docs/ux/evaluation.md` and are owned by `/said:review-ux` (Phase 3 task-close gate). This skill reads `feature-qa-checklist.md` only. Strict file-content split.
+- **Don't run UX rules.** UX rules (`<RULE-LABEL>`, `<RULE-LABEL>`, `<RULE-LABEL>`, `<RULE-LABEL>`) live in `docs/ux/feature-ux-checklist.md` and are owned by `/said:review-ux` (Phase 3 task-close gate). This skill reads `feature-qa-checklist.md` only. Strict file-content split.
 - **Don't extract task-IDs from prose.** Require explicit input.
 
 ## Anchors

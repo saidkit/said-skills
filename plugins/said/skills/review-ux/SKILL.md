@@ -2,14 +2,14 @@
 name: review-ux
 description: >
   SAID/Phase 3 (Implement) per-task UX verification gate for <PROJECT> feature work.
-  Spawns the `said:review-ux-agent` agent against `docs/ux/evaluation.md` with the task's screen-shape and changed-file context, returning a structured pass/fail report. Triggered ONLY by the explicit command "/said:review-ux". Do NOT trigger on general review / verify / check requests — only the exact command "/said:review-ux" activates this skill.
+  Spawns the `said:review-ux-agent` agent against `docs/ux/feature-ux-checklist.md` with the task's screen-shape and changed-file context, returning a structured pass/fail report. Triggered ONLY by the explicit command "/said:review-ux". Do NOT trigger on general review / verify / check requests — only the exact command "/said:review-ux" activates this skill.
 ---
 
 # Feature Review UX — Phase 3 (Implement) per-task Verification Gate
 
-Run the `said:review-ux-agent` agent on a just-completed feature task, **before** the task is closed in the FEATURE.tasks.md log file. The QA agent reads `docs/ux/evaluation.md`, filters rules by screen shape, runs each `verify:` action, and returns a structured report.
+Run the `said:review-ux-agent` agent on a just-completed feature task, **before** the task is closed in the FEATURE.tasks.md log file. The QA agent reads `docs/ux/feature-ux-checklist.md`, filters rules by screen shape, runs each `verify:` action, and returns a structured report.
 
-**Surface-type branch.** This gate reads the lane's `surface-type` (declared in the project binding; see the engine README) and picks its check-mode from it. `visual` → spawn the Playwright-driven `said:review-ux-agent` for screen-shape + visual parity, as detailed below. `api` / `mcp` / `cli` → run the surface's `docs/ux/evaluation.md` checklist `verify:` actions in that surface's mode — schema conformance / contract-tests / curl for an API, handshake + schema probes for an MCP tool, invocation + output assertions for a CLI — instead of a browser walk; the agent's screen-shape + Playwright steps below do not apply. The load-bearing rule: `surface-type`, not a hardcoded browser assumption, decides Playwright vs schema/contract checks — so an `api` lane is never reported "env-blocked" for lacking a dev server it never needed. The procedure below (Steps 1–4) is the **`visual`** arm; the non-visual path above is intentionally thin here (config, not a second heavy procedure) and thickens as surface-contract checklists land.
+**Surface-type branch.** This gate reads `SAID.surface-type:` (from the `## Lane` block; see the engine README) and picks its check-mode from it. `visual` → spawn the Playwright-driven `said:review-ux-agent` for screen-shape + visual parity, as detailed below. `api` / `mcp` / `cli` → run the surface's `docs/ux/feature-ux-checklist.md` checklist `verify:` actions in that surface's mode — schema conformance / contract-tests / curl for an API, handshake + schema probes for an MCP tool, invocation + output assertions for a CLI — instead of a browser walk; the agent's screen-shape + Playwright steps below do not apply. The load-bearing rule: `surface-type`, not a hardcoded browser assumption, decides Playwright vs schema/contract checks — so an `api` lane is never reported "env-blocked" for lacking a dev server it never needed. The procedure below (Steps 1–4) is the **`visual`** arm; the non-visual path above is intentionally thin here (config, not a second heavy procedure) and thickens as surface-contract checklists land.
 
 ## When this fires
 
@@ -52,7 +52,7 @@ Run all four sub-steps in parallel (one assistant message, four Bash tool calls)
    fi
    ```
 
-2. **Run quality gates in parallel; capture exit codes to `/tmp/qa-gates.json`.** All four gate commands run as background jobs; the skill waits for all and writes the consolidated result. ~20s wall-clock for the slowest gate (typecheck) — fully overlapped with the JWT mint and other pre-stage work. Resolve each concrete gate command (typecheck / test / lint / knip) at runtime via the same chain as `/said:review-qa` Step 0 (`CLAUDE.md` Development-Commands → `Makefile` → `package.json` scripts, per lockfile → ask operator); the `<gate-cmd>` tokens below stand in for those resolved commands.
+2. **Run quality gates in parallel; capture exit codes to `/tmp/qa-gates.json`.** All four gate commands run as background jobs; the skill waits for all and writes the consolidated result. ~20s wall-clock for the slowest gate (typecheck) — fully overlapped with the JWT mint and other pre-stage work. Resolve each concrete gate command (typecheck / test / lint / knip) at runtime via the same chain as `/said:review-qa` Step 0 (`SAID.commands:` → `Makefile` → `package.json` scripts, per lockfile → ask operator); the `<gate-cmd>` tokens below stand in for those resolved commands.
 
    ```bash
    cd <feature-path>
@@ -74,7 +74,7 @@ Run all four sub-steps in parallel (one assistant message, four Bash tool calls)
 3. **Capture checklist git-sha to `/tmp/qa-checklist-sha.txt`.**
 
    ```bash
-   git -C $(git rev-parse --show-toplevel) log -1 --format=%h docs/ux/evaluation.md > /tmp/qa-checklist-sha.txt
+   git -C $(git rev-parse --show-toplevel) log -1 --format=%h docs/ux/feature-ux-checklist.md > /tmp/qa-checklist-sha.txt
    ```
 
 4. **Build skip list from task evidence to `/tmp/qa-skip.txt`.** Read the task's entry in `docs/features/{FEATURE}.tasks.md` for the `### Fix` block. If the entry explicitly cites quality-gate exit codes ("tests N → M pass", "typecheck clean", "knip no new regressions"), append `R-GATE-TYPECHECK` / `R-GATE-TESTS` / `R-GATE-LINT` / `R-GATE-KNIP` to the skip list as appropriate. The agent will record these as PASS with evidence "pre-cleared by skill from task entry" without re-checking. This list is conservative — only skip rules whose evidence is unambiguous in the task entry.
@@ -98,7 +98,7 @@ Spawn `said:review-ux-agent` (which now runs on Sonnet by default — ~2× faste
 Example prompt to the agent:
 
 ```
-Run feature QA against docs/ux/evaluation.md for this task.
+Run feature QA against docs/ux/feature-ux-checklist.md for this task.
 
 - task-id: <task-id>
 - entity: <entity-name>

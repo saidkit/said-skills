@@ -14,7 +14,7 @@ A starter is its own cloneable git repo (e.g. a GitHub template) that a new proj
 | `docs/features/template-tasks.md` | task-log template + discipline                      | `said:architect`, `said:add-task` |
 | `docs/qa/feature-qa-checklist.md` | hygiene-gate rules (your `R-*` labels)              | `said:review-qa`                  |
 | `docs/adr/`                       | ADR templates + seed decisions                      | all phases (`Refs:`)              |
-| `CLAUDE.md` bindings              | Lane, id-shape, surface-type, rules, ADR short map  | all skills                        |
+| `CLAUDE.md` bindings              | a `## Lane` block of `SAID.<axis>:` keys (`SAID.lane` / `docs-root` / `surface-type` / `commands` / …) + rule vocab + ADR short map | all skills |
 
 
 ## Representation contract
@@ -24,7 +24,7 @@ Every surface additionally ships its representation contract — content per `su
 - `docs/ux/`
   - Engine consumer: `said:architect`, `said:review-ux`
   - Purpose: the surface's design rules (screens for `visual`; endpoint / schema / flag rules for non-visual)
-- `docs/ux/evaluation.md`
+- `docs/ux/feature-ux-checklist.md`
   - Engine consumer: `said:review-ux`, `said:review-ux-agent`
   - Purpose: UX-gate checklist (the `docs/ux` rules operationalized into `verify:` predicates) + the gate/wire label convention
 
