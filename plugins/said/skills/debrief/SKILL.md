@@ -45,7 +45,7 @@ After Phase 3 closes (all tasks Done, all quality gates green, operator's manual
 
 ## Step 0 — Preflight
 
-1. Resolve feature paths — declaration-first from the lane's `## Lane` `SAID.feature-spec:` + `SAID.task-log:` + `SAID.working:` keys; the conventional `docs/features/<feature-id>.md` / `.tasks.md` (glob by mtime when absent) + `docs/working/<feature-id>/` are the key-absent fallback. The resolved working root is used for every Phase A/B/C output below. **ADR ids + dir:** resolve the lane's `SAID.adr-prefix:` (the ADR id grammar) + `SAID.docs-root:` (for the `docs/adr/` dir) declaration-first — every promoted / newly-minted ADR id, `Refs:` pointer, and the close-footer migration id binds to `SAID.adr-prefix:`, and the ADR dir resolves under `SAID.docs-root:`; the `ADR-Sxx` / literal `docs/adr/` forms are the key-absent fallback.
+1. Resolve feature paths from `SAID.feature-spec:` + `SAID.task-log:` + `SAID.working:` on the `## Lane` block; no block/key → HALT (operator declares it), never glob-guess. The resolved working root is used for every Phase A/B/C output below. **ADR ids + dir:** from `SAID.adr-prefix:` + `SAID.docs-root:` — every promoted/minted ADR id, `Refs:` pointer, and the close-footer migration id binds to `SAID.adr-prefix:`; the ADR dir resolves under `SAID.docs-root:`.
 2. Read both files in full.
 3. Status check. For each task entry, confirm `Status: Done`. If any open → BLOCK with: "Cannot debrief — N task(s) still open. Close them via `/said:impl <feature-id>` first." List the open IDs.
 4. Sibling check. If spec § Related cites other feature specs, ask operator: "Are these siblings (umbrella, must all close) or successors (post-Debrief)?" BLOCK only if siblings incomplete.

@@ -52,7 +52,7 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 ## Step 0 — Preflight
 
 1. **Resolve mode + inputs:**
-   - **Paths declaration-first:** resolve the lane's `SAID.task-log:` + `SAID.feature-spec:` + `SAID.working:` keys from the `## Lane` block; the `docs/features/<feature-id>.tasks.md` / `.md` + `docs/working/<feature-id>/` conventions below are the key-absent fallback.
+   - **Paths:** resolve `SAID.task-log:` + `SAID.feature-spec:` + `SAID.working:` from the `## Lane` block; no block/key → HALT (operator declares it), never glob-guess.
    - Single arg matching project's task-id regex → task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
    - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) → feature-mode (bare or suffixed per-lane feature-id, e.g. `PROJ-01-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `PROJ-01-FE-07` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
 2. **Status check:**

@@ -16,7 +16,7 @@ Run the `said:review-ux-agent` agent on a just-completed feature task, **before*
 The user invokes one of:
 
 - `/said:review-ux <task-id>` — run QA on the named task.
-- `/said:review-ux` — run QA on the most recently touched task; resolve from the latest entry in the lane's `SAID.task-log:` (from the `## Lane` block; `docs/features/{FEATURE}.tasks.md` is the key-absent fallback).
+- `/said:review-ux` — run QA on the most recently touched task; resolve from the latest entry in `SAID.task-log:` (`## Lane` block; no key → HALT).
 
 ## Step 1: Gather inputs
 
