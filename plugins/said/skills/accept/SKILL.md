@@ -52,7 +52,8 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 ## Step 0 — Preflight
 
 1. **Resolve mode + inputs:**
-   - Single arg matching project's task-id regex (`<FEAT><NN>-<APP>-<NN>` or `<FEAT><NN>-<NN>`) → task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
+   - **Paths declaration-first:** resolve the lane's `SAID.task-log:` + `SAID.feature-spec:` + `SAID.working:` keys from the `## Lane` block; the `docs/features/<feature-id>.tasks.md` / `.md` + `docs/working/<feature-id>/` conventions below are the key-absent fallback.
+   - Single arg matching the project's task-id regex — derived from the lane's `SAID.id-shape:` key (declaration-first, as `flow` / `impl` resolve it; the canonical `<FEAT><NN>-<APP>-<NN>` / `<FEAT><NN>-<NN>` grammar is the key-absent fallback) → task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
    - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) → feature-mode (e.g., `<FEAT>-NN`, or a suffixed per-lane feature-id like `PROJ-01-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `PROJ-01-FE-07` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
    - `--feature-only` flag → feature-mode without task sweep.
 2. **Status check:**

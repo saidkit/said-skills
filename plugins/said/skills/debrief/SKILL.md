@@ -45,7 +45,7 @@ After Phase 3 closes (all tasks Done, all quality gates green, operator's manual
 
 ## Step 0 — Preflight
 
-1. Resolve feature paths. Try `docs/features/<feature-id>.md`; if absent, glob `docs/features/<feature-id>*.md` and pick by mtime. Same for `.tasks.md`.
+1. Resolve feature paths — declaration-first from the lane's `## Lane` `SAID.feature-spec:` + `SAID.task-log:` + `SAID.working:` keys; the conventional `docs/features/<feature-id>.md` / `.tasks.md` (glob by mtime when absent) + `docs/working/<feature-id>/` are the key-absent fallback. The resolved working root is used for every Phase A/B/C output below. **ADR ids + dir:** resolve the lane's `SAID.adr-prefix:` (the ADR id grammar) + `SAID.docs-root:` (for the `docs/adr/` dir) declaration-first — every promoted / newly-minted ADR id, `Refs:` pointer, and the close-footer migration id binds to `SAID.adr-prefix:`, and the ADR dir resolves under `SAID.docs-root:`; the `ADR-Sxx` / literal `docs/adr/` forms are the key-absent fallback.
 2. Read both files in full.
 3. Status check. For each task entry, confirm `Status: Done`. If any open → BLOCK with: "Cannot debrief — N task(s) still open. Close them via `/said:impl <feature-id>` first." List the open IDs.
 4. Sibling check. If spec § Related cites other feature specs, ask operator: "Are these siblings (umbrella, must all close) or successors (post-Debrief)?" BLOCK only if siblings incomplete.
@@ -92,7 +92,7 @@ For each approved finding, in order: stale → leak → bloat → lessons → ha
 
 - **Stale-state.** Flip `[ ]` → `[x]` (or `[N/A — <reason>]`). Sync § Feature Tasks summary table rows from `<feature>.tasks.md` `Status:` lines. Fix narrative tense (future → past) on shipped-feature descriptions.
 
-- **Leak-scan.** Before promoting, grep `docs/adr/*.md` + `docs/ux/*.md` for clauses that **contradict** the rule being moved. If any surface, flag to operator and halt this finding pending decision. On approval: add rule to destination ADR/UX-spec; remove from spec/tasks; add `Refs: <ADR-ID> §<n>` (or `Refs: ux/<area>.md §<n>`) pointer. Earn-its-place gate: pattern must have appeared in ≥2 features OR carry independent strong-spec justification — single-feature patterns stay in feature-spec.
+- **Leak-scan.** Before promoting, grep the ADR dir (`SAID.docs-root:`-relative `docs/adr/*.md`) + `docs/ux/*.md` for clauses that **contradict** the rule being moved. If any surface, flag to operator and halt this finding pending decision. On approval: add rule to destination ADR/UX-spec; remove from spec/tasks; add `Refs: <ADR-ID> §<n>` (id per `SAID.adr-prefix:`) (or `Refs: ux/<area>.md §<n>`) pointer. Earn-its-place gate: pattern must have appeared in ≥2 features OR carry independent strong-spec justification — single-feature patterns stay in feature-spec.
 
 - **Bloat.** Cut paraphrased bullets; trim § Context to load to template's ~6–10 entries; collapse implementation narrative into one-liners or pointer to commits.
 
@@ -128,7 +128,7 @@ For each approved finding, in order: stale → leak → bloat → lessons → ha
    ```
    ## Debrief close (YYYY-MM-DD)
    - Reconciliations: N (one-line summary)
-   - Migrations: M (rule → ADR-Sxx / ux/yyy.md)
+   - Migrations: M (rule → `<SAID.adr-prefix>` id / ux/yyy.md)
    - Compactions: K (spec A → B lines)
    - Lessons: in this file § Lessons (or N/A)
    - Pending proposals: in debrief.md § Pending proposals (or N/A)

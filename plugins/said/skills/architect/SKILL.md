@@ -45,12 +45,12 @@ Resolve inputs and ground in calibration sources before the operator interaction
 
 1. **Resolve scope-path.**
    - Path given as arg → verify with `ls <path>`. If missing, BLOCK and ask operator.
-   - No path given → list `docs/working/*/scope.md`; if exactly one, use it; if multiple or zero, ASK the operator which feature.
+   - No path given → list `<SAID.working:>/*/scope.md` under the lane's `SAID.working:` root (declaration-first from the `## Lane` block; `docs/working/` is the key-absent fallback); if exactly one, use it; if multiple or zero, ASK the operator which feature.
 2. **Verify §D empty.** Read scope.md, locate `## §D`, confirm it's empty (or every item explicitly marked "defer to Phase 2 (Architect)" with reasoning). Otherwise BLOCK.
 3. **Resolve surface-type.** Read `SAID.surface-type:` from the `## Lane` block (`visual | api | mcp | cli`; last-resort `visual`).
 4. **Derive feature name.** Take the leaf segment of the working dir (`docs/working/<feature>/scope.md` → `<feature>`). Confirm with operator only if ambiguous.
 5. **Resolve output paths.**
-   - Default spec: `docs/features/<feature>.md`. Default tasks: `docs/features/<feature>.tasks.md`.
+   - Declaration-first from the lane's `## Lane` `SAID.feature-spec:` + `SAID.task-log:` keys; conventional defaults (key-absent fallback) — spec `docs/features/<feature>.md`, tasks `docs/features/<feature>.tasks.md`.
    - For sub-phased features, operator may pass `output-name=<custom>` → `docs/features/<custom>.{md,tasks.md}`.
    - If either exists already, BLOCK and ask: "Spec exists at `<path>`. Overwrite, suffix `-2`, or abort?"
 6. **Load calibration contracts** (parallel reads):
@@ -199,7 +199,7 @@ Natural size: ≤ 15 lines total. Multi-piece features may go to 25 lines if Ghe
 
 #### `## Definition of Done`
 
-Reference CLAUDE.md quality gates with a one-line pointer ("Standard repo quality gates per CLAUDE.md:"). List any feature-specific gates that go beyond the standard set (visual parity walk against a named reference, specific test path that must pass).
+Reference the lane's quality gates with a one-line pointer ("Standard repo quality gates per the `SAID.commands:` key in CLAUDE.md:"). List any feature-specific gates that go beyond the standard set (visual parity walk against a named reference, specific test path that must pass).
 
 Natural size: 4–8 bullets.
 

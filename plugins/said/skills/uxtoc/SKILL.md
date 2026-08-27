@@ -33,7 +33,7 @@ The operator invokes:
 - `/said:uxtoc <path>` — outline to chat.
 - `/said:uxtoc <path> output=<file-or-dir>` — write to that path. If a directory, the file is named `toc.md` inside it. If a file path, that exact file is written (prompt overwrite / suffix `-2` / abort if it exists).
 
-`<path>` resolves to one of:
+`<path>` resolves to one of (the `docs/…` shapes below default from the lane's `SAID.docs-root:` / `SAID.working:` keys declaration-first; the literal `docs/` roots are the key-absent fallback):
 
 - `docs/screens/<SCREEN-ID>.md` — single screen.
 - `docs/features/<FEAT-ID>.md` — feature spec; outline scope + every screen the spec references (inline `## Screen` sections AND linked `docs/screens/*.md` files).

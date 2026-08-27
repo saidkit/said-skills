@@ -34,7 +34,9 @@ separate step.
 - **handoff-path** — substantive handoff doc. Authoritative where it
   speaks. Required.
 - **output-path** — where to write the refined draft (typically
-  `docs/working/<feature>/scope-N.md`). Required.
+  `docs/working/<feature>/scope-N.md`, **supplied by the caller** — the
+  `scope-refine` skill resolves it from the lane's `SAID.working:` key;
+  the agent does not derive it). Required.
 - **scope-hint** — optional comma-separated list of feature dirs to
   audit, overriding the dir list extracted from the handoff in
   Stage 1. Use when the handoff's scope language is ambiguous.

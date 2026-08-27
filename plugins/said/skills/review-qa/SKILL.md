@@ -6,9 +6,10 @@ description: >
   Verifies (a) quality gates clean, (b) `### Fix` claim integrity (test
   counts, grep results, file presence/absence), (c) `Refs:` ADR/UX mechanical
   conformance against `docs/qa/feature-qa-checklist.md`. Project-agnostic in command
-  invocation — resolves commands at runtime via the same chain as
-  `/said:impl` Step 0 #8 (`CLAUDE.md` → `Makefile` → `package.json` →
-  operator-prompt). Read-only by contract; never edits code, specs, or tasks.
+  invocation — resolves commands at runtime, primary from the `## Lane`
+  `SAID.commands:` key (in `CLAUDE.md`), then `Makefile` → `package.json` →
+  operator-prompt as fallback (same chain as `/said:impl` Step 0 #8).
+  Read-only by contract; never edits code, specs, or tasks.
   Sibling skill `/said:accept` covers behavioral contract (AC items) —
   this skill covers hygiene only.
   Triggered ONLY by the explicit command "/said:review-qa
@@ -51,6 +52,7 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 ## Step 0 — Preflight
 
 1. **Resolve mode + inputs:**
+   - **Paths declaration-first:** resolve the lane's `SAID.task-log:` + `SAID.feature-spec:` + `SAID.working:` keys from the `## Lane` block; the `docs/features/<feature-id>.tasks.md` / `.md` + `docs/working/<feature-id>/` conventions below are the key-absent fallback.
    - Single arg matching project's task-id regex → task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
    - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) → feature-mode (bare or suffixed per-lane feature-id, e.g. `PROJ-01-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `PROJ-01-FE-07` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
 2. **Status check:**
@@ -96,7 +98,7 @@ Procedure:
    ### Quality gates
    | Resolved command | Source |
    |---|---|
-   | <umbrella command> | <source — CLAUDE.md / Makefile / package.json> |
+   | <umbrella command> | <source — SAID.commands: / Makefile / package.json> |
 
    ### Fix-claim re-checks
    | source | claim | re-verify command |
