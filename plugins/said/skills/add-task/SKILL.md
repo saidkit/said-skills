@@ -62,7 +62,7 @@ Resolve inputs and ground in existing context:
    - **Legacy IDs do NOT contribute.** Any task heading not matching the canonical regex (e.g., pre-migration entries in projects that haven't run a one-time task-id migration) is excluded from the counter scan. Append-only — never fill gaps from deleted tasks.
 6. **Skim companion spec — capture coverage anchors.** Identify which section(s) govern the new task's scope (Per-piece scope / Acceptance Criteria / Implementation pointers / Boundaries — whichever the spec uses). Capture 1–2 lines per relevant section for Step 3 classification. Don't full-read.
 7. **Read `docs/features/template-tasks.md`** in full — for authoring discipline AND task-ID stencil. Extract accepted app-segment vocab from the stencil: parse the canonical heading + example task IDs (e.g., `# <FEAT><NN>-FE-<NN> Task Log` → middle literal segment `FE` → vocab = `{FE}`). The middle literal between two placeholder segments is the accepted app token. Validate the step-4 `app=` flag now: if outside the derived set, BLOCK per step 4. If the stencil has no `<APP>` segment, the project is single-app — reject any `app=` flag.
-8. **Classify screen shape** (web projects only — skip for server). Detect the new task's screen shape from the closest companion spec § Per-feature scope subsection (or from operator-provided context if the new task doesn't map cleanly to a scope piece):
+8. **Classify screen shape** (visual surfaces only — skip for non-visual). Detect the new task's screen shape from the closest companion spec § Per-feature scope subsection (or from operator-provided context if the new task doesn't map cleanly to a scope piece):
 
    | Screen shape | What it is |
    |---|---|
@@ -75,7 +75,7 @@ Resolve inputs and ground in existing context:
 
    If ambiguous, ASK the operator in Step 1's batch prompt — don't guess.
 
-9. **Resolve source UX specs + extract frozen rules** (web projects only). Per screen shape:
+9. **Resolve source UX specs + extract frozen rules** (visual surfaces only). Per screen shape:
 
    | Screen shape | Specs to pull frozen rules from |
    |---|---|
@@ -86,7 +86,7 @@ Resolve inputs and ground in existing context:
    | Bespoke layout | + `docs/ux/form-custom.md` |
    | Data-layer-only | `docs/ux/errors.md` only |
 
-   Read in parallel; extract applicable frozen-rule anchors (rule numbers only, no verbatim paraphrase). Server projects: fall back to `docs/qa/feature-ux-checklist.md` filtered by `applies-to`.
+   Read in parallel; extract applicable frozen-rule anchors (rule numbers only, no verbatim paraphrase). Non-visual surfaces: fall back to `docs/ux/evaluation.md` filtered by `applies-to`.
 
 ## Step 1 — Single-batch interactive Q&A
 
@@ -144,7 +144,7 @@ Before writing, validate the answers against template-tasks.md discipline. Rewri
   - Frozen-rule conformance (when task touches UX-governed surfaces): `- [ ] lists.md #20, #23 + form.md #16 satisfied (per screen shape)`.
   - Wire contract (when task adds/changes a `*.service.api.ts` method): `- [ ] GET /endpoint — Zod schema matches captured bytes (playwright)`.
   - Visual parity (when task migrates / reshapes a list-table or form screen): `- [ ] Walked side-by-side with /tasks — zero visible diff`.
-  - Cross-feature contracts (when spec's Boundaries lists Sacred consumers): `- [ ] DictionaryCell public props preserved (consumed by features/estimate/)`.
+  - Cross-feature contracts (when spec's Boundaries lists Sacred consumers): `- [ ] <Entity>Cell public props preserved (consumed by features/<entity>/)`.
   - Quality gates umbrella bullet.
   
   Typical task ends with 5–10 Acceptance bullets total. Bug tasks may be even leaner (Problem + Fix + Gotchas per template-tasks.md "depth varies").

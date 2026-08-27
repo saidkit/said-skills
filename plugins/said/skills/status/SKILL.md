@@ -33,7 +33,7 @@ Never hardcode paths or id shapes. Resolve in this order, and state what resolve
 | Fact | Declaration (first) | Fallback (second) |
 |---|---|---|
 | Docs root · working root | repo `CLAUDE.md` SAID doc paths / a `## Lane` block's declared roots | `docs/features/` and `docs/working/` |
-| Issued id-prefixes | `CLAUDE.md` (e.g. *"issues `APP-NN` and `INIT-NN` only"*) | stems of `<docs>/features/*.md` |
+| Issued id-prefixes | `CLAUDE.md` (e.g. *"issues `PROJ-NN` only"*) | stems of `<docs>/features/*.md` |
 | Id shape | `CLAUDE.md` / `template-tasks.md` (`<PREFIX>-<NN>`, sub-phase `-<slug>`, multi-target `-<APP>-<NN>`) | regex `[A-Z]+-[0-9]+` |
 | Lanes | `## Lane` blocks / a repo-root lane registry | single lane |
 

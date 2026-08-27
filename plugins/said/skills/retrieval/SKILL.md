@@ -25,7 +25,7 @@ Before proposing a default, accepting a spawned-agent's framing, or answering "w
 1. **`CLAUDE.md`** (project + user-global) — grep for the question's core concepts. Project invariants live here; user-global macros and standing preferences live here. If the project uses R-rule labels (`R-ENGINE`, `R-DEV-TOKEN`, etc.) — grep those too; they're the project's shorthand for cross-cutting invariants and surface in ADR headings + scope.md citations + code comments.
 2. **Memory files** — grep `MEMORY.md` index + every `<name>.md` in this project's memory directory. Prior-session feedback, project decisions, references.
 3. **ADRs** (or whatever the project's decision-log directory is — `docs/adr/`, `decision-log/`, `architecture/decisions/`, etc.) — grep every file for the question's core concepts. Don't trust an agent's citation chain alone; the agent may have surfaced one ADR but missed a contradicting one.
-4. **Prior-feature working dirs** (`docs/working/INIT-*/scope*.md`, `docs/working/FEAT-*/scope*.md`, `*/debrief.md`, `*/accept-*.md`, or project equivalents) — grep for the same concepts. Reuses across features signal precedent; reversals in debriefs signal "scope-time default was wrong."
+4. **Prior-feature working dirs** (`docs/working/PROJ-*/scope*.md`, `docs/working/<FEAT>-*/scope*.md`, `*/debrief.md`, `*/accept-*.md`, or project equivalents) — grep for the same concepts. Reuses across features signal precedent; reversals in debriefs signal "scope-time default was wrong."
 5. **Prior probe / wire-capture records** (scope.md §A blocks, `wip*.md` files) — for probe-mode / live-system outcomes that the current question depends on. Workarounds (dev tokens, fixture endpoints, env overrides) live here, not in ADRs.
 
 ## Output

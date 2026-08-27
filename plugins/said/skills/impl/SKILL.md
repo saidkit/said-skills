@@ -5,7 +5,7 @@ description: >
   to `Status: Done` through three phases: Phase A (Classify + Inventory),
   Phase B (Implement rule-by-rule under TDD discipline), Phase C (Verify +
   close-of-task 5-step). Composes with `/said:review-ux` at Phase C close
-  for web/UI features. Triggered ONLY by the explicit command
+  for features with a visual surface. Triggered ONLY by the explicit command
   "/said:impl <task-id|feature-id> [<task-id> ...]" — feature-id is
   auto-derived from the task-id prefix (regex captures `<PREFIX>` + `<NN>`
   → `<PREFIX>-<NN>`); a bare feature-id runs whole-feature mode (every
@@ -22,7 +22,7 @@ The skill itself is the orchestrator — there is NO separate agent. You — the
 
 **Single-pass goal.** Multiple "Pass 1 / Pass 2 / Pass 3" entries in a closed task's `### Fix` block = failure mode. The whole point of conformance-fold Acceptance (Phase 2 settlement) + 3-phase driver is to make every task close single-pass. If you find yourself thinking "I'll defer X to a Pass 2" mid-Phase B — STOP. Either widen Phase B to satisfy X now, or surface X as an operator decision (declare scope-creep, or split into a new task via `/said:add-task`).
 
-**Project-type duality.** Web-app projects (`docs/ux/` exists) run side-by-side playwright walk + `/said:review-ux` at Phase C; server-app projects drop visual parity + fall back to `docs/qa/feature-ux-checklist.md` filtered by `applies-to`. Auto-detected in Step 0.
+**Surface-type duality.** A `visual` surface runs the side-by-side playwright walk + `/said:review-ux` at Phase C; a non-visual surface (`api`/`mcp`/`cli`) drops visual parity and runs its surface's contract checks. Surface-type is read from the `## Lane` block (Step 0), not inferred from `docs/ux` presence.
 
 ## When this fires
 
@@ -78,7 +78,7 @@ Resolve inputs and ground in calibration sources before Phase A starts:
 3. **Read task body in full.** Locate `## <task-id>:` in the tasks file and read the whole entry. Verify `Status:` is `Todo (YYYY-MM-DD)`; BLOCK on Done per "When this fires" redirect.
 4. **Skim companion spec § Per-feature scope** for this task's piece. Don't full-read the spec — the task body's Reading list is canonical.
 5. **Read `docs/features/template-tasks.md`** in full. Phase C's close-of-task 5-step review enforces it.
-6. **Detect project type.** `[ -d docs/ux ] && echo web || echo server`. Auto-detected.
+6. **Resolve surface-type.** Read the lane's declared `surface-type` from the `## Lane` block (`visual | api | mcp | cli`; last-resort `visual`). Not inferred from `docs/ux` presence.
 7. **Skim project calibration.** Scan `docs/features/*.tasks.md` for the most recent closed task with a multi-pass `### Fix` block (failure mode this driver prevents) and the most recent single-pass close (target shape every task lands on). If the project has no closed tasks yet, skip — the rules below stand on their own.
 8. **Resolve project quality-gate commands.** Skill never hardcodes language-specific commands. Resolution chain (first-match wins):
    - **Primary** — `CLAUDE.md` § Development Commands table: identify umbrella target (`pre-commit`, `qa`, `check`, `all`).
@@ -114,7 +114,7 @@ Procedure:
 4. **Read in parallel** — every Reading-list UX spec flagged `(full read)`, AND every current-implementation file under the entity's feature dir cited in Reading list (or implied by Approach — e.g., `features/<entity>/` if the task migrates that entity). UX specs ground the rule anchors; current-impl files ground the "Evidence" column in step 6. Cite each in the inventory output with one-line anchor (e.g., "Read `lists.md` — rules #20, #23, #26 in scope per task Approach"; "Read `features/<entity>/screens/Browser.tsx:1-120` — current shape baseline").
 
 5. **Run wire-contract probes** for every endpoint cited in the task's Acceptance:
-   - Web project with playwright available: navigate the dev server route via `mcp__playwright__browser_navigate`; capture network via `mcp__playwright__browser_network_requests`. Save response payload to `docs/working/<feature-id>/<task-id>-wire-<endpoint-slug>.json`.
+   - `visual` surface with playwright available: navigate the dev server route via `mcp__playwright__browser_navigate`; capture network via `mcp__playwright__browser_network_requests`. Save response payload to `docs/working/<feature-id>/<task-id>-wire-<endpoint-slug>.json`.
    - Otherwise: `curl -H "Authorization: Bearer <dev-bypass-JWT>" <endpoint>`; capture stdout to the same path.
    - For each captured response, note drift between captured bytes and the FE schema in the task body's Approach. **Drift = blocker; surface in inventory.**
    - If the dev server is down, ASK the operator to start it (`make dev` or equivalent) before re-running Phase A.
@@ -162,11 +162,11 @@ Phase B continues until all Acceptance `[ ]` bullets except visual-parity are fl
 
 ## Phase C — Verify and close
 
-> **Stance: read the task body cold. Walk the migrated URL side-by-side with the reference URL. Run quality gates. Invoke `/said:review-ux` for web/UI features. Run the close-of-task 5-step. Flip Status. Hand off to operator for commit.**
+> **Stance: read the task body cold. Walk the migrated URL side-by-side with the reference URL. Run quality gates. Invoke `/said:review-ux` for visual-surface features. Run the close-of-task 5-step. Flip Status. Hand off to operator for commit.**
 
 Procedure:
 
-1. **Side-by-side playwright walk** (web project + UI surface only):
+1. **Side-by-side playwright walk** (visual surface only):
    - Migrated URL (e.g., `/<entity>`) vs reference URL (from task's Acceptance bullet, e.g., `/tasks`).
    - Enumerate every visible difference: toolbar / header / sheet / pagination / empty-state / chip styles / spacing.
    - **If diff non-empty** → which Acceptance bullet is unsatisfied → RETURN TO PHASE B for that bullet. Don't paper over with "minor cosmetic" — every visible diff is the visual-parity bullet's scope.
@@ -174,7 +174,7 @@ Procedure:
 
 2. **Quality gates:** run `<quality-gates-umbrella>` (resolved in Step 0 #8 — typically `make pre-commit` or equivalent). If the project lacks an umbrella target, chain `<typecheck> && <tests> && <lint>` plus any project-defined dead-code check. Per-merge build commands (e.g., `make build`) and project-specific test scoping (e.g., parity tests under `src/engine/` for <PROJECT>) are project conventions invoked via the resolved targets — not skill-driven literals. If any gate fails → STOP and report; fix; rerun. Don't close on red.
 
-3. **Invoke `/said:review-ux`** if web/UI feature with UI changes. Pass the task-id; the skill spawns `said:review-ux-agent` against `docs/qa/feature-ux-checklist.md` filtered by screen shape; returns structured PASS / FAIL / SOFT-FLAG report.
+3. **Invoke `/said:review-ux`** if the surface is `visual` with UI changes. Pass the task-id; the skill spawns `said:review-ux-agent` against `docs/ux/evaluation.md` filtered by screen shape; returns structured PASS / FAIL / SOFT-FLAG report.
    - Any FAIL → RETURN TO PHASE B for the failing rule.
    - SOFT-FLAGs only → operator decides whether to address now or defer.
 

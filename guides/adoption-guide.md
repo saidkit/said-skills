@@ -18,9 +18,9 @@ SAID's default layout. If yours differs, note the remapping in your binding tabl
 | `docs/features/<FEAT>.md`         | feature spec (recreation contract)                                                  |
 | `docs/features/<FEAT>.tasks.md`   | append-only task log                                                                |
 | `docs/adr/`                       | architecture decision records                                                       |
-| `docs/ux/`                        | UX / interaction specs (web projects)                                               |
+| `docs/ux/`                        | the surface's design / interaction specs (every surface; content per `surface-type`) |
 | `docs/qa/feature-qa-checklist.md` | hygiene-gate rules (read by `said:review-qa`)                                       |
-| `docs/qa/feature-ux-checklist.md` | UX-gate rules (read by `said:review-ux` / `said:review-ux-agent`)                   |
+| `docs/ux/evaluation.md` | UX-gate rules (read by `said:review-ux` / `said:review-ux-agent`)                   |
 
 ## Step 2 — Get the scaffolding (clone a starter)
 
@@ -31,11 +31,11 @@ The plugin ships **no project files** — it's the method only. The scaffolding 
 npx degit saidkit/said-<stack> my-app
 ```
 
-No starter for your stack yet? Author the files the skills expect, using an existing starter (e.g. `said-web`) as the reference for each shape:
+No starter for your stack yet? Author the files the skills expect, using an existing starter (e.g. `said-ts`) as the reference for each shape:
 
 - `docs/features/template.md` — the feature-spec shape `said:architect` writes (the recreation contract).
 - `docs/features/template-tasks.md` — the append-only task-log shape; carries the discipline + an app-segment vocab token you set to your project's vocab.
-- `docs/qa/feature-qa-checklist.md` (+ `docs/qa/feature-ux-checklist.md` for UI stacks) — your rule set. The gate/wire label convention (`R-GATE-*` / `R-WIRE-*`) is what the review machinery emits; the rest are your own `<RULE-LABEL>` rules citing your ADRs/UX-specs.
+- `docs/qa/feature-qa-checklist.md` (+ `docs/ux/evaluation.md` for UI stacks) — your rule set. The gate/wire label convention (`R-GATE-*` / `R-WIRE-*`) is what the review machinery emits; the rest are your own `<RULE-LABEL>` rules citing your ADRs/UX-specs.
 - `docs/adr/` — seed decisions the binding table (Step 3) points at.
 
 ## Step 3 — Write the binding table in your `CLAUDE.md`
@@ -43,6 +43,18 @@ No starter for your stack yet? Author the files the skills expect, using an exis
 Add a section your skills can read. Minimum contents:
 
 ```markdown
+## Lane
+
+**SAID lane:** <name>   (add an umbrella `§Lanes` registry if a feature spans ≥2 lanes)
+
+- Docs root — `docs/` 
+- Code mount(s) — `src/` (a lane spans mounts; a mount is not a lane)
+- Feature spec / Task log / Working dir — `docs/features/PROJ-01.md`, `docs/features/PROJ-01.tasks.md`, `docs/working/PROJ-01/`
+- Task-id shape — your own convention, verbatim (e.g. `PROJ-01` or `PROJ-01-BE-07`) — recorded, not normalized
+- ADR prefix — `ADR-<PREFIX>-*`
+- surface-type — `visual | api | mcp | cli`  (declared; not inferred from `docs/ux` presence)
+- Development-Commands — your umbrella gate command (language-neutral)
+
 ## SAID bindings
 
 ### Quality-gate command

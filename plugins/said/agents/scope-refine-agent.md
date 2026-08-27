@@ -60,22 +60,22 @@ dir as the handoff.
 If a file in the same dir as the handoff is not the handoff itself,
 do not open it without asking the spawner.
 
-## Project-type note
+## Surface-type note
 
-Works for both web-app and server-app SAID features. Adaptations:
+Works for every `surface-type`. Adaptations:
 
 - **Stage 0 contract reads** — the file list below is calibrated for
-  the <PROJECT> frontend project. For server-app or other project
-  types, read whichever contract docs the project's `CLAUDE.md`
+  a `<PROJECT>` `visual` surface. For a non-visual surface or other
+  project, read whichever contract docs the project's `CLAUDE.md`
   names. The "the work touches" qualifier on each item means only
   relevant docs get read either way.
-- **Stage 3a (wire probes)** — applies to both. HTTP is HTTP.
-- **Stage 3b (visual walk)** — web-app only. Auto-skips for
-  server-app refines and pure data-layer migrations because there's
-  no UI surface. The `probe-mode = full` override applies to web-app
+- **Stage 3a (wire probes)** — applies to any HTTP surface. HTTP is HTTP.
+- **Stage 3b (visual walk)** — `visual` surface only. Auto-skips for
+  non-visual refines and pure data-layer migrations because there's
+  no UI surface. The `probe-mode = full` override applies to `visual`
   UI-shape-change skips ONLY; `full` does NOT force a visual walk on
   non-UI work.
-- **Stage 5 §B output** — empty / omitted for server-app refines.
+- **Stage 5 §B output** — empty / omitted for non-visual refines.
   §A wire captures still apply.
 
 ## Procedure
@@ -88,7 +88,7 @@ Issue all reads in one assistant message (parallel tool calls):
 - `docs/conventions.md`.
 - `docs/features/template.md`.
 - `docs/features/template-tasks.md`.
-- `docs/qa/feature-ux-checklist.md` (full).
+- `docs/ux/evaluation.md` (full).
 - `docs/adr/README.md`, then every ADR the handoff names or the work
   touches.
 - Every UX spec under `docs/ux/` the work touches.
@@ -204,7 +204,7 @@ min playwright to <10s curl.
 |---|---|---|
 | `skip` | no-op | no-op |
 | `curl` (default) | curl-first; per-endpoint playwright fallback on auth/UI-only triggering | conditional — runs only when work changes UI shape |
-| `full` | playwright-first (skip the curl attempt) | unconditional **on web-app refines**; auto-skip still wins for server-app / data-layer-only work |
+| `full` | playwright-first (skip the curl attempt) | unconditional **on a `visual` surface**; auto-skip still wins for non-visual / data-layer-only work |
 
 **Reuse handoff captures first.** Before any live probe, scan the
 handoff: if every endpoint and screen-shape the work touches already
@@ -252,9 +252,9 @@ Skip Stage 3b entirely if ANY of the following:
   screenshot.
 
 `probe-mode = full` overrides the **UI-shape-change auto-skip** for
-web-app refines — visual walk runs unconditionally when `full` is
-selected on a web-app refine. `full` does NOT override the
-data-layer-only / no-UI-surface auto-skip — server-app refines and
+a `visual` surface — visual walk runs unconditionally when `full` is
+selected on a `visual` refine. `full` does NOT override the
+data-layer-only / no-UI-surface auto-skip — non-visual refines and
 pure data-layer migrations skip Stage 3b regardless of mode (no UI
 exists to walk).
 
@@ -322,8 +322,8 @@ this order:
 5. **Sequencing** — the order pieces land + what blocks what.
 6. **§A — Wire captures** (Stage 3a output, verbatim JSON; merge any
    handoff-cited captures).
-7. **§B — Visual contract** (web-app refines only) — Stage 3b
-   screenshots inline. Empty / omitted for server-app refines (no UI
+7. **§B — Visual contract** (`visual` surface only) — Stage 3b
+   screenshots inline. Empty / omitted for non-visual refines (no UI
    surface to capture).
 8. **§C — Cross-cutting decisions** — anything affecting 2+ pieces
    (type reconciliations, mock strategy, shared fixtures,

@@ -6,7 +6,7 @@ description: >
   (gather → author → plan). The spec is a recreation contract: a fresh
   implementer reading the spec alone must be able to rebuild the feature
   within its scope. Triggered ONLY by the explicit command
-  "/said:architect [<scope-path>] [project-type=web|server] [output-name=<custom>]".
+  "/said:architect [<scope-path>] [output-name=<custom>]".
   NOT for incremental updates to an already-architected feature — those use
   direct task append per `docs/features/template-tasks.md` discipline.
 ---
@@ -23,7 +23,7 @@ A feature spec is a **recreation contract**. A fresh implementer reading the spe
 
 This principle drives every authoring decision in Pass 2. If a paragraph describes HOW (file paths, function signatures, sequencing, folder-tree diagrams, past-tense work-log), it doesn't serve recreation and belongs in the tasks file by construction.
 
-**Surface-type duality.** The design step reads the lane's declared `surface-type ∈ {visual, api, mcp, cli}` (from the project binding; see the engine README) and authors each piece's requirements against that surface: a **`visual`** lane gets UI/UX Requirements + visual parity per piece; an **`api` / `mcp` / `cli`** lane drops UI/UX and expands API Integration against its surface's contract. The `project-type=web|server` flag remains the legacy web/server override for that authoring split.
+**Surface-type duality.** The design step reads the lane's declared `surface-type ∈ {visual, api, mcp, cli}` (from the project binding; see the engine README) and authors each piece's requirements against that surface: a **`visual`** lane gets UI/UX Requirements + visual parity per piece; an **`api` / `mcp` / `cli`** lane drops UI/UX and expands API Integration against its surface's contract.
 
 ## When this fires
 
@@ -31,7 +31,6 @@ The user invokes:
 
 - `/said:architect` — default scope-path = `docs/working/<feature>/scope.md` for the most recent `<feature>` working dir.
 - `/said:architect <scope-path>` — explicit scope.md path.
-- `/said:architect <scope-path> project-type=web` — override auto-detection.
 - `/said:architect <scope-path> output-name=<custom>` — override the default `<feature>` (derived from working-dir leaf) for output filenames. Useful for sub-phased umbrella specs (e.g., `output-name=<feature-id>-phaseB`).
 
 If the operator's request is to **add a new task** to an already-architected feature ("add a task for X", "amend the tasks log") — redirect to `/said:add-task` (the canonical entry point for backlog additions).
@@ -48,7 +47,7 @@ Resolve inputs and ground in calibration sources before the operator interaction
    - Path given as arg → verify with `ls <path>`. If missing, BLOCK and ask operator.
    - No path given → list `docs/working/*/scope.md`; if exactly one, use it; if multiple or zero, ASK the operator which feature.
 2. **Verify §D empty.** Read scope.md, locate `## §D`, confirm it's empty (or every item explicitly marked "defer to Phase 2 (Architect)" with reasoning). Otherwise BLOCK.
-3. **Detect project type.** Bash check: `[ -d docs/ux ] && echo web || echo server`. Operator override (`project-type=...` flag) takes precedence.
+3. **Resolve surface-type.** Read the lane's declared `surface-type` from the `## Lane` block (`visual | api | mcp | cli`; last-resort `visual`). Not inferred from `docs/ux` presence — `docs/ux` is universal.
 4. **Derive feature name.** Take the leaf segment of the working dir (`docs/working/<feature>/scope.md` → `<feature>`). Confirm with operator only if ambiguous.
 5. **Resolve output paths.**
    - Default spec: `docs/features/<feature>.md`. Default tasks: `docs/features/<feature>.tasks.md`.
@@ -162,7 +161,7 @@ For each entry in `Pieces of scope` (intent ledger), produce ONE outcome bullet:
 
 Natural size: 4–8 bullets, one line each.
 
-##### `### UI/UX Requirements` (web projects only — skip for server)
+##### `### UI/UX Requirements` (visual surfaces only — skip for non-visual)
 
 For each entry in `Screens / surfaces touched`, ONE bullet: `**<ScreenName>** — <what it shows> per <ux-spec>#<rule>`. Anchor only — never paraphrase the cited rule.
 
@@ -275,7 +274,7 @@ Procedure:
 
    Detection hints: "list / filter / pagination / table" → List-table; "create / edit / form" → Create/edit; "tab + embedded list" → Embedded list in tab; "no own screens / data-layer / selectors / badges" → Data-layer-only. If ambiguous, ask the operator.
 
-6. **Resolve source UX specs per screen-shape mapping** (web projects only — skip for server projects):
+6. **Resolve source UX specs per screen-shape mapping** (visual surfaces only — skip for non-visual):
 
    | Screen shape | Specs to pull frozen rules from |
    |---|---|
@@ -286,7 +285,7 @@ Procedure:
    | Bespoke layout | + `docs/ux/form-custom.md` |
    | Data-layer-only | `docs/ux/errors.md` only |
 
-   Server projects: fall back to `docs/qa/feature-ux-checklist.md` filtered by `applies-to`.
+   Non-visual surfaces: fall back to `docs/ux/evaluation.md` filtered by `applies-to`.
 
 7. **Read source UX specs in parallel; extract applicable frozen rules.** For each resolved spec, read in full and pull every numbered/anchored frozen-rule entry (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`, `<RULE-LABEL>`). Capture: rule number / verbatim one-line summary / source anchor. This list IS the per-task acceptance gate that step 8 pastes into the Frozen rules section.
 
@@ -328,7 +327,7 @@ Report to operator:
 
 Hard exit. The skill writes spec + tasks; that's the entire Phase 2 output. Implementation is Phase 3's job.
 
-Suggested next step for the operator: "Phase 3 (Implement) starts here. Run `/said:impl <feature-id>` to drive every `Status: Todo` task in order (whole-feature mode), or `/said:impl <task-id>` for a single task. Each task closes through `/said:review-ux` at Phase C (web/UI features only)."
+Suggested next step for the operator: "Phase 3 (Implement) starts here. Run `/said:impl <feature-id>` to drive every `Status: Todo` task in order (whole-feature mode), or `/said:impl <task-id>` for a single task. Each task closes through `/said:review-ux` at Phase C (visual-surface features only)."
 
 ## Structural boundaries
 

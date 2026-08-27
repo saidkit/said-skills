@@ -14,17 +14,21 @@ A starter is its own cloneable git repo (e.g. a GitHub template) that a new proj
 | `docs/features/template-tasks.md` | task-log template + discipline                      | `said:architect`, `said:add-task` |
 | `docs/qa/feature-qa-checklist.md` | hygiene-gate rules (your `R-*` labels)              | `said:review-qa`                  |
 | `docs/adr/`                       | ADR templates + seed decisions                      | all phases (`Refs:`)              |
-| `CLAUDE.md` binding section       | command resolution + ADR shortname map + rule vocab | all skills                        |
+| `CLAUDE.md` bindings              | Lane, id-shape, surface-type, rules, ADR short map  | all skills                        |
 
-UI stacks additionally provide:
 
-| File / dir                        | Purpose                                        | Engine consumer                          |
-| --------------------------------- | ---------------------------------------------- | ---------------------------------------- |
-| `docs/qa/feature-ux-checklist.md` | UX-gate rules + the gate/wire label convention | `said:review-ux`, `said:review-ux-agent` |
-| `docs/ux/`                        | interaction / spec rules                       | `said:architect`, `said:review-ux`       |
-| `docs/screens/` (optional)        | per-screen spec template (author by hand)      | `said:uxtoc` (seed / inspect)            |
+## Representation contract
 
-Server / CLI / library starters omit the **visual** UX pieces (`docs/ux/`, the visual checklist) and set their lane's `surface-type` to a non-visual value — `said:review-ux` then gates against that surface's contract (schema / handshake / invocation) instead of a browser walk. A lane that ships no evaluable surface contract runs the spine (Scope → Architect → Implement → Debrief) alone.
+Every surface additionally ships its representation contract — content per `surface-type`. A non-visual surface ships `docs/ux` too, with endpoint / schema / flag rules instead of screens - UX here means what consumer actually sees.
+
+- `docs/ux/`
+  - Engine consumer: `said:architect`, `said:review-ux`
+  - Purpose: the surface's design rules (screens for `visual`; endpoint / schema / flag rules for non-visual)
+- `docs/ux/evaluation.md`
+  - Engine consumer: `said:review-ux`, `said:review-ux-agent`
+  - Purpose: UX-gate checklist (the `docs/ux` rules operationalized into `verify:` predicates) + the gate/wire label convention
+
+Non-visual starters (server / CLI / library / MCP) still ship a `docs/ux` — its *content* is their surface's contract (endpoint / error-envelope rules for `api`, tool-schemas for `mcp`, flags / exit-codes for `cli`), not screen rules — and declare their lane's `surface-type` accordingly. `said:review-ux` gates against that surface's contract (schema / handshake / invocation) instead of a browser walk. A surface that lacks a `docs/ux` is a project deficiency the framework surfaces, not a supported mode.
 
 ## Starters
 
