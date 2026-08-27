@@ -14,8 +14,7 @@ A starter is its own cloneable git repo (e.g. a GitHub template) that a new proj
 | `docs/features/template-tasks.md` | task-log template + discipline                      | `said:architect`, `said:add-task` |
 | `docs/qa/feature-qa-checklist.md` | hygiene-gate rules (your `R-*` labels)              | `said:review-qa`                  |
 | `docs/adr/`                       | ADR templates + seed decisions                      | all phases (`Refs:`)              |
-| `CLAUDE.md` bindings              | a `## Lane` block of `SAID.<axis>:` keys (`SAID.lane` / `docs-root` / `surface-type` / `commands` / …) + rule vocab + ADR short map | all skills |
-
+| `CLAUDE.md` bindings              | Lane, id-shape, surface-type, rules, ADR short map  | all skills                        |
 
 ## Representation contract
 

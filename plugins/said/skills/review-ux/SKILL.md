@@ -52,7 +52,7 @@ Run all four sub-steps in parallel (one assistant message, four Bash tool calls)
    fi
    ```
 
-2. **Run quality gates in parallel; capture exit codes to `/tmp/qa-gates.json`.** All four gate commands run as background jobs; the skill waits for all and writes the consolidated result. ~20s wall-clock for the slowest gate (typecheck) — fully overlapped with the JWT mint and other pre-stage work. Resolve each concrete gate command (typecheck / test / lint / knip) at runtime via the same chain as `/said:review-qa` Step 0 (`SAID.commands:` → `Makefile` → `package.json` scripts, per lockfile → ask operator); the `<gate-cmd>` tokens below stand in for those resolved commands.
+2. **Run quality gates in parallel; capture exit codes to `/tmp/qa-gates.json`.** All four gate commands run as background jobs; the skill waits for all and writes the consolidated result. ~20s wall-clock for the slowest gate (typecheck) — fully overlapped with the JWT mint and other pre-stage work. Resolve each concrete gate command (typecheck / test / lint / knip) at runtime the same way `/said:review-qa` Step 0 does; the `<gate-cmd>` tokens below stand in for those resolved commands.
 
    ```bash
    cd <feature-path>

@@ -22,7 +22,7 @@ The skill itself is the orchestrator — there is NO separate agent. You — the
 
 **Single-pass goal.** Multiple "Pass 1 / Pass 2 / Pass 3" entries in a closed task's `### Fix` block = failure mode. The whole point of conformance-fold Acceptance (Phase 2 settlement) + 3-phase driver is to make every task close single-pass. If you find yourself thinking "I'll defer X to a Pass 2" mid-Phase B — STOP. Either widen Phase B to satisfy X now, or surface X as an operator decision (declare scope-creep, or split into a new task via `/said:add-task`).
 
-**Surface-type duality.** A `visual` surface runs the side-by-side playwright walk + `/said:review-ux` at Phase C; a non-visual surface (`api`/`mcp`/`cli`) drops visual parity and runs its surface's contract checks. `SAID.surface-type:` is read from the `## Lane` block (Step 0), not inferred from `docs/ux` presence.
+**Surface-type duality.** A `visual` surface runs the side-by-side playwright walk + `/said:review-ux` at Phase C; a non-visual surface (`api`/`mcp`/`cli`) drops visual parity and runs its surface's contract checks. `SAID.surface-type:` is read from the `## Lane` block (Step 0).
 
 ## When this fires
 
@@ -78,7 +78,7 @@ Resolve inputs and ground in calibration sources before Phase A starts:
 3. **Read task body in full.** Locate `## <task-id>:` in the tasks file and read the whole entry. Verify `Status:` is `Todo (YYYY-MM-DD)`; BLOCK on Done per "When this fires" redirect.
 4. **Skim companion spec § Per-feature scope** for this task's piece. Don't full-read the spec — the task body's Reading list is canonical.
 5. **Read `docs/features/template-tasks.md`** in full. Phase C's close-of-task 5-step review enforces it.
-6. **Resolve surface-type.** Read `SAID.surface-type:` from the `## Lane` block (`visual | api | mcp | cli`; last-resort `visual`). Not inferred from `docs/ux` presence.
+6. **Resolve surface-type.** Read `SAID.surface-type:` from the `## Lane` block (`visual | api | mcp | cli`; last-resort `visual`).
 7. **Skim project calibration.** Scan `docs/features/*.tasks.md` for the most recent closed task with a multi-pass `### Fix` block (failure mode this driver prevents) and the most recent single-pass close (target shape every task lands on). If the project has no closed tasks yet, skip — the rules below stand on their own.
 8. **Resolve project quality-gate commands.** Skill never hardcodes language-specific commands. Resolution chain (first-match wins):
    - **Primary** — the `## Lane` `SAID.commands:` key (in `CLAUDE.md`): the umbrella target (`pre-commit`, `qa`, `check`, `all`).

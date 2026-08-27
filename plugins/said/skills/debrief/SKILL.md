@@ -49,7 +49,7 @@ After Phase 3 closes (all tasks Done, all quality gates green, operator's manual
 2. Read both files in full.
 3. Status check. For each task entry, confirm `Status: Done`. If any open → BLOCK with: "Cannot debrief — N task(s) still open. Close them via `/said:impl <feature-id>` first." List the open IDs.
 4. Sibling check. If spec § Related cites other feature specs, ask operator: "Are these siblings (umbrella, must all close) or successors (post-Debrief)?" BLOCK only if siblings incomplete.
-5. Quality gate spot-check. Resolve and run the project's quality-gate command at runtime via the chain `SAID.commands:` → `Makefile` → `package.json` (scripts, per lockfile) → ask operator — exactly as `/said:review-qa` Step 0 does. Halt if it goes red — the feature isn't actually closed.
+5. Quality gate spot-check. Resolve and run the project's quality-gate command at runtime the same way `/said:review-qa` Step 0 resolves it. Halt if it goes red — the feature isn't actually closed.
 6. **Phase-3.5 gate check.** Glob `docs/working/<feature-id>/review-qa-*.md` and `accept-*.md` (most recent by mtime). (a) If **neither exists** → do not proceed silently: surface "No Phase-3.5 gate artifacts for `<feature-id>` — run `/said:review-qa` + `/said:accept` first, or confirm skip." **A confirmed skip is carried forward, not waved through — it is recorded at Phase C as the `Gate-skip` line of the `## Debrief close` footer (step 3), so the omission leaves an audit trail instead of a silent gap.** (b) If the latest `review-qa` **or** `accept` verdict is **FAIL** → BLOCK with redirect: "Resolve `/said:review-qa` / `/said:accept` failures before debrief." This is the gate `/said:review-qa` and `/said:accept` advertise (their "Gate effect for `/said:debrief`" sections) — without this read it never actually fires.
 
 ## Phase A — Read + Scan + Propose (STOP for operator review)
@@ -104,7 +104,7 @@ For each approved finding, in order: stale → leak → bloat → lessons → ha
 
 ## Phase C — Close
 
-1. Re-verify quality gates green. Resolve and run the project's quality-gate command at runtime via the chain `SAID.commands:` → `Makefile` → `package.json` (scripts, per lockfile) → ask operator — exactly as `/said:review-qa` Step 0 does. Halt if it goes red.
+1. Re-verify quality gates green. Resolve and run the project's quality-gate command at runtime the same way `/said:review-qa` Step 0 resolves it. Halt if it goes red.
 
 2. **Pending proposals.** For every §A.2c row, plus every Phase-A row the operator marked `defer` (operator chose to author later), append a `## Pending proposals (<feature-id>)` section to `debrief.md` (working file — tasks file stays clean). Each entry carries:
 
