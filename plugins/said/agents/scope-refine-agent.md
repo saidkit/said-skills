@@ -90,7 +90,7 @@ Issue all reads in one assistant message (parallel tool calls):
 - `docs/conventions.md`.
 - `docs/features/template.md`.
 - `docs/features/template-tasks.md`.
-- `docs/ux/feature-ux-checklist.md` (full).
+- the loaded surface-contract checklist (manifest-resolved, consumer `scope-refine-agent`) (full).
 - `docs/adr/README.md`, then every ADR the handoff names or the work
   touches.
 - Every UX spec under `docs/ux/` the work touches.
@@ -267,7 +267,7 @@ Otherwise (work changes UI shape AND captures are missing AND
   the named reference URL in playwright and capture full-page
   screenshots.
 - Reference URLs come from the handoff if named; otherwise from
-  `docs/ux/lists.md` / `shell.md` / `form.md` "named reference"
+  the surface's loaded UX specs' "named reference"
   sections.
 - Document band / toolbar / column / chip / pane shapes per
   screenshot.
@@ -286,11 +286,10 @@ For each Stage 1 decision, locate the matching contract clause:
 - Lib triad / file granularity → `<ADR-ID>`.
 - No mega-engines → `<ADR-ID>`.
 - Data-layer-only feature shape → `<ADR-ID>`.
-- List wire format → `<ADR-ID>` + `lists.md` <RULE-LABEL>.
-- Toolbar / band / pane shape → `lists.md`, `shell.md`, `form.md`
-  frozen rules.
-- Error containment → `<ADR-ID>` + `errors.md`.
-- RBAC affordance gating → `lists.md` <RULE-LABEL>, `form.md` <RULE-LABEL>.
+- List wire format → `<ADR-ID>` + the routed list-rule spec <RULE-LABEL>.
+- Toolbar / band / pane shape → the surface's routed frozen-rule specs.
+- Error containment → `<ADR-ID>` + the routed error-rule spec.
+- RBAC affordance gating → the routed list/form rule specs <RULE-LABEL>.
 - Naming / prefixes → `<ADR-ID>`.
 - Workspace scoping → `<ADR-ID>`.
 
@@ -340,14 +339,14 @@ this order:
      surfaced in Stage 1 inventory whose name matches `Manage X` /
      `Assign Y` / `Members of Z`, OR which would carry a list of
      items, OR which carries ≥2 sub-actions, emit a §D Q phrased:
-     "Per `docs/ux/lists.md` <RULE-LABEL>, default shape is a
+     "Per the surface's routed list-rule spec <RULE-LABEL>, default shape is a
      detail-page tab at `/<entity>/:id`. Confirm, or override with
      explicit reason." Never frame the choice as "Dialog or Sheet?"
      — that framing presupposes overlay and skips the default.
    - **Mutation-flow forcing-functions** — for every server-side
      action invoked from a row-level kebab item (or any other row
      affordance) surfaced in Stage 1 inventory, emit a §D Q phrased:
-     "Per `docs/ux/lists.md` <RULE-LABEL>, does this action need a
+     "Per the surface's routed list-rule spec <RULE-LABEL>, does this action need a
      user-confirmation step?" Default is yes (terse AlertDialog).
      "No confirm" requires an explicit operator decision recorded in
      scope.md with reason. Never silently default to fire-and-forget;

@@ -9,8 +9,7 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 | Phase | Skills | Produces |
 |---|---|---|
 | **1 — Scope** | `said:scope-grill` (thin idea), `said:scope-refine` (handoff / branch / external product specs) | `scope.md` (purpose / target shape / constraints / open questions) |
-| **1 / 1.5 — Plan / Inspect** | `said:uxtoc` | outline-first design-seed (plan a screen early) + descriptive spec outline (inspect an authored one) |
-| **2 — Architect** | `said:architect`, `said:add-task` | feature spec (recreation contract) + append-only `*.tasks.md` |
+| **2 — Architect** | `said:uxtoc` (outline: design-seed early, inspect late), `said:architect`, `said:add-task` | feature spec (recreation contract) + append-only `*.tasks.md` |
 | **3 — Implement** | `said:impl`, `said:review-ux` | tasks driven Todo → Done under TDD, per-task UX gate |
 | **3.5 — Gates** | `said:review-qa` (hygiene), `said:accept` (acceptance contract) | pass/fail reports |
 | **4 — Debrief** | `said:debrief` | retrospective + backports + shipping reports |

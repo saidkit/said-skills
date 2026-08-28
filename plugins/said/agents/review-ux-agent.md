@@ -29,7 +29,7 @@ The `/said:review-ux` skill pre-stages artifacts before spawning you. Your promp
 
 - **task-id** — the canonical project task ID. Used to look up the task's spec entry and recent commit range.
 - **entity** — feature directory NAME (e.g. `<entity>`, `<entity>`). Used as `<entity>` in the checklist's grep patterns. The checklist's `verify:` actions carry the project-specific path prefix (e.g. `<feature-path>/<entity>/`) — you don't need to resolve the prefix; just substitute the entity name.
-- **screen-shape** — one of: `list-table`, `form`, `detail-with-tabs`, `embedded-list-in-tab`, `data-layer-only`. Used to filter the rule set.
+- **screen-shape** — the task's shape, drawn from the loaded checklist's shape vocabulary (the map at the top of the checklist — see step 2; do not enumerate shapes inline). Used to filter the rule set.
 - **feature-url** — the running dev-server URL the task ships (e.g. `http://localhost:<port>/<route>`).
 - **reference-url** — the named reference screen for visual parity. Optional; if absent, skip `<RULE-LABEL>`.
 

@@ -41,7 +41,7 @@ What this work is for. The WHY — user pain, operator need, business driver. Ci
 ## §B — Target shape
 What the end product looks like. 
 For a non-visual surface (`api`/`mcp`/`cli`) - what is the API / tool / command shape, database changes required, feature interactions, RBAC etc
-For a `visual` surface - UI surfaces (which screens, where they live in the routing tree); data model touchpoints (entities created / read / mutated); behavioural envelope (what happens, what doesn't); reference screens / contract rules cited (`R-*` from `docs/ux/feature-ux-checklist.md`, named references from `docs/ux/lists.md` / `shell.md` / `form.md`).
+For a `visual` surface - UI surfaces (which screens, where they live in the routing tree); data model touchpoints (entities created / read / mutated); behavioural envelope (what happens, what doesn't); reference screens / contract rules cited (`R-*` from the loaded `feature-ux-checklist.md`, plus named references from the surface's UX specs the checklist routes to).
 
 ## §C — Constraints
 What this work MUST respect: performance budget, RBAC role gating, project conventions (cite ADRs / UX-spec frozen rules verbatim), sequencing dependencies (what blocks what, what waits on what), and explicit out-of-scope boundaries.
@@ -69,7 +69,7 @@ Suggested order:
 3. **§C — Constraints** — "What must this respect — performance, RBAC, existing conventions? Anything explicitly out-of-scope? Sequencing — does this block other work or wait on something? Any ADR / UX rule that pins a specific shape?"
 4. **§D — Open questions** — Surface as you go. Anything you'd otherwise have to GUESS at to write spec.md goes here, with phrasing + forcing function + your default-with-reasoning.
 
-For a `visual` surface: Cite `R-*` rules from `docs/ux/feature-ux-checklist.md` whenever §B / §C touches a contract-governed area (list-table → <RULE-LABEL>, form → <RULE-LABEL>, RBAC → <RULE-LABEL>, etc.). Phase 2 (Architect) needs these citations to ground the spec.
+For a `visual` surface: Cite `R-*` rules from the loaded `feature-ux-checklist.md` whenever §B / §C touches a contract-governed area (each governed shape → its `R-*` rules, per the checklist's own map — do not hardcode shape→rule pairs inline). Phase 2 (Architect) needs these citations to ground the spec.
 
 Whenever you find yourself about to silently resolve a question — STOP. That's a §D item. Surface it; do not pick a side.
 

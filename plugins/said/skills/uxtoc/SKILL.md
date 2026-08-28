@@ -1,7 +1,7 @@
 ---
 name: uxtoc
 description: >
-  SAID/Phase 1 design-seed & 1.5 inspect — descriptive table-of-contents
+  SAID/Phase 2 (Architect) — descriptive table-of-contents
   for spec artifacts. Reads a scope.md, feature spec, screen spec, or
   feature working dir and emits a hierarchical outline (screens → header
   band → panes → fields/columns/sorts/filters/actions) with each element's
@@ -22,7 +22,7 @@ description: >
 
 Read-only. Emits a structured outline of what a SAID spec artifact actually says — at element granularity, with each column / field / filter / action expanded into its attributes (title, type, renderer, operator, variant, label, target, permission, …).
 
-Purpose: a tight feedback loop for spec authoring, at two positions in the chain. **Design-seed (Phase 1, early)** — run it on a thin `scope.md` or a screen stub; the outline mirrors what the stub states so far, so the panes / fields / filters / actions it does not yet mention are simply absent from the outline, and you fill them in against it. **Inspect (Phase 1.5, late)** — run it on an authored spec to read back exactly what it commits to. Same loop both ways: emit → spot a missing attribute or wrong shape → edit the spec → re-run `/said:uxtoc`. No review-and-fix loop — the TOC carries no judgment, only what the spec says.
+Purpose: a tight feedback loop for spec authoring, at two positions in the chain. **Design-seed (early)** — run it on a thin `scope.md` or a screen stub; the outline mirrors what the stub states so far, so the panes / fields / filters / actions it does not yet mention are simply absent from the outline, and you fill them in against it. **Inspect (late)** — run it on an authored spec to read back exactly what it commits to. Same loop both ways: emit → spot a missing attribute or wrong shape → edit the spec → re-run `/said:uxtoc`. No review-and-fix loop — the TOC carries no judgment, only what the spec says.
 
 uxtoc supports your authoring loop by **mirroring** the spec; it does not **generate** the spec for you. The design comes from you — uxtoc reflects whatever the spec states, however thin, so you can see the holes and fill them in.
 
@@ -54,7 +54,7 @@ The operator invokes:
 2. Classify: `screen` | `feature-spec` | `scope` | `dir`.
 3. Ground in templates (one parallel-Read batch):
    - `docs/features/template.md` — feature-spec shape, including its `## Screen` sections (the screen-spec shape). If the project keeps standalone per-screen specs under `docs/screens/`, read one as a shape exemplar.
-   - `docs/ux/lists.md`, `docs/ux/form.md`, `docs/ux/form-inline.md`, `docs/ux/form-table.md`, `docs/ux/form-custom.md` — pane-type vocabulary.
+   - The **element grammar** (pane-type vocabulary) — resolved from the surface-contract manifest (consumer `uxtoc`) and LOADed whole (`feature-ux-grammar.md`), not a hardcoded list of screen-spec filenames.
 
 ## Pass 2 — Extract
 

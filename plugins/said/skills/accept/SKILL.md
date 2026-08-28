@@ -60,11 +60,11 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
    - Task-mode: the named task must be `Status: Done (YYYY-MM-DD)`. Otherwise BLOCK + redirect to `/said:impl`.
    - Feature-mode (default): every task with `Status: Todo` / `Status: In progress` listed; if any → BLOCK with the list; operator confirms in-scope vs out-of-scope or closes them first. (Backlog and N/A statuses pass — they're intentional non-gating per SAID convention.)
 3. **Read spec + tasks file.** Spec read in full only in feature-mode (need § Acceptance Criteria + § Feature Tasks summary table). Tasks file read by-section (`## <task-id>:` anchors → `### Acceptance` blocks).
-4. **Index probe artifacts.** Glob `docs/working/<feature-id>/` for recorded probes: `*-wire-*.json`, `*.png` screenshots, Playwright snapshot files. Build a `<task-id> → [artifact paths]` map for Phase A classification.
+4. **Index probe artifacts.** Glob `docs/working/<feature-id>/` for recorded probes: `*-wire-*.json`, `*.png` screenshots (Playwright snapshots for a `visual` surface; wire captures for `api`/`mcp`/`cli`). Build a `<task-id> → [artifact paths]` map for Phase A classification.
 
 ## Phase A — Parse + Classify (STOP for operator review)
 
-> **Stance: read every AC item; classify each as mechanical / Playwright / manual. No execution yet. Emit plan + STOP.**
+> **Stance: read every AC item; classify each as mechanical / recorded-probe / manual. No execution yet. Emit plan + STOP.**
 
 Procedure:
 
@@ -74,8 +74,8 @@ Procedure:
 
 2. **Classify each item:**
    - **Mechanical** — code/data assertion: file presence (`exists path/x`, `deleted`), grep result (`returns 0 results`, `N matches`), endpoint contract (`responds with shape Y`), schema validation, test count delta (`Tests 575 → 578`), ADR rule conformance (when the rule has a mechanical assertion).
-   - **Playwright** — UI flow with a recorded probe artifact under `docs/working/<feature-id>/`. Evidence read, NOT re-executed (default; see Anti-patterns).
-   - **Manual** — operator must eyeball; no mechanical assertion + no recorded probe. Subjective side-by-side walks ("zero visible diffs"), "operator confirms theme matches mock", production-build visual checks.
+   - **Recorded-probe** — verified against a recorded probe artifact under `docs/working/<feature-id>/` (a Playwright snapshot for a `visual` surface; a wire-capture JSON for `api`/`mcp`/`cli`). Evidence read, NOT re-executed (default; see Anti-patterns).
+   - **Manual** — operator must eyeball; no mechanical assertion + no recorded probe. Subjective operator eyeball — e.g. a visual surface's side-by-side "looks-identical" check, "operator confirms theme matches mock", production-build visual checks.
 
 3. **Special cases:**
    - `[N/A — <reason>]` → classify as mechanical, auto-PASS with reason recorded verbatim. No re-litigation (task closure already approved the N/A).
@@ -91,17 +91,17 @@ Procedure:
    | source | classification | item | evidence-source |
    |---|---|---|---|
    | <feat-id>.tasks.md:<line> (<task-id>) | mechanical | "<AC text — e.g., specific frozen-rule satisfied>" | grep <ux-spec path> |
-   | <feat-id>.tasks.md:<line> (<task-id>) | playwright | "<AC text — e.g., probe confirms <observed shape>>" | docs/working/<feat-id>/<task-id>-wire-*.json |
-   | <feat-id>.tasks.md:<line> (<task-id>) | manual | "<AC text — e.g., walked side-by-side with <reference> — zero visible differences>" | operator review |
+   | <feat-id>.tasks.md:<line> (<task-id>) | recorded-probe | "<AC text — e.g., probe confirms <observed shape>>" | docs/working/<feat-id>/<task-id>-wire-*.json |
+   | <feat-id>.tasks.md:<line> (<task-id>) | manual | "<AC text — e.g., walked side-by-side with <reference> — visually identical>" | operator review |
    ```
 
-6. **STOP for operator review.** Brief status: "Phase A complete. N items classified (M mechanical + P playwright + X manual). Plan at `docs/working/<feature-id>/accept-<id>.md`. Reply OK to execute (Phase B), or flag items to revise."
+6. **STOP for operator review.** Brief status: "Phase A complete. N items classified (M mechanical + P recorded-probe + X manual). Plan at `docs/working/<feature-id>/accept-<id>.md`. Reply OK to execute (Phase B), or flag items to revise."
 
 ## Phase B — Execute
 
 > **Stance: execute mechanicals; read recorded probes; surface manuals. One verdict per item. AC text IS the contract — don't interpret operator intent.**
 
-For each approved item, in classification order (mechanical → playwright → manual):
+For each approved item, in classification order (mechanical → recorded-probe → manual):
 
 1. **Mechanical.** Infer the assertion from AC text and execute via Bash / Read / grep. Examples:
    - "tsc + lint clean" → run `<typecheck>` + `<lint>` (resolved per project, same chain as `/said:impl` Step 0 #8).
@@ -111,9 +111,9 @@ For each approved item, in classification order (mechanical → playwright → m
    - "Spec §14 names `<path>`" → check file presence + structural match against spec.
    - ADR-rule conformance (when assertion is well-defined) → run the assertion.
 
-2. **Playwright (recorded-evidence mode).** Read the probe artifact:
+2. **Recorded-probe (recorded-evidence mode).** Read the probe artifact:
    - JSON wire probe → parse + compare assertion against captured bytes.
-   - Screenshot / Playwright snapshot → PASS if AC bullet says "captured" / "probe confirms X" and the artifact exists. The probe IS the evidence.
+   - Screenshot / Playwright snapshot (a `visual`-surface probe) → PASS if AC bullet says "captured" / "probe confirms X" and the artifact exists. The probe IS the evidence.
    - **NEVER re-execute the probe** (settled default; risks flakiness, BE drift, dev-server unavailability). Operator override via `--re-execute=<task-id>` is deferred to v1.1; not implemented.
 
 3. **Manual.** Emit checklist line with AC text verbatim + linked artifact path (if any). Verdict = `MANUAL-PENDING` pending operator inline mark (`PASS` / `FAIL` written by operator before final report).
@@ -137,9 +137,9 @@ Finalize `docs/working/<feature-id>/accept-<id>.md`:
 ```
 ## Accept verdict — <id> (YYYY-MM-DD)
 
-- Items: <total> (<M> mechanical + <P> playwright + <X> manual)
+- Items: <total> (<M> mechanical + <P> recorded-probe + <X> manual)
 - Mechanical: <pass>/<total-mechanical> PASS
-- Playwright: <pass>/<total-playwright> PASS
+- Recorded-probe: <pass>/<total-recorded-probe> PASS
 - Manual: <pending> pending, <pass-confirmed>/<total-manual> PASS, <fail> FAIL
 - Verdict: PASS | FAIL | MANUAL-PENDING
 ```
@@ -162,7 +162,7 @@ Gate effect for `/said:debrief`:
 - **Don't auto-promote MANUAL-PENDING → PASS.** Operator marks inline. Auto-promotion defeats the gate.
 - **Don't edit code, specs, or tasks.** Read-only by contract. Even when finding obvious typos. Fixes route through `/said:impl` (re-open task pre-commit) or `/said:add-task` (post-commit follow-up).
 - **Don't re-execute recorded probes.** Recorded probes are evidence-at-task-close (settled default). Re-execution risks flakiness, BE migration drift, dev-server unavailability — failures here would be unrelated to AC drift. `--re-execute=<task-id>` override deferred to v1.1.
-- **Don't synthesize Playwright scripts from AC text.** If an AC item could theoretically be automated (e.g., "kebab shows Disable / Enable / Remove") but no recorded probe exists, classify as manual. Auto-generating Playwright code from prose is error-prone and out of scope.
+- **Don't synthesize probe scripts from AC text.** If an AC item could theoretically be automated (e.g., "kebab shows Disable / Enable / Remove") but no recorded probe exists, classify as manual. Auto-generating probe code (e.g. Playwright, for a `visual` surface) from prose is error-prone and out of scope.
 - **Don't re-litigate `[N/A — <reason>]` items.** Auto-PASS with reason recorded. Operator can spot abuse in the report and revisit individual N/As; the gate is not the place.
 - **Don't extract task-IDs from prose.** Require explicit input. No `/said:accept "the recent stuff"` ambiguity.
 - **Don't run hygiene checks.** `/said:review-qa` is the sibling for quality gates + Fix integrity + Refs conformance. This skill verifies behavioral contract only — strict scope separation.

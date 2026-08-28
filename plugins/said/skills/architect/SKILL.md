@@ -35,7 +35,7 @@ The user invokes:
 
 If the operator's request is to **add a new task** to an already-architected feature ("add a task for X", "amend the tasks log") — redirect to `/said:add-task` (the canonical entry point for backlog additions).
 
-If the operator's request is to **propagate new info** into an existing feature — BE handoff result, scope refinement, mid-implementation discovery, "process X and update spec + tasks", etc. — do NOT bounce. This is direct-edit work, not re-architecture. Proceed: read the source doc, list the deltas, apply surgical edits to spec + tasks per `docs/features/template-tasks.md` amendment carve-out (uncommitted task → amend in place + `### Deviations` note; committed task → append a new task ID). Report the diff. The 3-pass authoring flow below runs ONLY for INITIAL spec + tasks creation from a `scope.md`.
+If the operator's request is to **propagate new info** into an existing feature — BE handoff result, scope refinement, mid-implementation discovery, "process X and update spec + tasks", etc. — do NOT bounce. This is direct-edit work, not re-architecture. Proceed: read the source doc, list the deltas, apply surgical edits to spec + tasks per `docs/features/template-tasks.md` amendment carve-out (uncommitted task → amend in place + `### Deviations` note; committed task → append a new task ID). **After applying the spec edit, re-run the recreation-contract self-test** (Pass 2 § Recreation-contract self-test) against the updated spec — this branch owns the relocated spec-write + self-test (formerly `add-task` Step 4.5, moved here per the charter boundary). Report the diff. The 3-pass authoring flow below runs ONLY for INITIAL spec + tasks creation from a `scope.md`.
 
 If `scope.md` doesn't exist or §D is non-empty — BLOCK. Phase 1 is incomplete. Redirect: "scope.md §D non-empty (Phase 1 incomplete). Resolve §D items via `/said:scope-refine` regenerate or hand-edit, then re-run `/said:architect`."
 
@@ -155,7 +155,7 @@ Three sub-sections, each with its own procedure.
 For each entry in `Pieces of scope` (intent ledger), produce ONE outcome bullet:
 - Present tense: "**When the feature is built, [observable end-state].**"
 - Describes what a user/integrator observes — never what an implementer does.
-- Cites governing ADR / UX-spec / external spec inline (anchor only — `lists.md #26`, not paraphrase).
+- Cites governing ADR / UX-spec / external spec inline (anchor only — `<ux-spec> #NN`, not paraphrase).
 - No file paths in bullet text. A fresh implementer derives files from the cited ADRs + existing codebase shape; the spec doesn't enumerate them.
 - No past tense, no phase numbering, no `[x]` Done boxes. The spec is a forward contract; status lives in the tasks file.
 
@@ -173,7 +173,7 @@ For each entry in `Endpoints consumed / produced`, one line: `- **<METHOD> <path
 
 If the feature introduces no new endpoints, state it in one line ("This feature introduces no new endpoints; consumes `<n>` from `<upstream spec>`"). Then optionally enumerate consumed endpoints, one per line.
 
-No JSON envelope code samples. No Zod schema source. No `*.service.api.ts` excerpts. Those live in the upstream spec and the implementation; this section cites them.
+No wire-format source or schema-definition excerpts of any surface (the concrete wire vocabulary is the surface's own — resolved from the loaded surface contract, not named here). Those live in the upstream spec and the implementation; this section cites them.
 
 Natural size: 3–8 lines.
 
@@ -255,41 +255,31 @@ Pause for operator review. Brief: "Spec authored at `<path>` (`<n>` lines). Read
 Procedure:
 
 1. **Decompose per-feature-dir as default.** Generate one task per entry in `Pieces of scope` (intent ledger), plus any prep / retire / sweep tasks the spec mandates. Operator override to per-AC-cluster only when a single piece has 5+ unrelated AC clusters that can't land in one PR.
-2. **Detect app-segment split (multi-app features only).** Scan the intent ledger's `Pieces of scope` + `Constraints inherited` for tier keywords. App-segment vocab is **project-scoped — derived from the literal `<APP>` segment in `docs/features/template-tasks.md` stencil** (e.g., stencil `# <FEAT><NN>-FE-<NN>` → vocab = `{FE}`). The middle literal between two placeholder segments is the accepted app token; multiple literal tokens across the template's example task IDs (summary table rows + task headings) extend the vocab set. If the stencil has no `<APP>` segment, the project is single-app.
-   - **Single-app feature** (one tier only): emit single-app IDs in the project's shape (`<PREFIX><NN>-<NN>`, task counter 2-digit zero-padded). Default for projects whose template-tasks.md stencil has no `<APP>` segment, or for features that live entirely in one tier of a multi-app project.
-   - **Multi-app feature** (touches 2+ tiers): emit per-tier multi-app IDs (`<PREFIX><NN>-<APP>-<NN>`, task counter 2-digit zero-padded). The `<APP>` token must match one of the literals derived from template-tasks.md. Decompose each piece-of-scope into per-app tasks; if the spec implies a tier not represented in template-tasks.md vocab, ASK operator (extend the template or pick an existing token).
-   - **Heuristic:** if `Pieces of scope` cleanly split by tier (e.g., "Schema migration", "API endpoints", "Web screens"), multi-app. If they cross tiers per entry ("Entity X — full stack rewrite"), surface the ambiguity to operator before deciding.
+2. **Detect lane split (multi-lane features only) — consume `SAID.lanes:`, do not derive.** Scan the intent ledger's `Pieces of scope` + `Constraints inherited` for tier keywords. The legal lane set is the declared **`SAID.lanes:` registry** (the §Lanes registry on the umbrella `## Lane` block; ADR-SAID-S04) — **LOAD-WHOLE** it and echo its token+count; never parse example task IDs out of `template-tasks.md` to derive the vocabulary. The id template stays `SAID.id-shape:`. If the project declares a single lane (no `SAID.lanes:` registry), the feature is single-lane.
+   - **Single-lane feature** (one tier only): emit single-lane IDs per `SAID.id-shape:` (`<PREFIX><NN>-<NN>`, 2-digit zero-padded). Default when the project declares one lane, or for a feature living entirely in one lane.
+   - **Multi-lane feature** (touches 2+ lanes): emit per-lane IDs per `SAID.id-shape:` (`<PREFIX><NN>-<LANE>-<NN>`). Each `<LANE>` must be a declared lane in `SAID.lanes:`. Decompose each piece-of-scope into per-lane tasks; if the spec implies a lane not in the registry, ASK the operator (declare the lane, or pick an existing one).
+   - **Heuristic:** if `Pieces of scope` cleanly split by lane (e.g., "Schema migration", "API endpoints", "Web screens"), multi-lane. If they cross lanes per entry ("Entity X — full stack rewrite"), surface the ambiguity to the operator before deciding.
 3. **Generate file header.** Use a CONDENSED preamble: the four "CRITICAL: append-only" bullets (Never overwrite / When updating status / When adding tasks / Keep all detail) + a one-line pointer to `docs/features/template-tasks.md` for full authoring discipline + close-of-task review + a one-line pointer to the companion spec. Do NOT verbatim-copy the full template-tasks.md preamble — it's ~70 lines and would bloat every tasks file.
-4. **Generate summary table.** One row per task: ID / Title / Status. All Status = `Todo` initially. **IDs follow the project's canonical shape** (`<PREFIX><NN>-<NN>` single-app, `<PREFIX><NN>-<APP>-<NN>` multi-app — feature segment collapses the dash; task counter is per-app, 2-digit zero-padded). Numbering: **per-app monotonic counter** — each `(feature, app)` pair starts at `01` independently (two apps' initial tasks both numbered `01`, not `01 + 02`).
-5. **Classify screen shape per task.** From the intent ledger's `Screens / surfaces touched` (or the spec's UI/UX Requirements bullet for the matching piece), detect the screen shape. The conformance-checklist sections in step 8 are screen-shape-driven:
+4. **Generate summary table.** One row per task: ID / Title / Status. All Status = `Todo` initially. **IDs follow `SAID.id-shape:`** (`<PREFIX><NN>-<NN>` single-lane, `<PREFIX><NN>-<LANE>-<NN>` multi-lane — feature segment collapses the dash; task counter 2-digit zero-padded). Numbering: **per-lane monotonic counter** — each `(feature, lane)` pair starts at `01` independently (two lanes' initial tasks both numbered `01`, not `01 + 02`).
+5. **Run Step 0.SC, then classify + resolve from the LOADED registry — never inline.** Classify each task's screen shape; resolve its rule bundle + stencils by filtering the loaded registry (cite rule ids). A non-visual surface resolves its rules from the same manifest-routed artifact, never a hardcoded fallback filename. Ambiguous `applies-to` → ask the operator.
 
-   | Screen shape | What it is |
-   |---|---|
-   | List-table | Entity table with filters / search / pagination |
-   | Create / edit (default) | Form page — new entity or editing existing |
-   | Per-section save | Inline edit, section-by-section save |
-   | Embedded list in tab | Detail page with list-table embedded in a tab |
-   | Bespoke layout | Timeline / kanban / dashboard / non-standard |
-   | Data-layer-only | No own screens; selectors / badges / hooks |
+## Step 0.SC — Load the surface contract (SC-STUB v1)
 
-   Detection hints: "list / filter / pagination / table" → List-table; "create / edit / form" → Create/edit; "tab + embedded list" → Embedded list in tab; "no own screens / data-layer / selectors / badges" → Data-layer-only. If ambiguous, ask the operator.
+Resolve this skill's surface contract before reasoning over any surface-shape rule. Consumer = `architect`.
 
-6. **Resolve source UX specs per screen-shape mapping** (visual surfaces only — skip for non-visual):
+1. Manifest path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/surface-contract.manifest.md`. No key → HALT.
+2. LOAD the manifest WHOLE; echo its `SC-MANIFEST-HEADER` `token · N rows`. Missing/malformed → HALT. Never grep a single row.
+3. Key-grep `SAID.surface-type:` (scalar). Own row = equality match `(consumer == architect, surface-type == <resolved>)`. No row → HALT. Never scan or derive a row.
+4. LOAD the row's artifact WHOLE (docs-root-relative); echo its `SC-HEADER` `token · N`. Absent or missing/malformed sentinel → HALT.
+5. Reason over the LOADED artifact only; cite rule ids. Never restate or re-derive a mapping from memory.
 
-   | Screen shape | Specs to pull frozen rules from |
-   |---|---|
-   | List-table | `docs/ux/lists.md` + `docs/ux/shell.md` + `docs/ux/errors.md` |
-   | Create / edit | `docs/ux/form.md` + `docs/ux/shell.md` + `docs/ux/fields.md` + `docs/ux/errors.md` |
-   | Per-section save | + `docs/ux/form-inline.md` |
-   | Embedded list in tab | + `docs/ux/form-table.md` |
-   | Bespoke layout | + `docs/ux/form-custom.md` |
-   | Data-layer-only | `docs/ux/errors.md` only |
+HALT = stop with a named redirect; never proceed on a guessed contract.
 
-   Non-visual surfaces: fall back to `docs/ux/feature-ux-checklist.md` filtered by `applies-to`.
+6. **Rule-bundle routing comes from the loaded registry** — the registry carries the shape→bundle mapping; there is no inline map. Resolve each task's bundle from it.
 
-7. **Read source UX specs in parallel; extract applicable frozen rules.** For each resolved spec, read in full and pull every numbered/anchored frozen-rule entry (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`, `<RULE-LABEL>`). Capture: rule number / verbatim one-line summary / source anchor. This list IS the per-task acceptance gate that step 8 pastes into the Frozen rules section.
+7. **Read the routed rule bundles in full; extract applicable frozen rules.** For each bundle the loaded registry routes the task's shape to, read it in full and pull every anchored frozen-rule entry (rule id / verbatim one-line summary / source anchor). This list IS the per-task acceptance gate step 8 folds into Acceptance.
 
-8. **Generate per-task entries** strictly per `docs/features/template-tasks.md` section list — no new `###` headers permitted. Each entry's `## <task-id>: <Title>` heading uses the SAID-canonical shape decided in step 2 (`<PREFIX><NN>-NN` single-app or `<PREFIX><NN>-<APP>-NN` multi-app, 2-digit zero-padded). Canonical order: Status (date) / Priority / Refs / Problem [+ optional `### Root cause` for bugs] / Approach / Reading list / Acceptance / Fix (placeholder) / Deviations (placeholder) / Gotchas (placeholder) / Out of scope (optional, only if scope.md flagged something). The frozen-rule + wire-probe + visual-parity + cross-feature-contract content extracted in steps 5–7 folds into **Approach** (cite rule anchors inline) and **Acceptance** (observable bullets, one per concern) per the per-task authoring rules below.
+8. **Generate per-task entries** strictly per `docs/features/template-tasks.md` section list — no new `###` headers permitted. Each entry's `## <task-id>: <Title>` heading uses `SAID.id-shape:` as decided in step 2 (`<PREFIX><NN>-NN` single-lane or `<PREFIX><NN>-<LANE>-NN` multi-lane, 2-digit zero-padded). Canonical order: Status (date) / Priority / Refs / Problem [+ optional `### Root cause` for bugs] / Approach / Reading list / Acceptance / Fix (placeholder) / Deviations (placeholder) / Gotchas (placeholder) / Out of scope (optional, only if scope.md flagged something). The frozen-rule + wire-probe + visual-parity + cross-feature-contract content extracted in steps 5–7 folds into **Approach** (cite rule anchors inline) and **Acceptance** (observable bullets, one per concern) per the per-task authoring rules below.
 
 Per-task authoring rules (HARD — violations require rework):
 
@@ -298,14 +288,14 @@ Per-task authoring rules (HARD — violations require rework):
 - **Refs:** Write-set, not read-set. List ADR / UX-spec / feature-spec paths the task **creates or edits**. Read-set — specs the task consumes — lives in Reading list, NOT Refs. Empty unless the task itself produces a doc edit; mandatory when applicable.
 - **Problem:** What needs to be solved + context. For bugs, add `### Root cause` subsection.
 - **Approach:** "What to build" framing. Key decisions called out. **NO step-lists ("1. Do X. 2. Do Y.")** — methodology belongs to Phase 3 only. **NO function signatures, no detailed file lists, no implementation playbook.**
-  - **Cite applicable frozen rules inline** when relevant — anchors only, no verbatim paraphrase. Example: "Reshape onto <PROJECT> list-table shape per `lists.md` #20, #23, #26 + `shell.md` #4, #7 + `errors.md` #1, #2." Implementer opens the cited specs per Reading list `(full read)`.
+  - **Cite applicable frozen rules inline** when relevant — anchors only, no verbatim paraphrase. Example: "Reshape onto the `<shape>` rule bundle per `<ux-spec> #NN, #MM`" (rule ids from the loaded registry). Implementer opens the cited specs per Reading list `(full read)`.
   - **Alternatives considered** subsection ONLY when a rejected option was reasonable to a cold reader. Skip otherwise.
   - **Code samples** ONLY when the sample IS the load-bearing decision (a `CLAUDE.md` patch literal, an end-state folder layout). Default to prose pointing at upstream ADR/UX-spec.
 - **Reading list:** Per-task delta from spec's Context-to-load. Don't duplicate. Cite additional files / ADR-IDs / UX-spec-frozen-items the task specifically needs beyond the umbrella context. **Flag `(full read)` on UX specs whose frozen rules are cited in Approach** — implementer re-opens the source at Phase 3 (Implement) start, not CLAUDE.md summaries.
 - **Acceptance:** Observable bullets — how "done" is judged. Cite spec / ADR / UX-spec anchors; never restate. Conformance content folds in as observable bullets, skip any that don't apply:
-  - **Frozen-rule conformance** (when task touches UX-governed surfaces): cite spec + rule numbers, not verbatim text. Example: `- [ ] lists.md #20, #23, #26 + shell.md #4, #7 satisfied (per screen shape)`.
-  - **Wire contract** (when task introduces or changes a `*.service.api.ts` method): one bullet per load-bearing endpoint. Example: `- [ ] GET /endpoint — Zod schema matches captured bytes (playwright)`.
-  - **Visual parity** (when task migrates / reshapes a list-table or form screen): one bullet citing closest already-conformant reference. Example: `- [ ] Walked side-by-side with /tasks — zero visible diff`.
+  - **Frozen-rule conformance** (when task touches surface-governed shapes): cite spec + rule ids from the loaded registry, not verbatim text. Example: `- [ ] <ux-spec> #NN, #MM satisfied (per screen shape)`.
+  - **Wire contract** (when a `visual`/`api` task introduces or changes a wire method): one bullet per load-bearing endpoint. Example: `- [ ] GET /endpoint — response schema matches captured bytes (per the surface's wire-probe)`.
+  - **Visual parity** (when task migrates / reshapes a list-table or form screen): one bullet citing closest already-conformant reference. Example: `- [ ] recorded UI probe matches the reference — zero diff (visual surface)`.
   - **Cross-feature contracts** (when intent ledger's `Constraints inherited` lists Sacred consumers): one bullet per public surface preserved. Example: `- [ ] <Entity>Cell public props preserved (consumed by features/<entity>/)`.
   - **Quality gates**: one umbrella bullet. Example: `- [ ] Quality gates green; no regression outside scope.`
 

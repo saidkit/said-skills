@@ -85,7 +85,7 @@ Procedure:
 
 2. **Compose rule set from `feature-qa-checklist.md`** — three triggers (union; a rule fires if any matches):
    - **`applies-to: any` sweep:** always include every `any` rule. Universal defense — `<RULE-LABEL>` structural rules, `R-GATE-*`, etc.
-   - **Screen-shape filter:** if the task / feature has a declared screen-shape (read from spec § Per-feature scope or task entry), include rules whose `applies-to` matches: `list-table`, `form`, `detail-with-tabs`, etc.
+   - **Screen-shape filter:** if the task / feature has a declared screen-shape (read from spec § Per-feature scope or task entry), include rules whose `applies-to` matches that shape — shape vocabulary = the `applies-to` values in the LOADED checklist; do not enumerate shapes inline.
    - **Refs-cite-driven match:** for each entry in the task's `Refs:` line, find rules whose `source` matches the cite — by ADR file path (`docs/adr/<adr-file>.md`), ADR short name (`<ADR-shortname>`), or rule ID (`R-<XXX>-N`). Cite without matching rule → WARN (operator-verify).
 
 3. **Parse `Refs:` line** for additional cites beyond the checklist mappings — purely spec/doc edits (e.g., spec edits, project-doc edits) surface as WARN since they have no mechanical assertion.

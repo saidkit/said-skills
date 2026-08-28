@@ -6,12 +6,13 @@ description: >
   authoring into a standalone single-pass skill, intended for tasks
   discovered mid-implementation: bugs surfaced by code review or runtime,
   scope-creep additions, follow-ups from close-of-task leak scans.
-  Emits task IDs in the project's canonical shape — single-app
-  `<PREFIX><NN>-<NN>` or multi-app `<PREFIX><NN>-<APP>-<NN>` (2-digit
-  zero-padded task counter) via `app=` flag. App-segment vocab and concrete shape derive from
-  `docs/features/template-tasks.md` stencil; skill reads it at Step 0.
+  Emits task IDs in the project's canonical shape — single-lane
+  `<PREFIX><NN>-<NN>` or per-lane `<PREFIX><NN>-<LANE>-<NN>` (2-digit
+  zero-padded task counter) via `lane=` flag. The id template is `SAID.id-shape:`;
+  the legal lane set is the declared `SAID.lanes:` registry (LOAD-WHOLE), read at
+  Step 0 — never derived from example IDs.
   Triggered ONLY by the explicit command "/said:add-task <feature-id>
-  [bug] [short] [auto] [app=<APP>] [priority=High|Medium|Low]". NOT for INITIAL spec
+  [bug] [short] [auto] [lane=<LANE>] [priority=High|Medium|Low]". NOT for INITIAL spec
   + tasks creation — that's `/said:architect`. NOT for implementation
   — that's `/said:impl`.
 ---
@@ -28,15 +29,15 @@ This skill is the **add** half of Phase 2's task lifecycle. The **execute** half
 
 The user invokes:
 
-- `/said:add-task <feature-id>` — single-app task; interactive Q&A; default Priority=Medium; non-bug shape. Emits the project's single-app shape `<PREFIX><NN>-<NN>` (2-digit zero-padded).
-- `/said:add-task <feature-id> app=<APP>` — multi-app task; emits `<PREFIX><NN>-<APP>-<NN>` (2-digit zero-padded). The `<APP>` token must match the literal app-segment in `docs/features/template-tasks.md` stencil. Skill derives accepted vocab at Step 0; rejects any other token.
+- `/said:add-task <feature-id>` — single-lane task; interactive Q&A; default Priority=Medium; non-bug shape. Emits the project's single-lane shape `<PREFIX><NN>-<NN>` (2-digit zero-padded).
+- `/said:add-task <feature-id> lane=<LANE>` — per-lane task; emits `<PREFIX><NN>-<LANE>-<NN>` (2-digit zero-padded). The `<LANE>` token must be a declared lane in the `SAID.lanes:` registry (LOAD-WHOLE the registry at Step 0); rejects any undeclared token.
 - `/said:add-task <feature-id> bug` — adds `### Root cause` subsection per template-tasks.md bug-task discipline; auto-Priority=High.
 - `/said:add-task <feature-id> priority=High` — explicit priority.
-- `/said:add-task <feature-id> short` — minimal-shape task. Q&A trims to Title + Problem (+ Root cause for bugs); Approach + Acceptance prefilled from detected screen-shape; operator edits or accepts defaults. Suitable for routine bug fixes / polish.
-- `/said:add-task <feature-id> auto` — skill runs the default flow but stops ONLY when operator input or decision is required (Step 1 Q&A input, Step 3 Contradicts, Step 4.5 failures). Step 3 Gap proposed edits auto-approve and write with a `### Gotchas` trail recording the auto-approved edits for post-write verification.
-- Composition `short auto bug` — typical routine-bug workflow: trimmed Q&A, no Step 3 Gap confirmations (usually Covered for bugs), Step 4.5 skipped (no spec edit).
+- `/said:add-task <feature-id> short` — minimal-shape task. Q&A trims to Title + Problem (+ Root cause for bugs); Approach + Acceptance prefilled from the loaded rule registry; operator edits or accepts defaults. Suitable for routine bug fixes / polish.
+- `/said:add-task <feature-id> auto` — skill runs the default flow but stops ONLY when operator input or decision is required (Step 1 Q&A input). It gains NO spec-write: a Step 3 Gap/Contradicts is recorded-and-stopped (redirect to `/said:architect` propagate-new-info), never auto-written.
+- Composition `short auto bug` — typical routine-bug workflow: trimmed Q&A, usually Covered for bugs (no Gap flag), no spec-write path.
 
-Flags compose: `/said:add-task <feature-id> bug app=<APP> priority=High` is valid. Operator may type `<feature-id>` in any case; the skill normalizes to UPPERCASE (canonical grammar requires uppercase IDs in docs / tasks files; lowercase is reserved for commit-msg scopes only). Symmetric with `/said:impl`.
+Flags compose: `/said:add-task <feature-id> bug lane=<LANE> priority=High` is valid. Operator may type `<feature-id>` in any case; the skill normalizes to UPPERCASE (canonical grammar requires uppercase IDs in docs / tasks files; lowercase is reserved for commit-msg scopes only). Symmetric with `/said:impl`.
 
 If `docs/features/<feature-id>.tasks.md` doesn't exist, this is the WRONG skill. Redirect: "No tasks file at `docs/features/<feature-id>.tasks.md` — this is an INITIAL Phase 2 case. Use `/said:architect` to author the spec + initial tasks log first."
 
@@ -51,42 +52,30 @@ Resolve inputs and ground in existing context:
 3. **Resolve companion spec path** from `SAID.feature-spec:` on the `## Lane` block; no key → HALT. Sub-phased features may use slug-suffixed naming (e.g., `<feature-id>-phaseB.md` for the spec alongside `<feature-id>.tasks.md` for the tasks). If `<feature-id>.md` is missing, scan `docs/features/` for files matching `<feature-id>*.md` and ASK the operator which is the companion spec. Otherwise default.
 4. **Parse flags.**
    - `bug` → adds `### Root cause` subsection + auto-Priority=High (operator override via `priority=` wins).
-   - `app=<APP>` → multi-app mode. Vocab validation happens at step 7 after `docs/features/template-tasks.md` is read; if `<APP>` doesn't match the literal app-segment in the project's stencil, BLOCK with "Token `<APP>` not in project vocab (derived from `docs/features/template-tasks.md`). Accepted: <derived-list>." Absent → single-app mode.
+   - `lane=<LANE>` → per-lane mode. Validation happens at step 7 after the `SAID.lanes:` registry is LOAD-WHOLEd; if `<LANE>` is not a declared lane, BLOCK with "Lane `<LANE>` not in the `SAID.lanes:` registry. Declared: <lane-list>." Absent → single-lane mode.
    - `priority=<High|Medium|Low>` → explicit; defaults to Medium for non-bugs, High for bugs.
-   - `short` → minimal-shape task; Step 1 trims Q&A to Title + Problem (+ Root cause for bugs); Step 3 / Step 4.5 unchanged.
-   - `auto` → skill stops only for required operator input/decision. Step 3 Gap auto-approves all proposed edits (writes them + `### Gotchas` trail). Step 1 Q&A, Step 3 Contradicts, Step 4.5 failures retain their default stops.
+   - `short` → minimal-shape task; Step 1 trims Q&A to Title + Problem (+ Root cause for bugs); Step 3 unchanged.
+   - `auto` → skill stops only for required operator input/decision. Step 3 Gap/Contradicts is recorded-and-stopped (redirect to `/said:architect` propagate-new-info), never auto-written. Step 1 Q&A retains its default stop.
 5. **Read existing tasks file in full.** Compute the next task ID from the lane's `## Lane` `SAID.id-shape:` key (declaration-first, as `flow` / `impl` resolve it); the canonical grammar (feature `<PREFIX>-<NN>`; task IDs collapse the dash inside the feature segment) is the **key-absent FALLBACK**:
    - **Compute task prefix:** strip the dash from `<feature-id>` (e.g., `<FEAT>-NN` → `<FEAT>NN`).
-   - **Single-app mode (no `app=` flag):** scan for headings matching `^## <PREFIX>-(\d+):`. Take max NN; new ID = `<PREFIX>-<NN+1>` zero-padded to 2 digits. If no prior single-app entries exist, start at `01`.
-   - **Multi-app mode (`app=<APP>`):** scan for headings matching `^## <PREFIX>-<APP>-(\d+):` (filtered to THIS app only). Take max NN; new ID = `<PREFIX>-<APP>-<NN+1>` zero-padded to 2 digits. **Per-app counter** — each `(feature, app)` pair has its own monotonic stream, starting at `01` independently.
+   - **Single-lane mode (no `lane=` flag):** scan for headings matching `^## <PREFIX>-(\d+):`. Take max NN; new ID = `<PREFIX>-<NN+1>` zero-padded to 2 digits. If no prior single-lane entries exist, start at `01`.
+   - **Per-lane mode (`lane=<LANE>`):** scan for headings matching `^## <PREFIX>-<LANE>-(\d+):` (filtered to THIS lane only). Take max NN; new ID = `<PREFIX>-<LANE>-<NN+1>` zero-padded to 2 digits. **Per-lane counter** — each `(feature, lane)` pair has its own monotonic stream, starting at `01` independently.
    - **Legacy IDs do NOT contribute.** Any task heading not matching the canonical regex (e.g., pre-migration entries in projects that haven't run a one-time task-id migration) is excluded from the counter scan. Append-only — never fill gaps from deleted tasks.
 6. **Skim companion spec — capture coverage anchors.** Identify which section(s) govern the new task's scope (Per-piece scope / Acceptance Criteria / Implementation pointers / Boundaries — whichever the spec uses). Capture 1–2 lines per relevant section for Step 3 classification. Don't full-read.
-7. **Read `docs/features/template-tasks.md`** in full — for authoring discipline AND task-ID stencil. Extract accepted app-segment vocab from the stencil: parse the canonical heading + example task IDs (e.g., `# <FEAT><NN>-FE-<NN> Task Log` → middle literal segment `FE` → vocab = `{FE}`). The middle literal between two placeholder segments is the accepted app token. Validate the step-4 `app=` flag now: if outside the derived set, BLOCK per step 4. If the stencil has no `<APP>` segment, the project is single-app — reject any `app=` flag.
-8. **Classify screen shape** (visual surfaces only — skip for non-visual). Detect the new task's screen shape from the closest companion spec § Per-feature scope subsection (or from operator-provided context if the new task doesn't map cleanly to a scope piece):
+7. **Read `docs/features/template-tasks.md`** in full — for authoring discipline AND the id-shape stencil. **LOAD-WHOLE the `SAID.lanes:` registry** (a mapping — the §Lanes registry on the umbrella `## Lane` block; ADR-SAID-S04) and echo its token+count before use; it is the source of the legal lane set — never parse example task IDs to derive it. Validate the step-4 `lane=` flag now against the declared lanes: if `<LANE>` is not declared, BLOCK per step 4. If the project declares a single lane (no `SAID.lanes:` registry), reject any `lane=` flag.
+8. **Run Step 0.SC, then classify + resolve from the LOADED registry — never inline.** Classify the task's screen shape; resolve its rule bundle + stencils by filtering the loaded registry (taxonomy/routing/stencils live there). Ambiguous `applies-to` → ASK in Step 1's batch prompt; never guess or fall back to an inline list.
 
-   | Screen shape | What it is |
-   |---|---|
-   | List-table | Entity table with filters / search / pagination |
-   | Create / edit (default) | Form page — new entity or editing existing |
-   | Per-section save | Inline edit, section-by-section save |
-   | Embedded list in tab | Detail page with list-table embedded in a tab |
-   | Bespoke layout | Timeline / kanban / dashboard / non-standard |
-   | Data-layer-only | No own screens; selectors / badges / hooks |
+## Step 0.SC — Load the surface contract (SC-STUB v1)
 
-   If ambiguous, ASK the operator in Step 1's batch prompt — don't guess.
+Resolve this skill's surface contract before reasoning over any surface-shape rule. Consumer = `add-task`.
 
-9. **Resolve source UX specs + extract frozen rules** (visual surfaces only). Per screen shape:
+1. Manifest path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/surface-contract.manifest.md`. No key → HALT.
+2. LOAD the manifest WHOLE; echo its `SC-MANIFEST-HEADER` `token · N rows`. Missing/malformed → HALT. Never grep a single row.
+3. Key-grep `SAID.surface-type:` (scalar). Own row = equality match `(consumer == add-task, surface-type == <resolved>)`. No row → HALT. Never scan or derive a row.
+4. LOAD the row's artifact WHOLE (docs-root-relative); echo its `SC-HEADER` `token · N`. Absent or missing/malformed sentinel → HALT.
+5. Reason over the LOADED artifact only; cite rule ids. Never restate or re-derive a mapping from memory.
 
-   | Screen shape | Specs to pull frozen rules from |
-   |---|---|
-   | List-table | `docs/ux/lists.md` + `docs/ux/shell.md` + `docs/ux/errors.md` |
-   | Create / edit | `docs/ux/form.md` + `docs/ux/shell.md` + `docs/ux/fields.md` + `docs/ux/errors.md` |
-   | Per-section save | + `docs/ux/form-inline.md` |
-   | Embedded list in tab | + `docs/ux/form-table.md` |
-   | Bespoke layout | + `docs/ux/form-custom.md` |
-   | Data-layer-only | `docs/ux/errors.md` only |
-
-   Read in parallel; extract applicable frozen-rule anchors (rule numbers only, no verbatim paraphrase). Non-visual surfaces: fall back to `docs/ux/feature-ux-checklist.md` filtered by `applies-to`.
+HALT = stop with a named redirect; never proceed on a guessed contract.
 
 ## Step 1 — Single-batch interactive Q&A
 
@@ -104,11 +93,11 @@ Suggested batch prompt:
 
 ```
 Authoring <new-task-id> (project-canonical shape per `docs/features/template-tasks.md`).
-Derived from: feature <feature-id>, app=<app-token> (literal from template-tasks.md stencil; accepted vocab = {<derived-set>}), prior counter <max-NN> → next <new-NN>.
+Derived from: feature <feature-id>, lane=<lane-token> (declared in the `SAID.lanes:` registry; declared set = {<lane-set>}), prior counter <max-NN> → next <new-NN>.
 
 [If task-id is wrong — flag in your reply and skill recomputes before write.]
 
-Detected screen shape: <list-table | create-edit | data-layer-only | ...> (from spec § Per-feature scope). UX specs in scope: <lists.md, shell.md, errors.md>. Applicable frozen-rule anchors: <#20, #23, #26 + #4, #7 + #1, #2> (skill extracted from Step 0).
+Detected shape: <the task's shape, from the loaded registry's vocabulary>. Rules in scope: <the registry's routed rule ids for that shape> (skill resolved these from the loaded registry at Step 0.SC).
 
 Reply with answers below (any format; terse OK):
 
@@ -120,8 +109,8 @@ Alternatives considered: [optional — only if a rejected option was reasonable]
 Reading list: [task-specific files beyond spec's Context-to-load — skill will flag (full read) on UX specs sourced]
 Acceptance bullets (skill prefills; strip categories that don't apply):
   - [ ] <spec> #N, #M satisfied (per screen shape)
-  - [ ] GET <endpoint> — Zod schema matches captured bytes (playwright)
-  - [ ] Walked side-by-side with <reference URL> — zero visible diff
+  - [ ] <endpoint-contract bullet — only for a surface with a wire probe>
+  - [ ] <surface-appropriate acceptance bullet — e.g. a recorded UI probe for a visual surface>
   - [ ] <ComponentName> public props preserved (consumed by <ConsumerFeature>)
   - [ ] Quality gates green; no regression outside scope.
 Refs: [ADR/UX-spec/feature-spec paths this task CREATES or EDITS; empty otherwise]
@@ -136,14 +125,14 @@ Before writing, validate the answers against template-tasks.md discipline. Rewri
 
 - **STRICT template adherence (HARD).** Use ONLY the section list in `docs/features/template-tasks.md`: Problem / Approach / Reading list / Acceptance / Fix / Deviations / Gotchas / Out of scope (+ optional `### Root cause` subsection under Problem for bugs). NEVER invent new `###` headers ("Frozen rules to satisfy", "Wire contract probes", "Visual parity reference", "Cross-feature contracts", "Spec changes", "Files modified", "Implementation notes", "Lessons learned", "Discovery" — all forbidden). Frozen-rule conformance / wire probes / visual parity / cross-feature contracts fold into Approach + Acceptance per the rules below. Task bloat dies here.
 - **Approach: no step-lists.** "1. Do X. 2. Do Y." → rewrite as "what-to-build" framing with key decisions called out. If the operator's Approach reads as imperative numbered steps, contract to declarative end-state prose.
-- **Approach: cite frozen-rule anchors inline** when the task touches UX-governed surfaces. Use Step 0's extracted anchors. Example: "Reshape Sheet → Dialog per `lists.md` #20 (Sheet form needs ≥2 fields) + `form.md` #16 (RBAC affordance gating)." Anchors only — no verbatim paraphrase. Implementer opens the source via Reading list `(full read)`.
+- **Approach: cite frozen-rule anchors inline** when the task touches surface-governed shapes. Use the rule ids the loaded registry routed at Step 0.SC. Example: "Reshape per the routed rules — cite ids (e.g. `<ux-spec> #NN, #MM`)." Anchors only — no verbatim paraphrase. Implementer opens the source via Reading list `(full read)`.
 - **Approach: no implementation-detail leakage.** Function signatures, file enumerations, code samples that aren't load-bearing → cut and cite the upstream ADR/UX-spec/spec section. A code sample is load-bearing only when the sample ITSELF carries a decision the prose can't (e.g., end-state folder layout for a data-layer-only feature; a literal doc-patch wording).
 - **Alternatives considered: only when reasonable.** If the operator listed an alternative that no cold reader would have picked, drop it (per template's bloat-scan rule).
 - **Reading list: per-task DELTA only.** If the operator cited files already in the spec's Context-to-load, cut the duplicates — the spec covers the umbrella; the task cites only what's specifically additional. **Flag `(full read)` on UX specs whose anchors are cited in Approach** — implementer re-opens the source at Phase 3 (Implement) start, not CLAUDE.md summaries.
 - **Acceptance: observable bullets, conformance content folds in.** Cite spec / ADR / UX-spec anchors; never restate. Skip every category that doesn't apply:
-  - Frozen-rule conformance (when task touches UX-governed surfaces): `- [ ] lists.md #20, #23 + form.md #16 satisfied (per screen shape)`.
-  - Wire contract (when task adds/changes a `*.service.api.ts` method): `- [ ] GET /endpoint — Zod schema matches captured bytes (playwright)`.
-  - Visual parity (when task migrates / reshapes a list-table or form screen): `- [ ] Walked side-by-side with /tasks — zero visible diff`.
+  - Frozen-rule conformance (when task touches surface-governed shapes): `- [ ] <ux-spec> #NN, #MM satisfied (per the loaded registry)`.
+  - Wire contract (when a task changes a wire method): `- [ ] GET /endpoint — response schema matches captured bytes (per the surface's wire probe)`.
+  - Surface parity (visual surface only): `- [ ] recorded UI probe matches the reference — zero diff`.
   - Cross-feature contracts (when spec's Boundaries lists Sacred consumers): `- [ ] <Entity>Cell public props preserved (consumed by features/<entity>/)`.
   - Quality gates umbrella bullet.
   
@@ -154,55 +143,22 @@ Before writing, validate the answers against template-tasks.md discipline. Rewri
 
 If a §D-class question surfaces during Q&A — an operator decision the skill cannot silently resolve (cross-cutting choice, contract conflict, sequencing ambiguity) — STOP authoring. Surface the question explicitly; wait for operator decision; then proceed. Do not bake guesses into the new task.
 
-## Step 3 — Spec coverage gate
+## Step 3 — Spec coverage gate (read-only — classify + flag, never write)
 
-**Mode-aware gate behavior.**
+Classify the new task vs the companion spec (anchors from Step 0 step 6). This gate **detects and flags**; it does **not** write spec content — authoring a spec edit is `/said:architect`'s charter, not this skill's (a task-appender never writes a sibling-owned artifact; ADR-SAID-S01 charter boundary).
 
-- **Default / `bug` / `short`** — existing flow (operator confirms each Gap edit; 3-option prompt on Contradicts).
-- **`auto`** — auto-resolves clear gates; stops only when decision required:
-  - **Covered** → proceed silently to Step 4 (clear).
-  - **Gap** → write each proposed spec edit as drafted (no per-edit prompt — skill's proposals are the default); add `### Gotchas` line on the new task: `Auto-mode approved <N> spec edit(s) at <spec-section list>. Operator verify post-write.`
-  - **Contradicts** → STOP and surface the 3-option prompt (decision REQUIRED — auto does not override).
+- **Covered** — spec already mandates this requirement → proceed to Step 4. No flag.
+- **Gap** — spec silent or partial on the new task's requirement → **record a `### Gotchas` flag** on the new task (`Spec GAP vs <spec-path> § <section>: <one-line>. Propagate via /said:architect propagate-new-info before impl.`) and **STOP**, redirecting the operator to `/said:architect <spec-path>` (propagate-new-info branch) to author the spec edit. Do not draft or write the edit here.
+- **Contradicts** — task Approach diverges from a stated spec rule → **record the `### Gotchas` flag** and **STOP** with the redirect; the operator resolves via `/said:architect` propagate-new-info (surgical bullet rewrite) or re-architecture (`/said:architect <scope-path> output-name=<feature-id>-v2`) for a fundamental scope shift. Never reconcile by editing the spec here.
 
-Classify the new task vs companion spec (anchors from Step 0 step 6):
-
-- **Covered** — spec already mandates this requirement → proceed to Step 4. No spec edit.
-- **Gap** — spec silent or partial → propose requirement-level spec edit (below).
-- **Contradicts** — task Approach diverges from a stated spec rule → BLOCK with three options:
-  - **(a) Revise the task** — the contradiction is task-shape; reword Approach / Acceptance to align with the existing spec.
-  - **(b) Direct-edit the spec** via `/said:architect` propagate-new-info branch — if the contradiction resolves to a surgical bullet rewrite (e.g., spec says "displays X" but the new task implements "displays Y" for a justified reason).
-  - **(c) Re-architect** via `/said:architect <scope-path> output-name=<feature-id>-v2` — rare; only when the contradiction reflects a fundamental scope shift requiring full re-author.
-
-**Propose spec edit (Gap only):**
-
-1. **Extract REQUIREMENT from task's Problem + Approach.** Strip implementation: file paths, function signatures, code samples, step-lists, library names. Spec = WHAT (observable behavior, shape, constraint); task = HOW.
-2. **Match spec's section style.** Edits land in template-conforming sections only: **Functional Requirements bullet** / **UI/UX Requirements bullet** / **API Integration line** / **Acceptance Criteria statement** (Gherkin or bullet, per spec's AC mode) / **Known limitations bullet**. Never introduce a new top-level section — if the proposed edit doesn't fit any of the above, the spec needs re-architecture (BLOCK and redirect to `/said:architect` propagate-new-info branch).
-3. **Surface proposed edits.** If the gap affects ONE spec section, surface as single batch. If it affects ≥ 2 sections (common: Functional Requirements gains a bullet AND Acceptance Criteria gains a matching statement), surface as a numbered list and confirm each independently:
-
-   ```
-   Spec coverage: GAP — <spec-path>.
-     Edit 1 / <section>:  + <draft>
-     Edit 2 / <section>:  + <draft>
-     [...]
-   Confirm each (y / revise N: <new text> / no: <N> — log as deliberate skip per edit).
-   ```
-
-   **Hard cap: ≤ 4 sections affected.** If > 4, BLOCK with redirect: "Multi-section spec change exceeds `/said:add-task` scope (`<n>` sections needed). Apply via `/said:architect` propagate-new-info branch directly."
-
-4. **Response per edit:**
-   - `y` → record for Step 4 atomic write.
-   - `revise N: <new text>` → use operator's text for edit N.
-   - `no: <N>` → skip edit N; add Gotchas bullet `Spec edit N not applied per operator decision <YYYY-MM-DD>.`
-
-`bug` tasks default to Covered (bug = code/spec divergence, not new requirement); gate still runs to catch the rare case where spec was silent on affected behavior.
+**Mode note.** `auto` does not change this: a Gap/Contradicts is an owed architect action — recorded-and-stopped, never auto-written (the spec-write capability is removed; charter boundary). `bug` tasks default to Covered (bug = code/spec divergence, not a new requirement); the gate still runs to catch the rare spec-silent case, flagging it the same way.
 
 ## Step 4 — Append + apply confirmed spec edit
 
-**Write order (spec first if Step 3 confirmed, then task):**
+**Write the task (this skill writes the tasks log only — never the spec):**
 
-1. If Step 3 confirmed: open spec, insert requirement under named section, save. Surface diff.
-2. Append task block + summary table row (canonical shape per Step 0 step 5).
-3. `Refs:` reflects what skill wrote — spec path if edited, empty if not. Not future intentions.
+1. Append task block + summary table row (canonical shape per Step 0 step 5).
+2. `Refs:` reflects what this skill wrote — a task-appender never edits the spec, so `Refs:` is empty unless the task itself is a doc-editing task that creates/edits an ADR. Not future intentions.
 
 Use the canonical section order from template-tasks.md:
 
@@ -245,24 +201,6 @@ Use the canonical section order from template-tasks.md:
 
 Insert a `---` separator before the new task block (matching the calibration target's task-separator pattern).
 
-## Step 4.5 — Recreation-contract self-test (only when Step 3 confirmed a spec edit)
-
-After spec + task are written, re-run the 5-question recreation-contract test from `/said:architect` Pass 2 § Recreation-contract self-test against the updated spec. Common failure modes after a single-task edit:
-
-| Failed question | Cause | Fix |
-|---|---|---|
-| Q1 Screens | edit removed a `**<ScreenName>**` mention | Restore mention |
-| Q3 Governing rules | edit removed an ADR / UX-spec inline anchor | Restore citation |
-| Q4 Acceptance harness | Functional Requirements gained a bullet without matching Acceptance | Add Acceptance bullet for the new requirement |
-| Q5 End-state per piece | new piece-of-scope without Functional Requirement bullet (rare for add-task) | Add Functional Requirement bullet |
-
-If any question fails, surface to operator. Allow:
-
-- **revise** — re-edit the spec; re-run test.
-- **skip** — proceed; add `### Gotchas` line on the new task: `Spec recreation-test failed on Q<N> per operator decision <YYYY-MM-DD>; <one-line reason>.` Commit-msg notes the skip.
-
-Skip Step 4.5 entirely when Step 3 was Covered (no spec edit ran).
-
 ## Step Final — Exit
 
 Report to operator:
@@ -272,8 +210,7 @@ Report to operator:
 - Summary table updated (yes/no).
 
 **Auto-mode addendum to report** (when `auto` was set):
-- Step 3 outcome: Covered / Gap with <N> auto-approved spec edits / Contradicts (resolved per operator choice).
-- Recommend operator review auto-approved spec edits before `/said:impl <new-task-id>`.
+- Step 3 outcome: Covered / Gap (flagged + stopped) / Contradicts (flagged + stopped) — any Gap/Contradicts names the `/said:architect propagate-new-info` action owed before `/said:impl`.
 
 Hard exit. Do NOT begin implementation. Do NOT spawn coding agents. Phase 3 implementation is a separate operator decision — the new task is now in the backlog; the operator picks when to work it.
 
@@ -288,12 +225,11 @@ Suggested next step: "Task `<new-task-id>` appended. Run `/said:impl <new-task-i
 - **Don't begin implementation.** This skill writes the task entry; that's the entire output. NEVER spawn coding agents; NEVER invoke `/said:impl` automatically (the operator triggers it after this skill exits); NEVER begin code edits.
 - **Don't run on features without an existing tasks file.** Redirect to `/said:architect` for INITIAL spec + tasks creation.
 - **Don't modify or reorder existing tasks.** Append-only per `template-tasks.md`. The only exception (per template-tasks.md) is Status updates with `### Fix` — that's close-of-task review territory, not this skill.
-- **Don't fill task-ID gaps.** Per-app monotonic counter — the highest existing NN for THIS `(feature, app)` pair gets `+1` regardless of deleted-task gaps below. Append-only matches git-log sequencing.
-- **Don't cross-pollinate counters across apps.** Each `(feature, app)` pair has its own independent counter — the next ID for app-A doesn't increment based on app-B's counter. Different apps own different bug/feature streams.
+- **Don't fill task-ID gaps.** Per-lane monotonic counter — the highest existing NN for THIS `(feature, lane)` pair gets `+1` regardless of deleted-task gaps below. Append-only matches git-log sequencing.
+- **Don't cross-pollinate counters across lanes.** Each `(feature, lane)` pair has its own independent counter — the next ID for lane-A doesn't increment based on lane-B's counter. Different lanes own different task streams.
 - **Don't mix legacy IDs into the counter scan.** Task headings not matching the canonical regex live in a separate namespace; the canonical counter starts fresh at `01` regardless of how many legacy entries exist. After migration (if applicable), all IDs share the canonical shape and this anti-pattern dissolves.
 - **Don't bypass `Refs:` discipline.** Refs is for ADR/UX/spec EDITS the task creates, NOT for everything the task READS. Reading is captured in Reading list.
 - **Don't conflate bug tasks with planned tasks.** Bug tasks have `### Root cause`; planned tasks don't. The `bug` flag is the explicit signal — never auto-detect via problem-text keyword scanning (false positives corrupt the calibration target).
 - **Don't invent new `###` sections in task entries.** `docs/features/template-tasks.md` is the exhaustive section list: Problem / Approach / Reading list / Acceptance / Fix / Deviations / Gotchas / Out of scope (+ optional `### Root cause` under Problem for bugs). Forbidden: `### Frozen rules to satisfy`, `### Wire contract probes`, `### Visual parity reference`, `### Cross-feature contracts`, `### Spec changes`, `### Files modified`, `### Implementation notes`, `### Lessons learned`, `### Discovery`, `### Pass N` — all fold into Approach + Acceptance.
 - **Don't skip the Step 3 spec coverage gate.** Even for trivial tasks, classify before appending. Silent skip = spec drift.
-- **Don't leak implementation into proposed spec edits.** Spec = WHAT (behavior, shape, constraint). Task = HOW (paths, signatures, code, step-lists). Strip the latter before surfacing to operator.
-- **Don't reverse spec/task write order.** Spec edit FIRST in Step 4, then task. Reversed = task references a spec line that doesn't exist yet.
+- **Don't write spec content.** This skill classifies coverage and flags a Gap/Contradicts; the spec edit itself is `/said:architect`'s propagate-new-info branch (charter boundary). A task-appender that writes a sibling-owned spec is the drift this corrects.

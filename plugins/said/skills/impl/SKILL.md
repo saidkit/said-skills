@@ -112,7 +112,7 @@ Procedure:
 
 3. **If S — output classification + discipline + plan paragraph. STOP. Skip steps 4–6.**
 
-4. **Read in parallel** — every Reading-list UX spec flagged `(full read)`, AND every current-implementation file under the entity's feature dir cited in Reading list (or implied by Approach — e.g., `features/<entity>/` if the task migrates that entity). UX specs ground the rule anchors; current-impl files ground the "Evidence" column in step 6. Cite each in the inventory output with one-line anchor (e.g., "Read `lists.md` — rules #20, #23, #26 in scope per task Approach"; "Read `features/<entity>/screens/Browser.tsx:1-120` — current shape baseline").
+4. **Read in parallel** — every Reading-list UX spec flagged `(full read)`, AND every current-implementation file under the entity's feature dir cited in Reading list (or implied by Approach — e.g., `features/<entity>/` if the task migrates that entity). UX specs ground the rule anchors; current-impl files ground the "Evidence" column in step 6. Cite each in the inventory output with one-line anchor (e.g., "Read the routed rule spec — its rules in scope per task Approach"; "Read `features/<entity>/screens/Browser.tsx:1-120` — current shape baseline").
 
 5. **Run wire-contract probes** for every endpoint cited in the task's Acceptance:
    - `visual` surface with playwright available: navigate the dev server route via `mcp__playwright__browser_navigate`; capture network via `mcp__playwright__browser_network_requests`. Save response payload to `docs/working/<feature-id>/<task-id>-wire-<endpoint-slug>.json`.
@@ -126,9 +126,9 @@ Procedure:
 
    | Acceptance bullet | Satisfied? | Evidence | Work |
    |---|---|---|---|
-   | `lists.md` #20, #23, #26 satisfied | no | `features/<entity>/screens/Browser.tsx:42` mounts inline `<Input>`; needs `<TableGlobalSearch>` per #26 | Replace inline state with `useTableQueryParams`; mount `<DataTableToolbar>` |
-   | GET `/<entity>/terms` — Zod schema matches captured bytes | no | Captured `{data, pageCount, totalCount}`; FE schema expects `{items, total, page, limit}` | Rewrite `<entity>TermListResponseSchema` to wire shape |
-   | Walked side-by-side with `/tasks` — zero visible diff | no | Not walked | Phase C playwright walk |
+   | `<ux-spec>` #NN, #MM satisfied (from loaded registry) | no | `features/<entity>/screens/Browser.tsx:42` mounts inline `<Input>`; needs the rule's component per #MM | Replace inline state with `useTableQueryParams`; mount `<DataTableToolbar>` |
+   | GET `/<entity>/terms` — response schema matches captured bytes | no | Captured `{data, pageCount, totalCount}`; client schema expects `{items, total, page, limit}` | Rewrite `<entity>TermListResponseSchema` to wire shape |
+   | Surface-parity: matches the reference | no | Not checked | Phase C side-by-side walk (visual surface) |
    | Spec §14 names `features/<entity>/components/<entity>-users-table.tsx` | no | Not on disk | CREATE |
    | Spec §14 names `features/<entity>/components/<entity>-users-table-columns.tsx` | no | Not on disk | CREATE |
 
@@ -140,14 +140,24 @@ Procedure:
 
 > **Stance: turn `[ ]` into `[x]` rule-by-rule. TDD red-green-refactor by default; declarative-test or no-test for declared structural carve-outs. One rule, one confirmation in chat. NO batching. NO "I'll defer X to a Pass 2" thinking. `<typecheck>` after every changed file.**
 
+## Step 0.SC — Load the surface contract (SC-STUB v1)
+
+Resolve this skill's surface contract before reasoning over any surface-shape rule. Consumer = `impl`.
+
+1. Manifest path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/surface-contract.manifest.md`. No key → HALT.
+2. LOAD the manifest WHOLE; echo its `SC-MANIFEST-HEADER` `token · N rows`. Missing/malformed → HALT. Never grep a single row.
+3. Key-grep `SAID.surface-type:` (scalar). Own row = equality match `(consumer == impl, surface-type == <resolved>)`. No row → HALT. Never scan or derive a row.
+4. LOAD the row's artifact WHOLE (docs-root-relative); echo its `SC-HEADER` `token · N`. Absent or missing/malformed sentinel → HALT.
+5. Reason over the LOADED artifact only; cite rule ids. Never restate or re-derive a mapping from memory.
+
+HALT = stop with a named redirect; never proceed on a guessed contract.
+
 Procedure:
 
-1. **Order rules by blast radius** (cheapest first, highest cross-cut leverage first):
-   - `errors.md` rules — `parseResponse` wrap, `silentError` meta, `RouteSlot`. Cheapest to satisfy; biggest blast radius if missing.
-   - `shell.md` rules — `PageHeader` band, AppShell `SidebarInset min-w-0`.
-   - `lists.md` / `form.md` / `fields.md` rules — entity-shape rules; deepest change.
-   - Wire-contract reshape — Zod schema rewrite per captured bytes from Phase A probes.
-   - Visual-parity gaps — DEFERRED to Phase C side-by-side walk; don't pre-tune.
+1. **Order rules by blast radius per the loaded registry** (Step 0.SC) — cheapest first. The bundle + ordering come from the manifest-routed registry (cross-cutting rules first → entity-shape deepest → wire-contract reshape → visual-parity last), not hardcoded `docs/ux/*.md` filenames.
+   - Wire-contract reshape — response-schema rewrite per Phase A captured bytes.
+   - Visual-parity gaps — DEFERRED to Phase C side-by-side walk (visual surface only); don't pre-tune.
+   *(Stack-discipline vocab — `parseResponse`/`silentError`/`RouteSlot`, `PageHeader`/`SidebarInset` — stays inline; deferred to a later pass.)*
 
 2. **TDD path (default):** for each rule, write the failing test first (red), implement until green, refactor. Tests live next to source per the feature-structure-ADR; co-location is non-negotiable. **NEVER `vi.mock()`** — mock services are runtime-selected production code under `IS_MOCK`, not test mocks. Mocking the data layer for a test is the discipline-collapse failure mode.
 
@@ -175,7 +185,7 @@ Procedure:
 
 2. **Quality gates:** run `<quality-gates-umbrella>` (resolved in Step 0 #8 — typically `make pre-commit` or equivalent). If the project lacks an umbrella target, chain `<typecheck> && <tests> && <lint>` plus any project-defined dead-code check. Per-merge build commands (e.g., `make build`) and project-specific test scoping (e.g., parity tests under `src/engine/` for <PROJECT>) are project conventions invoked via the resolved targets — not skill-driven literals. If any gate fails → STOP and report; fix; rerun. Don't close on red.
 
-3. **Invoke `/said:review-ux`** if the surface is `visual` with UI changes. Pass the task-id; the skill spawns `said:review-ux-agent` against `docs/ux/feature-ux-checklist.md` filtered by screen shape; returns structured PASS / FAIL / SOFT-FLAG report.
+3. **Invoke `/said:review-ux`** if the surface is `visual` with UI changes. Pass the task-id; the skill spawns `said:review-ux-agent` against the surface's loaded UX checklist filtered by screen shape; returns structured PASS / FAIL / SOFT-FLAG report.
    - Any FAIL → RETURN TO PHASE B for the failing rule.
    - SOFT-FLAGs only → operator decides whether to address now or defer.
 
@@ -223,7 +233,7 @@ Hard exit. Implementation is done; commit is operator-triggered. Do NOT commit. 
 
 - **Don't merge with `/said:add-task`.** Add-task creates the backlog entry; this skill implements an existing entry. Separate skills, separate phases of the per-task lifecycle.
 - **Don't subsume `/said:review-ux`.** The UX gate is deliberately separate; this skill INVOKES it at Phase C, doesn't replace it. The split exists because "implementation agent declares done, QA agent rubber-stamps" is the regression-shipping pattern the separation guards against.
-- **Don't batch rules in Phase B.** "I'll satisfy errors.md #1 + #2 + #5 in one commit" = discipline collapse. One rule, one confirmation, one chat message. The agent's tendency to bulk-edit is the failure mode this discipline exists to prevent.
+- **Don't batch rules in Phase B.** "I'll satisfy three rules at once in one commit" = discipline collapse. One rule, one confirmation, one chat message. The agent's tendency to bulk-edit is the failure mode this discipline exists to prevent.
 - **Reference comments: `// <task-id>` only.** NOT `// <task-id>: <anything>` — the suffix is what produced the prose problem.
 - **Don't auto-progress phase boundaries.** Operator pauses at Phase A → Phase B and Phase B → Phase C are mandatory. If the operator reply is silent or ambiguous, ASK rather than proceed.
 - **Don't run on `Status: Done` tasks.** BLOCK; for follow-ups on COMMITTED Done tasks (`git log --all --grep <task-id>` non-empty), redirect to `/said:add-task`. Pre-commit Done tasks MAY be amended in place per template-tasks.md pre-commit carve-out — operator gate via mid-flight rule below.

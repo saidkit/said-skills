@@ -24,7 +24,7 @@ Before spawning the agent, collect — by reading sources, NOT by asking the use
 
 1. **task-id** — from the slash-command argument or, if absent, the most recent task in `docs/features/{FEATURE}.tasks.md` whose status is "In Progress" or "Pending Review".
 2. **entity** — the feature directory NAME (e.g., `<entity>`). Resolve from the task's spec entry or extract from `git log --name-only <task-range>` — look for `*/src/features/<name>/` paths and take the leaf segment. The actual project-root prefix (`<feature-path>/`, `web/`, etc.) lives in the QA checklist's `verify:` actions; the agent doesn't need it here.
-3. **screen-shape** — pick from `list-table`, `form`, `detail-with-tabs`, `embedded-list-in-tab`, `data-layer-only`. Infer from the task's spec entry or ask user if unknown or vague. If the task has multiple shapes, run QA once per shape.
+3. **screen-shape** — the task's shape, drawn from the loaded checklist's shape vocabulary (the `applies-to` values at the top of the surface's `feature-ux-checklist.md`; do not enumerate shapes inline). Infer from the task's spec entry or ask user if unknown or vague. If the task has multiple shapes, run QA once per shape.
 4. **feature-url** — from the task's spec or, if missing, infer from the entity name (`/<entity>s`, `/app/<entity>`, etc.). Confirm by `curl -sI <url>` returning 200 from the running dev server. If the dev server is down, ask the user to start it before proceeding.
 5. **reference-url** — the named reference screen for visual parity. These are the <PROJECT> reference fixtures mounted under `/app/reference/*` in a repo:
    - list-table → `/app/reference/tasks`
