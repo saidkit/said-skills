@@ -2,7 +2,7 @@
 name: board
 description: >
   SAID status board — LOCAL WEB dashboard (browser sibling of /said:status):
-  List + Kanban views, live refresh, click-through deep-dive. Self-contained
+  List + Kanban views, manual refresh, per-lane view, click-through deep-dive. Self-contained
   stdlib server; htmx + daisyUI from a CDN; read-only, loopback. Triggered ONLY
   by "/said:board [stop] [--port N] [--stale] [--lane …]" — `stop` kills the
   running server. DEPENDS on the said:status skill (imports its said_status.py).
@@ -19,8 +19,11 @@ surfaces; the web numbers match the terminal board exactly because it imports th
 
 - **Read-only, GET-only, loopback.** Bind `127.0.0.1` only; no write/POST routes, no mutation, no
   downstream skill invoked, nothing on the network.
-- **Derive, never store.** Every request re-runs `analyze()`; no server-side board cache. `Next` is
-  copyable text, never a button that runs `/said:impl`.
+- **Derive per request, guarded.** Every request re-derives via `analyze()`, but truly-concurrent and
+  short-burst requests collapse onto one run via a single-flight + short-TTL guard; an explicit refresh
+  (the header button or a full page load) forces a fresh derive. Read-only — nothing is persisted, and
+  the sub-second burst-staleness is operator-invisible. `Next` is copyable text, never a button that
+  runs `/said:impl`.
 - **Depends on `said:status`.** Import its `said_status.py` (`analyze()`, `feature_tasks()`) — never
   reimplement the derivation; the web numbers must match the terminal board. If that analyzer or
   `python3` is missing, say so and stop — never hand-render a web page.

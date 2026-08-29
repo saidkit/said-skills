@@ -22,6 +22,11 @@ header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-
 .ctrls{display:flex;align-items:center;gap:14px}
 .stamp{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .switch{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12.5px;cursor:pointer;user-select:none}
+#refreshBtn{font-size:15px;line-height:1}
+#refreshBtn.htmx-request{opacity:.6;animation:sb-spin .7s linear infinite}
+@keyframes sb-spin{to{transform:rotate(360deg)}}
+.laneSel{height:1.55rem;min-height:1.55rem;font-size:11px;font-family:var(--font-mono);
+  letter-spacing:.02em;padding-inline:8px 22px;background-size:13px}
 #main{flex:1;min-height:0;display:flex;flex-direction:column}
 #listwrap.cols{flex:1;display:grid;grid-template-columns:minmax(370px,430px) 1fr;min-height:0}
 #kanbanwrap{display:none;flex:1;min-height:0}

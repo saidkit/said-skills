@@ -17,6 +17,8 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import webbrowser
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -68,8 +70,37 @@ def _md_inline(s):  # s is already html-escaped; render inline `code`/**bold**, 
     return re.sub(r"\*\*([^*\n]{1,80})\*\*", r"<strong>\1</strong>", s)
 
 
-def get_data(stale_days=None):
+# --- single-flight + short-TTL guard -----------------------------------------
+# Read-only board: collapse concurrent and <=CACHE_TTL-burst requests onto ONE
+# analyze() run so the page-load fan-in, multiple tabs, and refresh clicks cannot
+# storm git. Not a staleness buffer — an explicit refresh (button or full page
+# load) passes fresh=True to force a live derive.
+CACHE_TTL = 1.0
+_cache = {}                       # stale_days -> (monotonic_ts, data)
+_cache_lock = threading.Lock()
+_flight = {}                      # stale_days -> Lock (one derive per key in flight)
+
+
+def _analyze(stale_days):
     return said_status.analyze(CFG["lanes"], CFG.get("today") or date.today().isoformat(), stale_days, CFG["project"])
+
+
+def get_data(stale_days=None, fresh=False):
+    key = stale_days
+    started = time.monotonic()
+    if not fresh:
+        hit = _cache.get(key)
+        if hit and started - hit[0] < CACHE_TTL:
+            return hit[1]
+    with _cache_lock:
+        flight = _flight.setdefault(key, threading.Lock())
+    with flight:                  # single-flight: one derive per key at a time
+        hit = _cache.get(key)     # a concurrent run may have just produced one
+        if hit and ((not fresh and time.monotonic() - hit[0] < CACHE_TTL) or hit[0] >= started):
+            return hit[1]
+        data = _analyze(stale_days)
+        _cache[key] = (time.monotonic(), data)
+        return data
 
 
 def _pct(f):
@@ -168,7 +199,7 @@ def render_roster(data, stale_only=False, lane=None):
         rows = [f for f in lr["features"] if (not stale_only or f["stale"])]
         if multi and stale_only and not rows:
             continue
-        if multi:
+        if multi and lane is None:  # the select names the lane; no lanehead when one is chosen
             out.append('<div class="lanehead">%s <span class="muted">· %s</span></div>' % (esc(lr["name"]), esc(lr["root"])))
         for f in rows:
             out.append(render_row(f))
@@ -285,24 +316,32 @@ def read_asset(filename):
 
 
 def page():
-    d = get_data()
-    n = d["lane_count"]
+    d = get_data(fresh=True)  # a full page load forces a live derive
+    # One lane at a time: a select drives ?lane=. Always rendered (a one-option select on a
+    # single-lane repo); the client persists the choice and defaults to the first declared lane.
+    lane_opts = "".join('<option value="%s">%s</option>' % (esc(lr["name"]), esc(lr["name"])) for lr in d["lanes"])
+    lane_select = ('<select id="laneSelect" class="select select-xs laneSel" onchange="setLane(this)" '
+                   'aria-label="Lane">%s</select>') % lane_opts
     head = (
         '<div class="brand">'
         '<a class="lockup" href="%s" target="_blank" rel="noopener noreferrer" '
         'title="saidkit.dev" aria-label="SAID — saidkit.dev">%s<span class="wm">SAID</span></a>'
-        '<span class="proj">%s</span><span class="sub">%d lane%s · %s</span></div>'
+        '<span class="proj">%s</span><span class="sub">%s</span></div>'
         '<div class="ctrls">'
         '<div class="join vtoggle"><button class="btn btn-xs join-item btn-active" data-view="list" onclick="setView(this)">List</button>'
         '<button class="btn btn-xs join-item" data-view="kanban" onclick="setView(this)">Kanban</button></div>'
+        '%s'
+        '<button id="refreshBtn" class="btn btn-ghost btn-sm btn-square" onclick="refreshNow()" title="Refresh from git" aria-label="Refresh">⟳</button>'
         '<span id="updated" class="stamp">loading…</span>'
         '<label class="switch"><input id="staleToggle" type="checkbox" class="toggle toggle-sm" onchange="refreshVisible()">stale only</label>'
         '<label class="switch kanban-only"><input type="checkbox" class="toggle toggle-sm" onchange="toggleHideClosed(this)">hide closed</label>'
         '<button id="kbdBtn" class="btn btn-ghost btn-sm btn-square" onclick="toggleHelp()" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">⌨️</button>'
         '<button id="themeBtn" class="btn btn-ghost btn-sm btn-square" onclick="cycleTheme()" title="Toggle theme">\U0001F319</button>'
         "</div>"
-    ) % (HOME, MARK % (22, 22), esc(d["project"]), n, "" if n == 1 else "s", esc(d["today"]))
-    vals = "hx-vals='js:{stale: (document.getElementById(\"staleToggle\")||{}).checked?1:0}'"
+    ) % (HOME, MARK % (22, 22), esc(d["project"]), esc(d["today"]), lane_select)
+    vals = ("hx-vals='js:{stale: (document.getElementById(\"staleToggle\")||{}).checked?1:0, "
+            "fresh: window.__fresh?1:0, "
+            "lane: (document.getElementById(\"laneSelect\")||{}).value||\"\"}'")
     return (
         '<!doctype html><html data-theme="light"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1"><title>SAID board · %s</title>'
@@ -315,11 +354,11 @@ def page():
         '<div id="cdnwarn">A CDN asset (htmx/daisyUI) failed to load — data is live, but styling/refresh may be limited.</div>'
         "<header>%s</header><main id=\"main\" aria-keyshortcuts=\"ArrowUp ArrowDown ArrowLeft ArrowRight Enter Escape\">"
         '<div id="listwrap" class="cols">'
-        '<section class="roster" id="roster" hx-get="/fragment/roster" hx-trigger="load, refresh" %s>'
+        '<section class="roster" id="roster" hx-get="/fragment/roster" hx-trigger="load, refresh" hx-indicator="#refreshBtn" %s>'
         '<div class="empty-state">loading…</div></section>'
         '<section class="detail" id="detail" tabindex="-1"><div class="empty-state">Select a feature — or press <kbd class="k">↑</kbd> <kbd class="k">↓</kbd> — to see its position in the SAID cycle.</div></section>'
         "</div>"
-        '<div id="kanbanwrap"><section id="kanban" class="kanban" hx-get="/fragment/kanban" hx-trigger="load, refresh" %s></section></div>'
+        '<div id="kanbanwrap"><section id="kanban" class="kanban" hx-get="/fragment/kanban" hx-trigger="load, refresh" hx-indicator="#refreshBtn" %s></section></div>'
         "</main>"
         '<aside id="drawer" aria-label="feature detail"><div class="drawer-h">'
         '<button class="btn btn-xs btn-ghost" onclick="closeDrawer()" title="Close">✕ close</button></div>'
@@ -364,10 +403,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(page())
             elif path == "/fragment/roster":
                 stale = q.get("stale", ["0"])[0] in ("1", "true", "on")
-                self._send(render_roster(get_data(), stale_only=stale, lane=q.get("lane", [None])[0]))
+                fresh = q.get("fresh", ["0"])[0] in ("1", "true", "on")
+                self._send(render_roster(get_data(fresh=fresh), stale_only=stale, lane=q.get("lane", [None])[0]))
             elif path == "/fragment/kanban":
                 stale = q.get("stale", ["0"])[0] in ("1", "true", "on")
-                self._send(render_kanban(get_data(), stale_only=stale, lane=q.get("lane", [None])[0]))
+                fresh = q.get("fresh", ["0"])[0] in ("1", "true", "on")
+                self._send(render_kanban(get_data(fresh=fresh), stale_only=stale, lane=q.get("lane", [None])[0]))
             elif path.startswith("/fragment/feature/"):
                 fid = path[len("/fragment/feature/"):]
                 self._send(render_feature(get_data(), fid) if ID_RE.match(fid)
@@ -444,8 +485,11 @@ def _clear_pidfile():
 
 
 def _pids_on_port(port):
+    # LISTENers only: a bare `lsof -i tcp:<port>` also matches connected CLIENTS
+    # (an open browser tab holds a socket to the loopback port), which must never be signalled.
     try:
-        out = subprocess.run(["lsof", "-ti", "tcp:%d" % port], capture_output=True, text=True, timeout=5)
+        out = subprocess.run(["lsof", "-t", "-i", "tcp:%d" % port, "-sTCP:LISTEN"],
+                             capture_output=True, text=True, timeout=5)
         return [int(x) for x in out.stdout.split()]
     except Exception:
         return []
@@ -453,12 +497,16 @@ def _pids_on_port(port):
 
 def stop_server(port):
     info, killed, targets = _read_pidfile(), [], []
+    listeners = None
     if info and info.get("pid"):
-        targets.append(int(info["pid"]))
+        pid = int(info["pid"])
         port = int(info.get("port") or port)
-    for p in _pids_on_port(port):  # fallback / catches a server started before pidfiles
-        if p not in targets:
-            targets.append(p)
+        listeners = _pids_on_port(port)
+        if pid in listeners:
+            targets.append(pid)  # trust the recorded server; no broad port sweep
+    if not targets:
+        # pidfile missing/stale — fall back to the port's LISTENer(s) only
+        targets = listeners if listeners is not None else _pids_on_port(port)
     for pid in targets:
         try:
             os.kill(pid, signal.SIGTERM)

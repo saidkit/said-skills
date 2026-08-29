@@ -131,6 +131,15 @@
   function refreshVisible(){if(!window.htmx)return;var v=vw();
     if(v==='kanban'){var kk=$('kanban');if(kk)htmx.trigger(kk,'refresh');}else htmx.trigger('#roster','refresh');}
   window.refreshVisible=refreshVisible;
+  // Manual refresh: force a live derive (busts the server's short-TTL guard). __fresh is read
+  // synchronously by the fragment's hx-vals while htmx.trigger issues the request, then reset.
+  window.refreshNow=function(){window.__fresh=true;refreshVisible();window.__fresh=false;};
+  // One lane at a time, persisted so a full-page-reload refresh keeps the choice.
+  window.setLane=function(sel){localStorage.setItem('sb-lane',sel.value);refreshVisible();};
+  function restoreLane(){var ls=$('laneSelect');if(!ls)return;var want=localStorage.getItem('sb-lane'),ok=false;
+    for(var i=0;i<ls.options.length;i++){if(ls.options[i].value===want){ok=true;break;}}
+    if(ok){if(ls.value!==want){ls.value=want;refreshVisible();}}  // htmx already fired load with the default; re-load the stored lane
+    else{localStorage.setItem('sb-lane',ls.value);}}              // no/stale stored lane → keep the first-declared default
   window.setView=function(btn){var m=btn.getAttribute('data-view');document.body.setAttribute('data-view',m);localStorage.setItem('sb-view',m);
     document.querySelectorAll('.vtoggle .btn').forEach(function(b){b.classList.toggle('btn-active',b.getAttribute('data-view')===m);});
     document.body.classList.remove('drawer-open');refreshVisible();
@@ -145,8 +154,9 @@
     }
     if(t.querySelector){var ds=t.querySelector('.d-tasks');if(ds&&window.__tfilter)applyTF(ds,window.__tfilter);}});
 
-  setInterval(refreshVisible,5000);
+  // No auto-poll: status refreshes on a full page load and via the header refresh button only.
   apply(localStorage.getItem('sb-theme')||(sysDark()?'dark':'light'));
   var sv=localStorage.getItem('sb-view')||'list';document.body.setAttribute('data-view',sv);
   document.querySelectorAll('.vtoggle .btn').forEach(function(b){b.classList.toggle('btn-active',b.getAttribute('data-view')===sv);});
+  restoreLane();
 })();

@@ -38,10 +38,17 @@ GLYPH = {"done": "█", "empty": "░", "none": "·",
          "ok": "✓", "pending": "○", "warn": "⚠", "block": "⛔"}
 
 
-def sh(args):
-    """Run a command, return stdout stripped, or None on any failure."""
+def sh(args, timeout=5):
+    """Run a command, return stdout stripped, or None on any failure.
+
+    Read-only git calls get `core.optionalLocks=false` so a status read never waits
+    on `.git/index.lock` held by concurrent user git ops; a bounded timeout degrades
+    to None (task-log dates) rather than stalling a caller.
+    """
+    if args and args[0] == "git":
+        args = ["git", "-c", "core.optionalLocks=false", *args[1:]]
     try:
-        out = subprocess.run(args, capture_output=True, text=True, timeout=15)
+        out = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
         return out.stdout.strip() if out.returncode == 0 else None
     except Exception:
         return None

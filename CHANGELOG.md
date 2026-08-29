@@ -2,6 +2,24 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.3.5] — 2026-08-29
+
+**`said:board`** — multi-lane usability + stability:
+- **Changed:** shows one lane at a time via a header selector (persisted across reloads), replacing the
+  stacked all-lanes view; auto-poll removed — status refreshes on a full page load or an explicit
+  refresh button. Amends the board's re-derive/refresh contract (read-only re-derive behind a
+  single-flight + short-TTL guard; an explicit refresh forces a fresh derive).
+- **Fixed:** the board wedged unreachable under concurrent repo git activity — an uncached, per-request
+  `git`-backed status call collapsed under the board's own polling once `.git/index.lock` was
+  contended. Fixed by the guard above plus running the read-only `git` calls with
+  `core.optionalLocks=false` and a bounded timeout (degrading to task-log dates), so a status read
+  never waits on a user-held index lock.
+- **Fixed:** `said:board stop` sometimes terminated the browser — the port lookup that found the server
+  also matched connected clients (an open dashboard tab). `stop` now signals listeners only, and trusts
+  a recorded server pid only when it is a current listener.
+
+PRD: `docs/specs/board/REQUIREMENTS.md`.
+
 ## [0.3.4] — 2026-08-09
 Unified phases names - "Gates"/"Delivery" -> "Deliver" across all skills
 Unified gates - added "review-ux" next to "review-qa"
