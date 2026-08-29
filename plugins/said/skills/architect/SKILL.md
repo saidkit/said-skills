@@ -261,19 +261,16 @@ Procedure:
    - **Heuristic:** if `Pieces of scope` cleanly split by lane (e.g., "Schema migration", "API endpoints", "Web screens"), multi-lane. If they cross lanes per entry ("Entity X — full stack rewrite"), surface the ambiguity to the operator before deciding.
 3. **Generate file header.** Use a CONDENSED preamble: the four "CRITICAL: append-only" bullets (Never overwrite / When updating status / When adding tasks / Keep all detail) + a one-line pointer to `docs/features/template-tasks.md` for full authoring discipline + close-of-task review + a one-line pointer to the companion spec. Do NOT verbatim-copy the full template-tasks.md preamble — it's ~70 lines and would bloat every tasks file.
 4. **Generate summary table.** One row per task: ID / Title / Status. All Status = `Todo` initially. **IDs follow `SAID.id-shape:`** (`<PREFIX><NN>-<NN>` single-lane, `<PREFIX><NN>-<LANE>-<NN>` multi-lane — feature segment collapses the dash; task counter 2-digit zero-padded). Numbering: **per-lane monotonic counter** — each `(feature, lane)` pair starts at `01` independently (two lanes' initial tasks both numbered `01`, not `01 + 02`).
-5. **Run Step 0.SC, then classify + resolve from the LOADED registry — never inline.** Classify each task's screen shape; resolve its rule bundle + stencils by filtering the loaded registry (cite rule ids). A non-visual surface resolves its rules from the same manifest-routed artifact, never a hardcoded fallback filename. Ambiguous `applies-to` → ask the operator.
+5. **For a surface-governed task, run Step 0.SC, then classify + resolve from the LOADED registry — never inline** (a structural / non-surface task skips it). Classify each task's screen shape; resolve its rule bundle + stencils by filtering the loaded registry (cite rule ids). Ambiguous `applies-to` → ask the operator.
 
 ## Step 0.SC — Load the surface contract (SC-STUB v1)
 
-Resolve this skill's surface contract before reasoning over any surface-shape rule. Consumer = `architect`.
+Run this ONLY when about to reason over a surface-shape rule (a screen/UI shape). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
-1. Manifest path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/surface-contract.manifest.md`. No key → HALT.
-2. LOAD the manifest WHOLE; echo its `SC-MANIFEST-HEADER` `token · N rows`. Missing/malformed → HALT. Never grep a single row.
-3. Key-grep `SAID.surface-type:` (scalar). Own row = equality match `(consumer == architect, surface-type == <resolved>)`. No row → HALT. Never scan or derive a row.
-4. LOAD the row's artifact WHOLE (docs-root-relative); echo its `SC-HEADER` `token · N`. Absent or missing/malformed sentinel → HALT.
-5. Reason over the LOADED artifact only; cite rule ids. Never restate or re-derive a mapping from memory.
-
-HALT = stop with a named redirect; never proceed on a guessed contract.
+1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
+2. Registry absent → SKIP: this lane has no surface contract; proceed without one — never HALT, never invent a rule.
+3. Present → LOAD it WHOLE; echo its `SC-HEADER` `token · N rules`. Missing/malformed sentinel → HALT. Never grep a single row.
+4. Reason over the LOADED registry only; cite rule ids. Never restate or re-derive a mapping from memory.
 
 6. **Rule-bundle routing comes from the loaded registry** — the registry carries the shape→bundle mapping; there is no inline map. Resolve each task's bundle from it.
 

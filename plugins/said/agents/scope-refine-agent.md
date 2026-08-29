@@ -90,7 +90,7 @@ Issue all reads in one assistant message (parallel tool calls):
 - `docs/conventions.md`.
 - `docs/features/template.md`.
 - `docs/features/template-tasks.md`.
-- the loaded surface-contract checklist (manifest-resolved, consumer `scope-refine-agent`) (full).
+- the loaded surface-contract checklist (`docs/ux/feature-ux-checklist.md`, resolved from `SAID.docs-root:` if present) (full).
 - `docs/adr/README.md`, then every ADR the handoff names or the work
   touches.
 - Every UX spec under `docs/ux/` the work touches.

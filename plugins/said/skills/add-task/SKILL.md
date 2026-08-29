@@ -63,19 +63,16 @@ Resolve inputs and ground in existing context:
    - **Legacy IDs do NOT contribute.** Any task heading not matching the canonical regex (e.g., pre-migration entries in projects that haven't run a one-time task-id migration) is excluded from the counter scan. Append-only — never fill gaps from deleted tasks.
 6. **Skim companion spec — capture coverage anchors.** Identify which section(s) govern the new task's scope (Per-piece scope / Acceptance Criteria / Implementation pointers / Boundaries — whichever the spec uses). Capture 1–2 lines per relevant section for Step 3 classification. Don't full-read.
 7. **Read `docs/features/template-tasks.md`** in full — for authoring discipline AND the id-shape stencil. **LOAD-WHOLE the `SAID.lanes:` registry** (a mapping — the §Lanes registry on the umbrella `## Lane` block; ADR-SAID-S04) and echo its token+count before use; it is the source of the legal lane set — never parse example task IDs to derive it. Validate the step-4 `lane=` flag now against the declared lanes: if `<LANE>` is not declared, BLOCK per step 4. If the project declares a single lane (no `SAID.lanes:` registry), reject any `lane=` flag.
-8. **Run Step 0.SC, then classify + resolve from the LOADED registry — never inline.** Classify the task's screen shape; resolve its rule bundle + stencils by filtering the loaded registry (taxonomy/routing/stencils live there). Ambiguous `applies-to` → ASK in Step 1's batch prompt; never guess or fall back to an inline list.
+8. **For a surface-governed task (a screen/UI shape), run Step 0.SC, then classify + resolve from the LOADED registry — never inline** (a structural / data-layer / non-surface task skips it). Classify the task's screen shape; resolve its rule bundle + stencils by filtering the loaded registry (taxonomy/routing/stencils live there). Ambiguous `applies-to` → ASK in Step 1's batch prompt; never guess or fall back to an inline list.
 
 ## Step 0.SC — Load the surface contract (SC-STUB v1)
 
-Resolve this skill's surface contract before reasoning over any surface-shape rule. Consumer = `add-task`.
+Run this ONLY when about to reason over a surface-shape rule (a screen/UI shape). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
-1. Manifest path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/surface-contract.manifest.md`. No key → HALT.
-2. LOAD the manifest WHOLE; echo its `SC-MANIFEST-HEADER` `token · N rows`. Missing/malformed → HALT. Never grep a single row.
-3. Key-grep `SAID.surface-type:` (scalar). Own row = equality match `(consumer == add-task, surface-type == <resolved>)`. No row → HALT. Never scan or derive a row.
-4. LOAD the row's artifact WHOLE (docs-root-relative); echo its `SC-HEADER` `token · N`. Absent or missing/malformed sentinel → HALT.
-5. Reason over the LOADED artifact only; cite rule ids. Never restate or re-derive a mapping from memory.
-
-HALT = stop with a named redirect; never proceed on a guessed contract.
+1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
+2. Registry absent → SKIP: this lane has no surface contract; proceed without one — never HALT, never invent a rule.
+3. Present → LOAD it WHOLE; echo its `SC-HEADER` `token · N rules`. Missing/malformed sentinel → HALT. Never grep a single row.
+4. Reason over the LOADED registry only; cite rule ids. Never restate or re-derive a mapping from memory.
 
 ## Step 1 — Single-batch interactive Q&A
 

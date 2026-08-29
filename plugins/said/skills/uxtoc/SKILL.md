@@ -54,7 +54,7 @@ The operator invokes:
 2. Classify: `screen` | `feature-spec` | `scope` | `dir`.
 3. Ground in templates (one parallel-Read batch):
    - `docs/features/template.md` — feature-spec shape, including its `## Screen` sections (the screen-spec shape). If the project keeps standalone per-screen specs under `docs/screens/`, read one as a shape exemplar.
-   - The **element grammar** (pane-type vocabulary) — resolved from the surface-contract manifest (consumer `uxtoc`) and LOADed whole (`feature-ux-grammar.md`), not a hardcoded list of screen-spec filenames.
+   - The **element grammar** (pane-type vocabulary) — resolved directly from `SAID.docs-root:` + `/ux/feature-ux-grammar.md` and LOADed whole if present (skip if the lane ships none), not a hardcoded list of screen-spec filenames.
 
 ## Pass 2 — Extract
 

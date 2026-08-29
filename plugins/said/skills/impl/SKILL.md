@@ -142,19 +142,16 @@ Procedure:
 
 ## Step 0.SC — Load the surface contract (SC-STUB v1)
 
-Resolve this skill's surface contract before reasoning over any surface-shape rule. Consumer = `impl`.
+Run this ONLY when about to reason over a surface-shape rule (a screen/UI shape). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
-1. Manifest path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/surface-contract.manifest.md`. No key → HALT.
-2. LOAD the manifest WHOLE; echo its `SC-MANIFEST-HEADER` `token · N rows`. Missing/malformed → HALT. Never grep a single row.
-3. Key-grep `SAID.surface-type:` (scalar). Own row = equality match `(consumer == impl, surface-type == <resolved>)`. No row → HALT. Never scan or derive a row.
-4. LOAD the row's artifact WHOLE (docs-root-relative); echo its `SC-HEADER` `token · N`. Absent or missing/malformed sentinel → HALT.
-5. Reason over the LOADED artifact only; cite rule ids. Never restate or re-derive a mapping from memory.
-
-HALT = stop with a named redirect; never proceed on a guessed contract.
+1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
+2. Registry absent → SKIP: this lane has no surface contract; proceed without one — never HALT, never invent a rule.
+3. Present → LOAD it WHOLE; echo its `SC-HEADER` `token · N rules`. Missing/malformed sentinel → HALT. Never grep a single row.
+4. Reason over the LOADED registry only; cite rule ids. Never restate or re-derive a mapping from memory.
 
 Procedure:
 
-1. **Order rules by blast radius per the loaded registry** (Step 0.SC) — cheapest first. The bundle + ordering come from the manifest-routed registry (cross-cutting rules first → entity-shape deepest → wire-contract reshape → visual-parity last), not hardcoded `docs/ux/*.md` filenames.
+1. **For a surface-governed task, order rules by blast radius per the loaded registry** (Step 0.SC) — cheapest first (a non-surface task skips it). The bundle + ordering come from the loaded registry (cross-cutting rules first → entity-shape deepest → wire-contract reshape → visual-parity last), not hardcoded `docs/ux/*.md` filenames.
    - Wire-contract reshape — response-schema rewrite per Phase A captured bytes.
    - Visual-parity gaps — DEFERRED to Phase C side-by-side walk (visual surface only); don't pre-tune.
    *(Stack-discipline vocab — `parseResponse`/`silentError`/`RouteSlot`, `PageHeader`/`SidebarInset` — stays inline; deferred to a later pass.)*

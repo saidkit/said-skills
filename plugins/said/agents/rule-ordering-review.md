@@ -22,11 +22,10 @@ smell, without ever gating the close.
 
 ## What it checks
 
-1. **Resolve the registry** the task consumed — via the governed manifest
-   (`<SAID.docs-root>/surface-contract.manifest.md`, own-row for
-   `(consumer == impl, surface-type == <resolved>)`). LOAD-WHOLE it; if it can't
-   be resolved, report `ordering: unverifiable (registry not resolved)` and STOP
-   — do not guess.
+1. **Resolve the registry** the task consumed — `<SAID.docs-root>/ux/feature-ux-rules.md`,
+   resolved directly from `SAID.docs-root:`. LOAD-WHOLE it if present; if the lane
+   ships no registry, report `ordering: unverifiable (no surface contract)` and
+   STOP — do not guess.
 2. **Read the diff / task body** for the order rules were satisfied in.
 3. **Compare** against the registry's routed bundle ordering (cross-cutting
    error/shell-level rules first → entity-shape rules → wire-contract reshape →

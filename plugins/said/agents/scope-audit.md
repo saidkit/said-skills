@@ -26,7 +26,7 @@ When you (the scope-refine orchestrator) audit a single dir, your job is: read t
 
 - **dir-path** — absolute path of the dir to audit (e.g., `<feature-path>/<entity>/`). Required.
 - **target-shape** — verbatim excerpt describing what this dir should end up looking like. Authoritative. Source: the handoff doc or a named contract-doc section, copied verbatim by the spawner. Required.
-- **rule-citations** — array of governance citations: either `R-*` IDs from the loaded surface-contract checklist (manifest-resolved, consumer `scope-audit`) (preferred — agent looks up `source:` and `summary:` via the checklist) or direct ADR / UX-spec section names. Both forms accepted; the agent reconciles by reading the checklist's `source:` field. Required for the "Gaps vs target shape" section's grounding.
+- **rule-citations** — array of governance citations: either `R-*` IDs from the loaded surface-contract checklist (`docs/ux/feature-ux-checklist.md`, resolved from `SAID.docs-root:` if present) (preferred — agent looks up `source:` and `summary:` via the checklist) or direct ADR / UX-spec section names. Both forms accepted; the agent reconciles by reading the checklist's `source:` field. Required for the "Gaps vs target shape" section's grounding.
 
 If any input is missing or empty, ask the spawner. Do not guess.
 
@@ -34,7 +34,7 @@ If any input is missing or empty, ask the spawner. Do not guess.
 
 Read ONLY:
 - The named `dir-path` and everything recursively inside it.
-- the loaded surface-contract checklist (manifest-resolved, consumer `scope-audit`) — look up rule wording for cited R-IDs.
+- the loaded surface-contract checklist (`docs/ux/feature-ux-checklist.md`, resolved from `SAID.docs-root:` if present) — look up rule wording for cited R-IDs.
 - The R-cited ADR / UX-spec sections — read sparingly, only when the checklist `summary:` is ambiguous and you need the source rule for grounding.
 - Cross-feature consumer search via `grep -rn` against the project source root, scoped to find imports OF this dir.
 
@@ -72,7 +72,7 @@ The point: identify cross-feature coupling that the migration must preserve or e
 
 ### Stage 3 — Gaps vs target shape
 
-For each `R-*` ID in `rule-citations`, look up its `summary:` in the loaded surface-contract checklist (manifest-resolved, consumer `scope-audit`) (the only place rule summaries are authoritative). If the summary is ambiguous, read the cited ADR / UX-spec section linked in `source:`.
+For each `R-*` ID in `rule-citations`, look up its `summary:` in the loaded surface-contract checklist (`docs/ux/feature-ux-checklist.md`, resolved from `SAID.docs-root:` if present) (the only place rule summaries are authoritative). If the summary is ambiguous, read the cited ADR / UX-spec section linked in `source:`.
 
 Compare the dir's current state against:
 1. The `target-shape` excerpt (top-level intent).
@@ -143,7 +143,7 @@ The exact `<dir-path>` in the section header is load-bearing — the orchestrato
 
 ## Anti-patterns
 
-- Inventing R-IDs that don't exist in the loaded surface-contract checklist (manifest-resolved, consumer `scope-audit`).
+- Inventing R-IDs that don't exist in the loaded surface-contract checklist (`docs/ux/feature-ux-checklist.md`, resolved from `SAID.docs-root:` if present).
 - Loose prose in any of the five sections — bullets only.
 - Missing the `<dir-path>` in the section header — breaks orchestrator dedupe.
 - Picking a side when the dir disagrees with target-shape — that is a §D conflict at the orchestrator's Stage 4, not yours.
