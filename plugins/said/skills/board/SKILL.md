@@ -19,11 +19,11 @@ surfaces; the web numbers match the terminal board exactly because it imports th
 
 - **Read-only, GET-only, loopback.** Bind `127.0.0.1` only; no write/POST routes, no mutation, no
   downstream skill invoked, nothing on the network.
-- **Derive per request, guarded.** Every request re-derives via `analyze()`, but truly-concurrent and
-  short-burst requests collapse onto one run via a single-flight + short-TTL guard; an explicit refresh
-  (the header button or a full page load) forces a fresh derive. Read-only — nothing is persisted, and
-  the sub-second burst-staleness is operator-invisible. `Next` is copyable text, never a button that
-  runs `/said:impl`.
+- **Derive on refresh, cache until the next one.** `analyze()` runs only on an explicit refresh — a full
+  page load or the header button — and the result is cached until the next such refresh; non-fresh
+  requests (deep-dive clicks, lane switches) reuse it, so navigating the board never re-runs git. A
+  single-flight guard collapses the page-load fan-in onto one run. Read-only — nothing is persisted.
+  `Next` is copyable text, never a button that runs `/said:impl`.
 - **Depends on `said:status`.** Import its `said_status.py` (`analyze()`, `feature_tasks()`) — never
   reimplement the derivation; the web numbers must match the terminal board. If that analyzer or
   `python3` is missing, say so and stop — never hand-render a web page.

@@ -24,9 +24,9 @@ import sys
 from datetime import date
 
 # --- grammar (the SAID task-log shape) --------------------------------------
-STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(Done|Todo|Canceled|Cancelled|Backlog)\b", re.I)
+STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(Done|Todo|Canceled|Cancelled|Superseded|Backlog)\b", re.I)
 DATE_RE = re.compile(r"\((\d{4}-\d{2}-\d{2})\)")
-HEADER_RE = re.compile(r"^##\s+([A-Z]+-\d+(?:-[A-Za-z0-9]+)*)\s*[:：]?\s*(.*?)\s*$")
+HEADER_RE = re.compile(r"^##\s+([A-Z]+-?\d+(?:-[A-Za-z0-9]+)+)\s*[:：]?\s*(.*?)\s*$")
 FOOTER_RE = re.compile(r"^##\s+Debrief close\b", re.I)
 IDDIR_RE = re.compile(r"^([A-Z]+)-(\d+)$")
 
@@ -59,7 +59,7 @@ def feature_prefix(fid):
     return m.group(1) if m else fid.split("-")[0]
 
 
-SPEC_H1_RE = re.compile(r"^#\s+([A-Z]+-\d+(?:-[A-Za-z0-9]+)*)\s*[:：]\s*(.+?)\s*$")
+SPEC_H1_RE = re.compile(r"^#\s+([A-Z]+-?\d+(?:-[A-Za-z0-9]+)*)\s*[:：]\s*(.+?)\s*$")
 
 
 def feature_name(spec_path):
@@ -123,7 +123,7 @@ def parse_tasks(paths):
             s = STATUS_RE.match(ln)
             if s:
                 status = s.group(1).capitalize()
-                if status == "Cancelled":
+                if status in ("Cancelled", "Superseded"):  # obsolete/replaced → counts as canceled
                     status = "Canceled"
                 counts[status] = counts.get(status, 0) + 1
                 d = DATE_RE.search(ln)

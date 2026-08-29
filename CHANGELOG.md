@@ -2,6 +2,23 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.3.6] — 2026-08-29
+
+**`said:board`** — loading feedback, header restructure, and real-repo fixes:
+- **Added:** a global loading indicator — the header logo ticks in 45° steps while any request is in
+  flight (delay-before-show + min-visible so it never flashes on cached navigation), replacing the
+  refresh-icon spin. The page shell now renders instantly from config and streams data into fragments,
+  so a large repo no longer paints a blank page while the first derive runs.
+- **Changed:** the header is restructured into three zones — identity + controls left, List|Kanban
+  centred, options right; the refresh icon is now a labelled "Update" button.
+- **Fixed:** the deep-dive showed no tasks for collapsed task-ids (e.g. `PROJ01-LANE-01`) — the
+  analyzer's id grammar now accepts both the collapsed and dashed id shapes, and recognises a
+  `Superseded` status.
+- **Fixed:** the board re-ran the expensive derive on every interaction — it now caches until an
+  explicit refresh (a full page load or the Update button).
+
+PRD: `docs/specs/board/REQUIREMENTS.md`.
+
 ## [0.3.5] — 2026-08-29
 
 **`said:board`** — multi-lane usability + stability:

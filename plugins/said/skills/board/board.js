@@ -1,5 +1,27 @@
 (function(){
   function $(id){return document.getElementById(id);}
+  // Global loading indicator: the header logo ticks (45° steps, see board.css) while a request is in
+  // flight — but ONLY for a genuinely slow load (a fresh derive / manual refresh). Instant cached
+  // navigation must not flash: a short delay before showing skips anything that finishes quickly, and a
+  // minimum visible span once shown keeps it from blinking off. A pending counter spans concurrent requests.
+  (function(){
+    // shown starts true when the shell shipped <body class="loading"> (the initial full-load tick).
+    var inflight=0, shown=document.body.classList.contains('sb-loading'),
+        showT=null, hideT=null, shownAt=shown?Date.now():0, DELAY=160, MIN=520;
+    function on(){shown=true;shownAt=Date.now();document.body.classList.add('sb-loading');}
+    function off(){shown=false;document.body.classList.remove('sb-loading');}
+    document.addEventListener('htmx:beforeRequest',function(){
+      if(++inflight===1){ if(hideT){clearTimeout(hideT);hideT=null;}
+        if(!shown&&!showT) showT=setTimeout(function(){showT=null; if(inflight>0)on();}, DELAY); }
+    });
+    document.addEventListener('htmx:afterRequest',function(){
+      if((inflight=inflight>0?inflight-1:0)===0){
+        window.__fresh=false;                                      // initial full-load fresh flag is spent → later nav reuses the cache
+        if(showT){clearTimeout(showT);showT=null;}                 // finished before DELAY → never shown → no flash
+        if(shown){var left=MIN-(Date.now()-shownAt); hideT=setTimeout(off, left>0?left:0);}
+      }
+    });
+  })();
   function sysDark(){return window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches;}
   function cssEsc(s){return (window.CSS&&CSS.escape)?CSS.escape(String(s)):String(s).replace(/[^a-zA-Z0-9_-]/g,'\\$&');}
   function apply(t){document.documentElement.setAttribute('data-theme',t);

@@ -70,12 +70,13 @@ def _md_inline(s):  # s is already html-escaped; render inline `code`/**bold**, 
     return re.sub(r"\*\*([^*\n]{1,80})\*\*", r"<strong>\1</strong>", s)
 
 
-# --- single-flight + short-TTL guard -----------------------------------------
-# Read-only board: collapse concurrent and <=CACHE_TTL-burst requests onto ONE
-# analyze() run so the page-load fan-in, multiple tabs, and refresh clicks cannot
-# storm git. Not a staleness buffer — an explicit refresh (button or full page
-# load) passes fresh=True to force a live derive.
-CACHE_TTL = 1.0
+# --- single-flight guard: derive on refresh, cache until the next one --------
+# Read-only board: analyze() (a git-per-feature call, seconds on a large repo)
+# runs only on an explicit refresh — a full page load or the header button, both
+# fresh=True — and the result is cached until the next such refresh. Non-fresh
+# requests (deep-dive clicks, lane switches) always reuse the cached derive, so
+# navigating the board never re-runs git. Single-flight collapses the page-load
+# fan-in (page + roster + kanban) onto one run.
 _cache = {}                       # stale_days -> (monotonic_ts, data)
 _cache_lock = threading.Lock()
 _flight = {}                      # stale_days -> Lock (one derive per key in flight)
@@ -90,14 +91,14 @@ def get_data(stale_days=None, fresh=False):
     started = time.monotonic()
     if not fresh:
         hit = _cache.get(key)
-        if hit and started - hit[0] < CACHE_TTL:
+        if hit:                   # cache until an explicit refresh — no TTL expiry
             return hit[1]
     with _cache_lock:
         flight = _flight.setdefault(key, threading.Lock())
     with flight:                  # single-flight: one derive per key at a time
-        hit = _cache.get(key)     # a concurrent run may have just produced one
-        if hit and ((not fresh and time.monotonic() - hit[0] < CACHE_TTL) or hit[0] >= started):
-            return hit[1]
+        hit = _cache.get(key)     # a concurrent request may have refreshed meanwhile
+        if hit and (not fresh or hit[0] >= started):
+            return hit[1]         # non-fresh reuses any cached value; fresh only one produced after it began
         data = _analyze(stale_days)
         _cache[key] = (time.monotonic(), data)
         return data
@@ -129,8 +130,8 @@ def _flag_html(f):
         bits.append('<span class="muted">%s</span>' % esc(lbl))
     if f["stale"]:
         bits.append('<span class="warn">⚠ %dd idle</span>' % f["idle_days"])
-    if f.get("integrity"):
-        bits.append('<span class="warn">! %s</span>' % esc(f["integrity"]))
+    if f.get("integrity"):  # compact in the row (full detail on hover) — long text overflowed the row
+        bits.append('<span class="warn" title="%s">⚠ tasks≠status</span>' % esc(f["integrity"]))
     return " ".join(bits)
 
 
@@ -316,29 +317,42 @@ def read_asset(filename):
 
 
 def page():
-    d = get_data(fresh=True)  # a full page load forces a live derive
+    # The header needs only cheap config (project · lane names · today) — NOT the full analyze() — so the
+    # shell returns instantly and the fragments stream the feature data in (with the loading logo ticking),
+    # instead of the browser sitting blank while a git-per-feature derive runs server-side on a big repo.
+    lanes, project = CFG["lanes"], CFG["project"]
+    # lane switcher icon — a small branch glyph (the lanes are repo parts: front/server/prototype)
+    lane_ico = ('<svg class="lane-ico" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" '
+                'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+                '<path d="M5 3.6v8.8"/><path d="M5 8h3.4a2.6 2.6 0 0 0 2.6-2.6V4.4"/>'
+                '<circle cx="5" cy="3.4" r="1.35" fill="currentColor" stroke="none"/>'
+                '<circle cx="5" cy="12.6" r="1.35" fill="currentColor" stroke="none"/>'
+                '<circle cx="11" cy="3.9" r="1.35" fill="currentColor" stroke="none"/></svg>')
     # One lane at a time: a select drives ?lane=. Always rendered (a one-option select on a
     # single-lane repo); the client persists the choice and defaults to the first declared lane.
-    lane_opts = "".join('<option value="%s">%s</option>' % (esc(lr["name"]), esc(lr["name"])) for lr in d["lanes"])
+    lane_opts = "".join('<option value="%s">%s</option>' % (esc(L["name"]), esc(L["name"])) for L in lanes)
     lane_select = ('<select id="laneSelect" class="select select-xs laneSel" onchange="setLane(this)" '
                    'aria-label="Lane">%s</select>') % lane_opts
+    # 3-zone header: LEFT (logo·SAID·project·lane·Update·updated-time) | CENTER (List|Kanban) | RIGHT (rest)
     head = (
-        '<div class="brand">'
-        '<a class="lockup" href="%s" target="_blank" rel="noopener noreferrer" '
+        '<div class="hz-left">'
+        '<div class="brand"><a class="lockup" href="%s" target="_blank" rel="noopener noreferrer" '
         'title="saidkit.dev" aria-label="SAID — saidkit.dev">%s<span class="wm">SAID</span></a>'
-        '<span class="proj">%s</span><span class="sub">%s</span></div>'
-        '<div class="ctrls">'
-        '<div class="join vtoggle"><button class="btn btn-xs join-item btn-active" data-view="list" onclick="setView(this)">List</button>'
-        '<button class="btn btn-xs join-item" data-view="kanban" onclick="setView(this)">Kanban</button></div>'
-        '%s'
-        '<button id="refreshBtn" class="btn btn-ghost btn-sm btn-square" onclick="refreshNow()" title="Refresh from git" aria-label="Refresh">⟳</button>'
+        '<span class="proj">%s</span></div>'
+        '<span class="lane-wrap">%s%s</span>'
+        '<button id="refreshBtn" class="btn btn-xs update-pill" onclick="refreshNow()" title="Update from git">Update</button>'
         '<span id="updated" class="stamp">loading…</span>'
+        "</div>"
+        '<div class="hz-center"><div class="join vtoggle">'
+        '<button class="btn btn-xs join-item btn-active" data-view="list" onclick="setView(this)">List</button>'
+        '<button class="btn btn-xs join-item" data-view="kanban" onclick="setView(this)">Kanban</button></div></div>'
+        '<div class="hz-right">'
         '<label class="switch"><input id="staleToggle" type="checkbox" class="toggle toggle-sm" onchange="refreshVisible()">stale only</label>'
         '<label class="switch kanban-only"><input type="checkbox" class="toggle toggle-sm" onchange="toggleHideClosed(this)">hide closed</label>'
         '<button id="kbdBtn" class="btn btn-ghost btn-sm btn-square" onclick="toggleHelp()" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">⌨️</button>'
         '<button id="themeBtn" class="btn btn-ghost btn-sm btn-square" onclick="cycleTheme()" title="Toggle theme">\U0001F319</button>'
         "</div>"
-    ) % (HOME, MARK % (22, 22), esc(d["project"]), esc(d["today"]), lane_select)
+    ) % (HOME, MARK % (22, 22), esc(project), lane_ico, lane_select)
     vals = ("hx-vals='js:{stale: (document.getElementById(\"staleToggle\")||{}).checked?1:0, "
             "fresh: window.__fresh?1:0, "
             "lane: (document.getElementById(\"laneSelect\")||{}).value||\"\"}'")
@@ -350,7 +364,10 @@ def page():
         '<link rel="stylesheet" href="%s">'
         '<script src="%s" defer onerror="var b=document.getElementById(\'cdnwarn\');if(b)b.style.display=\'block\'"></script>'
         '<link rel="stylesheet" href="%s" onerror="var b=document.getElementById(\'cdnwarn\');if(b)b.style.display=\'block\'">'
-        '<link rel="stylesheet" href="/board.css"></head><body data-view="list">'
+        '<link rel="stylesheet" href="/board.css"></head><body data-view="list" class="sb-loading">'
+        # a full page load is an explicit refresh → the initial fragment loads derive fresh (async, while
+        # the logo ticks); board.js clears __fresh after they settle so later navigation reuses the cache.
+        '<script>window.__fresh=true</script>'
         '<div id="cdnwarn">A CDN asset (htmx/daisyUI) failed to load — data is live, but styling/refresh may be limited.</div>'
         "<header>%s</header><main id=\"main\" aria-keyshortcuts=\"ArrowUp ArrowDown ArrowLeft ArrowRight Enter Escape\">"
         '<div id="listwrap" class="cols">'
@@ -378,7 +395,7 @@ def page():
         '<span class="khint"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>↵</kbd> open · <kbd>esc</kbd> back · <kbd>?</kbd> keys</span>'
         '<a href="/api/status.json" target="_blank">/api/status.json</a></footer>'
         '<script src="/board.js" defer></script></body></html>'
-    ) % (esc(d["project"]), FONTS, HTMX, DAISY, head, vals, vals)
+    ) % (esc(project), FONTS, HTMX, DAISY, head, vals, vals)
 
 
 # --- HTTP handler ------------------------------------------------------------

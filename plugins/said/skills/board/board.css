@@ -15,18 +15,26 @@ html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;
   font:14px/1.5 var(--font-ui);letter-spacing:-.011em;-webkit-font-smoothing:antialiased}
 code,.rid,.mono,.d-files{font-family:var(--font-mono)}
-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:12px;
+header{position:sticky;top:0;z-index:10;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;
   padding:11px 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+.hz-left{display:flex;align-items:center;gap:12px;min-width:0;justify-self:start}
+.hz-center{justify-self:center}
+.hz-right{display:flex;align-items:center;gap:14px;justify-self:end}
+.lane-wrap{display:inline-flex;align-items:center;gap:6px}
+.lane-ico{color:var(--muted);flex:none;opacity:.85}
+.update-pill{height:1.55rem;min-height:1.55rem;font-size:11px}
 .brand{font-weight:650;display:flex;align-items:baseline;gap:9px}.brand b{color:var(--accent)}
 .brand .sub{font-weight:400;color:var(--muted);font-size:12.5px}
 .ctrls{display:flex;align-items:center;gap:14px}
 .stamp{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .switch{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12.5px;cursor:pointer;user-select:none}
-#refreshBtn{font-size:15px;line-height:1}
-#refreshBtn.htmx-request{opacity:.6;animation:sb-spin .7s linear infinite}
-@keyframes sb-spin{to{transform:rotate(360deg)}}
-.laneSel{height:1.55rem;min-height:1.55rem;font-size:11px;font-family:var(--font-mono);
-  letter-spacing:.02em;padding-inline:8px 22px;background-size:13px}
+#refreshBtn.htmx-request{opacity:.6}  /* subtle in-flight cue on the button; the logo carries the animation */
+/* Loading: the header logo is the single global indicator — it ticks in 45° clockwise steps about its
+   centre (steps(8) over one turn) while any request is in flight. Deliberately stepped, not a smooth spin. */
+.brand .mark{transform-origin:50% 50%}
+body.sb-loading .brand .mark{animation:mark-load 1.2s steps(8) infinite}
+@keyframes mark-load{to{transform:rotate(360deg)}}
+.laneSel{height:1.6rem;min-height:1.6rem;font-size:11px;font-family:var(--font-mono);letter-spacing:.02em;padding-inline:9px 20px}
 #main{flex:1;min-height:0;display:flex;flex-direction:column}
 #listwrap.cols{flex:1;display:grid;grid-template-columns:minmax(370px,430px) 1fr;min-height:0}
 #kanbanwrap{display:none;flex:1;min-height:0}
@@ -142,7 +150,8 @@ footer{padding:10px 20px;border-top:1px solid var(--border);color:var(--muted);f
 #help .krow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:3.5px 0;font-size:12.5px}
 #help .krow .keys{display:flex;gap:4px;align-items:center}
 @media (max-width:680px){.khint{display:none}}
-@media (max-width:720px){header{flex-wrap:wrap;row-gap:9px}.ctrls{margin-left:auto;flex-wrap:wrap;justify-content:flex-end;gap:9px 11px}}
+@media (max-width:980px){header{grid-template-columns:1fr;row-gap:9px 0;justify-items:start}
+  .hz-left,.hz-right{flex-wrap:wrap;gap:9px 11px}.hz-center,.hz-right{justify-self:start}}
 
 /* ---- SAID brand layer (colour, type, the mark — geometry stays daisyUI's) ---- */
 /* The brand book's square panels are slide/editorial layout, not a UI-control rule:
@@ -194,3 +203,4 @@ footer a{color:var(--accent);text-decoration:none}
 .task.t-canceled .t-status{color:var(--faint)}
 .task.t-canceled .t-dot{background:var(--faint)}   /* dimmest of the set — the title is struck through too */
 .task.t-none .t-status{color:var(--faint)}
+.task.t-superseded .t-status{color:var(--faint)}.task.t-superseded .t-dot{background:var(--faint)}.t-superseded .t-title{text-decoration:line-through;color:var(--muted)}
