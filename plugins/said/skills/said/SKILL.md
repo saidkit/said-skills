@@ -100,7 +100,7 @@ On the first substantive turn, resolve the ordered stage sequence **from the SAI
 ```
 SAID cycle for <id> — resolved from the map:
   [ ] Scope      → /said:scope-refine (handoff) | /said:scope-grill (thin idea)
-  [ ] Architect  → /said:architect
+  [ ] Architect  → /said:architect  (optional design-seed/inspect: /said:uxtoc)
   [ ] Implement  → /said:impl (+ /said:review-ux per web task)
   [ ] Deliver    → /said:review-qa → /said:review-ux → /said:accept → /said:debrief
 ```
