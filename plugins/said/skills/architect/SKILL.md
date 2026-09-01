@@ -23,7 +23,7 @@ A feature spec is a **recreation contract**. A fresh implementer reading the spe
 
 This principle drives every authoring decision in Pass 2. If a paragraph describes HOW (file paths, function signatures, sequencing, folder-tree diagrams, past-tense work-log), it doesn't serve recreation and belongs in the tasks file by construction.
 
-**Surface-type duality.** The design step reads `SAID.surface-type:` (`visual | api | mcp | cli`) from the `## Lane` block and authors each piece's requirements against that surface: a **`visual`** lane gets UI/UX Requirements + visual parity per piece; an **`api` / `mcp` / `cli`** lane drops UI/UX and expands API Integration against its surface's contract.
+**Surface duality.** The design step reads `SAID.surface:` (the medium) from the `## Lane` block and authors each piece's requirements against it: a **`web`** lane gets UI/UX Requirements + visual parity per piece; a **`cli` / `api` / `mcp`** lane drops UI/UX and expands API Integration against its surface's contract.
 
 ## When this fires
 
@@ -47,7 +47,7 @@ Resolve inputs and ground in calibration sources before the operator interaction
    - Path given as arg → verify with `ls <path>`. If missing, BLOCK and ask operator.
    - No path given → list `<SAID.working>/*/scope.md` (from `SAID.working:` on the `## Lane` block; no key → HALT); if exactly one, use it; if multiple or zero, ASK the operator which feature.
 2. **Verify §D empty.** Read scope.md, locate `## §D`, confirm it's empty (or every item explicitly marked "defer to Phase 2 (Architect)" with reasoning). Otherwise BLOCK.
-3. **Resolve surface-type.** Read `SAID.surface-type:` from the `## Lane` block (`visual | api | mcp | cli`; last-resort `visual`).
+3. **Resolve surface.** Read `SAID.surface:` from the `## Lane` block (the medium; required — an omitted key HALTs, never a last-resort default).
 4. **Derive feature name.** Take the leaf segment of the working dir (`docs/working/<feature>/scope.md` → `<feature>`). Confirm with operator only if ambiguous.
 5. **Resolve output paths.**
    - Output spec/tasks paths from `SAID.feature-spec:` + `SAID.task-log:` on the `## Lane` block; no key → HALT.
@@ -268,7 +268,7 @@ Procedure:
 Run this ONLY when about to reason over a surface-shape rule (a screen/UI shape). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
 1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
-2. Registry absent → SKIP: this lane has no surface contract; proceed without one — never HALT, never invent a rule.
+2. Registry absent → bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).
 3. Present → LOAD it WHOLE; echo its `SC-HEADER` `token · N rules`. Missing/malformed sentinel → HALT. Never grep a single row.
 4. Reason over the LOADED registry only; cite rule ids. Never restate or re-derive a mapping from memory.
 
@@ -291,7 +291,7 @@ Per-task authoring rules (HARD — violations require rework):
 - **Reading list:** Per-task delta from spec's Context-to-load. Don't duplicate. Cite additional files / ADR-IDs / UX-spec-frozen-items the task specifically needs beyond the umbrella context. **Flag `(full read)` on UX specs whose frozen rules are cited in Approach** — implementer re-opens the source at Phase 3 (Implement) start, not CLAUDE.md summaries.
 - **Acceptance:** Observable bullets — how "done" is judged. Cite spec / ADR / UX-spec anchors; never restate. Conformance content folds in as observable bullets, skip any that don't apply:
   - **Frozen-rule conformance** (when task touches surface-governed shapes): cite spec + rule ids from the loaded registry, not verbatim text. Example: `- [ ] <ux-spec> #NN, #MM satisfied (per screen shape)`.
-  - **Wire contract** (when a `visual`/`api` task introduces or changes a wire method): one bullet per load-bearing endpoint. Example: `- [ ] GET /endpoint — response schema matches captured bytes (per the surface's wire-probe)`.
+  - **Wire contract** (when a `web`/`api` task introduces or changes a wire method): one bullet per load-bearing endpoint. Example: `- [ ] GET /endpoint — response schema matches captured bytes (per the surface's wire-probe)`.
   - **Visual parity** (when task migrates / reshapes a list-table or form screen): one bullet citing closest already-conformant reference. Example: `- [ ] recorded UI probe matches the reference — zero diff (visual surface)`.
   - **Cross-feature contracts** (when intent ledger's `Constraints inherited` lists Sacred consumers): one bullet per public surface preserved. Example: `- [ ] <Entity>Cell public props preserved (consumed by features/<entity>/)`.
   - **Quality gates**: one umbrella bullet. Example: `- [ ] Quality gates green; no regression outside scope.`

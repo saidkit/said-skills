@@ -602,6 +602,119 @@ def render_feature(data, fid):
     return "\n\n".join(_feature_block(f, f["lane"] if multi else None) for f in matches)
 
 
+# --- L2: the reviewer-set validating oracle (replaces the existence-only glob) ---
+# The gate does NOT merely check a verdict file exists; it validates the L1 header and
+# recomputes deterministic-family Checkers. Exit-coded — a new gate a pre-close hook
+# would run; that hook is deferred, so nothing auto-runs this yet.
+VERDICT_KEYS = ("checker-id", "target-sha", "capture-evidence-ref", "verdict", "timestamp")
+
+
+def parse_verdict_header(path):
+    """Read an L1 verdict artifact's `key: value` header. {} on unreadable."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return {}
+    hdr = {}
+    for key in VERDICT_KEYS:
+        m = re.search(r"^%s:\s*(.+?)\s*$" % re.escape(key), text, re.M)
+        if m:
+            hdr[key] = m.group(1).strip()
+    return hdr
+
+
+def index_checkers(*paths):
+    """Map `said-checker` id -> meta. Discovers both forms: an **agent-form** Checker
+    (a subagent's frontmatter) and a **recipe-form** Checker (a `said-*` block in a
+    `docs/ux` rules file — the row declares its capture + judge inline). A block is a
+    run of lines between blank lines; any block carrying a `said-checker:` line is a
+    Checker, so one rules file may declare several. `paths` are dirs (globbed `*.md`)
+    or files."""
+    files = []
+    for p in paths:
+        if p and os.path.isdir(p):
+            files.extend(sorted(glob.glob(os.path.join(p, "*.md"))))
+        elif p and os.path.isfile(p):
+            files.append(p)
+    idx = {}
+    for path in files:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        for block in re.split(r"\n[ \t]*\n", text):
+            if "said-checker:" not in block:
+                continue
+            meta = {}
+            for key in ("said-checker", "said-governs", "said-capture", "said-judge", "said-recompute"):
+                m = re.search(r"^[ \t>*-]*%s:\s*(.+?)\s*$" % re.escape(key), block, re.M)
+                if m:
+                    meta[key] = m.group(1).strip()
+            if meta.get("said-checker"):
+                idx[meta["said-checker"]] = meta
+    return idx
+
+
+def validate_reviewer(workdir, cid, meta, head_sha, root="."):
+    """Validate one expected reviewer's L1 verdict. Returns (ok, reason)."""
+    hits = sorted(glob.glob(os.path.join(workdir, "review-%s-*.md" % glob.escape(cid))))
+    if not hits:
+        return False, "missing verdict artifact (review-%s-*.md)" % cid
+    hdr = parse_verdict_header(hits[-1])
+    if hdr.get("verdict", "").upper() != "PASS":
+        return False, "verdict != PASS (%s)" % (hdr.get("verdict") or "absent")
+    cap = hdr.get("capture-evidence-ref")
+    if not cap:
+        return False, "no capture-evidence-ref"
+    cap_path = cap if os.path.isabs(cap) else os.path.join(workdir, cap)
+    if not os.path.isfile(cap_path):  # a dir/missing ref is not a capture
+        return False, "dangling capture (%s)" % cap
+    tgt = hdr.get("target-sha")
+    if head_sha and tgt != head_sha:  # absent tgt fails too — never skip the staleness check
+        return False, "stale/missing target-sha (%s != HEAD %s)" % (tgt[:8] if tgt else "absent", head_sha[:8])
+    judge = (meta or {}).get("said-judge")
+    if judge in ("oracle", "metric"):  # deterministic → must recompute, never trust the file
+        cmd = (meta or {}).get("said-recompute")
+        if not cmd:
+            return False, "%s Checker declares no said-recompute (unverifiable)" % judge
+        env = {**os.environ, "SAID_WORKDIR": os.path.abspath(workdir), "SAID_CAPTURE": cap_path}
+        rc = subprocess.run(cmd, shell=True, cwd=root, capture_output=True, env=env).returncode
+        if rc != 0:
+            return False, "recompute failed (exit %d)" % rc
+    return True, "PASS"
+
+
+def reviewer_gate(workdir, surface, reviewers, checker_index, head_sha, root="."):
+    """L2 gate over the declared reviewer set. Returns (passed, [(id, ok, reason), ...])."""
+    surface = (surface or "").strip()
+    reviewers = [r.strip() for r in reviewers if r and r.strip()]
+    if surface in ("", "none"):
+        return True, [("surface", True, "none — declared skip")]
+    if not reviewers:
+        return False, [("reviewers", False,
+                        "surface-bearing (%s) but no reviewers declared — declare reviewers:, or surface: none" % surface)]
+    details, passed = [], True
+    for cid in reviewers:
+        ok, reason = validate_reviewer(workdir, cid, checker_index.get(cid), head_sha, root)
+        details.append((cid, ok, reason))
+        passed = passed and ok
+    return passed, details
+
+
+def run_reviewer_gate(a):
+    """CLI dispatch for --reviewer-gate: prints per-reviewer verdicts, exits 0/1."""
+    head = sh(["git", "-C", a.root, "rev-parse", "HEAD"]) or ""
+    idx = index_checkers(os.path.join(a.root, a.checkers_dir), a.recipe_rules)
+    revs = a.reviewers.split(",") if a.reviewers else []
+    passed, details = reviewer_gate(a.workdir or ".", a.surface, revs, idx, head, a.root)
+    for cid, ok, reason in details:
+        print("  %s %s: %s" % (GLYPH["ok"] if ok else GLYPH["block"], cid, reason))
+    print("reviewer-gate: %s" % ("PASS" if passed else "FAIL"))
+    return 0 if passed else 1
+
+
 def main():
     ap = argparse.ArgumentParser(description="Deterministic SAID feature-state analyzer (read-only).")
     ap.add_argument("feature", nargs="?", help="feature-id for a deep-dive (else: roster)")
@@ -618,7 +731,18 @@ def main():
                     help="declare a lane (repeatable); keys: root,docs,working,prefixes,legacy. "
                          "Omit entirely for one default lane.")
     ap.add_argument("--project", help="header label (default: --root basename)")
+    ap.add_argument("--reviewer-gate", action="store_true",
+                    help="L2: validate the declared reviewer set for a working dir (exit-coded gate)")
+    ap.add_argument("--workdir", help="reviewer-gate: feature working dir holding verdict artifacts")
+    ap.add_argument("--surface", help="reviewer-gate: the lane's SAID.surface medium")
+    ap.add_argument("--reviewers", help="reviewer-gate: comma-sep declared reviewer ids")
+    ap.add_argument("--checkers-dir", default="plugins/said/agents",
+                    help="reviewer-gate: dir of agent-form Checker files (default: plugins/said/agents)")
+    ap.add_argument("--recipe-rules", help="reviewer-gate: a docs/ux rules file to also scan for recipe-form Checkers")
     a = ap.parse_args()
+
+    if a.reviewer_gate:  # L2 exit-coded enforcement gate
+        sys.exit(run_reviewer_gate(a))
 
     project = a.project or os.path.basename(os.path.abspath(a.root))
     defaults = {"name": project, "root": a.root, "docs_dir": a.docs_dir, "work_dir": a.working_dir,

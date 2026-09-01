@@ -62,17 +62,17 @@ dir as the handoff.
 If a file in the same dir as the handoff is not the handoff itself,
 do not open it without asking the spawner.
 
-## Surface-type note
+## Surface note
 
-Works for every `surface-type`. Adaptations:
+Works for every `SAID.surface:` medium. Adaptations:
 
 - **Stage 0 contract reads** — the file list below is calibrated for
-  a `<PROJECT>` `visual` surface. For a non-visual surface or other
+  a `<PROJECT>` `web` surface. For a non-visual surface or other
   project, read whichever contract docs the project's `CLAUDE.md`
   names. The "the work touches" qualifier on each item means only
   relevant docs get read either way.
 - **Stage 3a (wire probes)** — applies to any HTTP surface. HTTP is HTTP.
-- **Stage 3b (visual walk)** — `visual` surface only. Auto-skips for
+- **Stage 3b (visual walk)** — `web` surface only. Auto-skips for
   non-visual refines and pure data-layer migrations because there's
   no UI surface. The `probe-mode = full` override applies to `visual`
   UI-shape-change skips ONLY; `full` does NOT force a visual walk on
@@ -206,7 +206,7 @@ min playwright to <10s curl.
 |---|---|---|
 | `skip` | no-op | no-op |
 | `curl` (default) | curl-first; per-endpoint playwright fallback on auth/UI-only triggering | conditional — runs only when work changes UI shape |
-| `full` | playwright-first (skip the curl attempt) | unconditional **on a `visual` surface**; auto-skip still wins for non-visual / data-layer-only work |
+| `full` | playwright-first (skip the curl attempt) | unconditional **on a `web` surface**; auto-skip still wins for non-visual / data-layer-only work |
 
 **Reuse handoff captures first.** Before any live probe, scan the
 handoff: if every endpoint and screen-shape the work touches already
@@ -254,8 +254,8 @@ Skip Stage 3b entirely if ANY of the following:
   screenshot.
 
 `probe-mode = full` overrides the **UI-shape-change auto-skip** for
-a `visual` surface — visual walk runs unconditionally when `full` is
-selected on a `visual` refine. `full` does NOT override the
+a `web` surface — visual walk runs unconditionally when `full` is
+selected on a `web` refine. `full` does NOT override the
 data-layer-only / no-UI-surface auto-skip — non-visual refines and
 pure data-layer migrations skip Stage 3b regardless of mode (no UI
 exists to walk).
@@ -323,7 +323,7 @@ this order:
 5. **Sequencing** — the order pieces land + what blocks what.
 6. **§A — Wire captures** (Stage 3a output, verbatim JSON; merge any
    handoff-cited captures).
-7. **§B — Visual contract** (`visual` surface only) — Stage 3b
+7. **§B — Visual contract** (`web` surface only) — Stage 3b
    screenshots inline. Empty / omitted for non-visual refines (no UI
    surface to capture).
 8. **§C — Cross-cutting decisions** — anything affecting 2+ pieces

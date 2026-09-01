@@ -70,7 +70,7 @@ Resolve inputs and ground in existing context:
 Run this ONLY when about to reason over a surface-shape rule (a screen/UI shape). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
 1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
-2. Registry absent → SKIP: this lane has no surface contract; proceed without one — never HALT, never invent a rule.
+2. Registry absent → bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).
 3. Present → LOAD it WHOLE; echo its `SC-HEADER` `token · N rules`. Missing/malformed sentinel → HALT. Never grep a single row.
 4. Reason over the LOADED registry only; cite rule ids. Never restate or re-derive a mapping from memory.
 

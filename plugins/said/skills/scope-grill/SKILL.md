@@ -41,7 +41,7 @@ What this work is for. The WHY — user pain, operator need, business driver. Ci
 ## §B — Target shape
 What the end product looks like. 
 For a non-visual surface (`api`/`mcp`/`cli`) - what is the API / tool / command shape, database changes required, feature interactions, RBAC etc
-For a `visual` surface - UI surfaces (which screens, where they live in the routing tree); data model touchpoints (entities created / read / mutated); behavioural envelope (what happens, what doesn't); reference screens / contract rules cited (`R-*` from the loaded `feature-ux-checklist.md`, plus named references from the surface's UX specs the checklist routes to).
+For a `web` surface - UI surfaces (which screens, where they live in the routing tree); data model touchpoints (entities created / read / mutated); behavioural envelope (what happens, what doesn't); reference screens / contract rules cited (`R-*` from the loaded `feature-ux-checklist.md`, plus named references from the surface's UX specs the checklist routes to).
 
 ## §C — Constraints
 What this work MUST respect: performance budget, RBAC role gating, project conventions (cite ADRs / UX-spec frozen rules verbatim), sequencing dependencies (what blocks what, what waits on what), and explicit out-of-scope boundaries.
@@ -65,11 +65,11 @@ Drive focused questions. Pace: one or two questions at a time, never five at onc
 Suggested order:
 
 1. **§A — Purpose** — "What pain does this solve? Who hits it? Why now? What's the user role(s) that interact with this?"
-2. **§B — Target shape** — "What does the user see / do? Which surfaces / routes? Which entities / data are touched? For a `visual` surface - Any reference screens that name the shape (`/tasks`, `/projects/new`, etc.) or contract rules that apply (<RULE-LABEL>, <RULE-LABEL>, etc.)?"
+2. **§B — Target shape** — "What does the user see / do? Which surfaces / routes? Which entities / data are touched? For a `web` surface - Any reference screens that name the shape (`/tasks`, `/projects/new`, etc.) or contract rules that apply (<RULE-LABEL>, <RULE-LABEL>, etc.)?"
 3. **§C — Constraints** — "What must this respect — performance, RBAC, existing conventions? Anything explicitly out-of-scope? Sequencing — does this block other work or wait on something? Any ADR / UX rule that pins a specific shape?"
 4. **§D — Open questions** — Surface as you go. Anything you'd otherwise have to GUESS at to write spec.md goes here, with phrasing + forcing function + your default-with-reasoning.
 
-For a `visual` surface: Cite `R-*` rules from the loaded `feature-ux-checklist.md` whenever §B / §C touches a contract-governed area (each governed shape → its `R-*` rules, per the checklist's own map — do not hardcode shape→rule pairs inline). Phase 2 (Architect) needs these citations to ground the spec.
+For a `web` surface: Cite `R-*` rules from the loaded `feature-ux-checklist.md` whenever §B / §C touches a contract-governed area (each governed shape → its `R-*` rules, per the checklist's own map — do not hardcode shape→rule pairs inline). Phase 2 (Architect) needs these citations to ground the spec.
 
 Whenever you find yourself about to silently resolve a question — STOP. That's a §D item. Surface it; do not pick a side.
 
@@ -94,5 +94,5 @@ Resolve these EARLY in the loop, not at the end:
 - **Don't ask five questions at once.** Focused, one-or-two-at-a-time. Compounding questions overwhelm and produce shallow answers.
 - **Don't write `scope.md` before §D is empty** (or all §D items explicitly deferred). Premature write = incomplete scope = Phase 2 starts on bad input.
 - **Don't silently invoke `/said:scope-refine`.** That's Case 1, different shape, different agent. If the operator HAS a handoff doc, redirect explicitly: "You have a handoff at `<path>` — run `/said:scope-refine <path>` instead."
-- **Don't assume the project's contract.** Before answering §B / §C technical questions - for a non-visual surface: read any cited ADRs / API specs, for a `visual` surface - read any cited ADRs / `docs/ux/feature-ux-checklist.md` and UX specs. Your job is to elicit and structure, not to invent constraints.
+- **Don't assume the project's contract.** Before answering §B / §C technical questions - for a non-visual surface: read any cited ADRs / API specs, for a `web` surface - read any cited ADRs / `docs/ux/feature-ux-checklist.md` and UX specs. Your job is to elicit and structure, not to invent constraints.
 - **Don't load context the operator hasn't asked for.** If `<feature>` matches an existing dir under `docs/features/` or `src/features/`, ASK before deep-diving — they may want a fresh-eyes ideation, not a refine.

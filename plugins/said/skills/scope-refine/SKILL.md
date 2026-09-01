@@ -17,7 +17,7 @@ This skill drives the Phase 1 Case 1 path — turning a substantive handoff into
 
 The skill itself is a thin wrapper. The `said:scope-refine-agent` agent does the substantive work — Stage 0 contract reads, Stage 1 handoff index, Stage 2 parallel codebase audit (via `said:scope-audit` subagents, one per in-scope dir, all batched), Stage 3 mode-gated wire/visual probes (curl-first by default), Stage 4 contract classification, Stage 5 scope.md write, Stage 6 self-check. Your job here is to resolve inputs, spawn the agent, and carry §D items visibly back to the operator.
 
-**Surface-type note.** Works for every `surface-type`. The agent handles the variation internally — Stage 0 reads whichever contract docs the project's `CLAUDE.md` names; Stage 3a (wire probes) applies to any HTTP surface (`api`/`mcp`); Stage 3b (visual walk) runs only for a `visual` surface and auto-skips for non-visual surfaces + pure data-layer migrations because there's no UI surface. §B in the output `scope.md` is empty / omitted for non-visual refines accordingly. The skill itself is surface-type-agnostic — it just resolves inputs and spawns.
+**Surface note.** Works for every `SAID.surface:` medium. The agent handles the variation internally — Stage 0 reads whichever contract docs the project's `CLAUDE.md` names; Stage 3a (wire probes) applies to any HTTP surface (`api`/`mcp`); Stage 3b (visual walk) runs only for a `web` surface and auto-skips for non-visual surfaces + pure data-layer migrations because there's no UI surface. §B in the output `scope.md` is empty / omitted for non-visual refines accordingly. The skill itself is surface-agnostic — it just resolves inputs and spawns.
 
 ## When this fires
 
@@ -48,7 +48,7 @@ Resolve five inputs — by reading sources, not by asking — except where expli
 
 2. **output-path** — `SAID.working:` root (`## Lane` block; no key → HALT) + `scope.md`. The agent writes here. If `scope.md` already exists at that path, append `-N` (`scope-1.md`, `scope-2.md`, …) so prior versions stay as history.
 
-3. **probe-mode** — explicit flag value, or default `curl`. Validate: must be `skip | curl | full`. The default is curl-first because typical case shrinks 2–3 min playwright to <10s curl. Reach for `full` only when the dev backend is known auth-gated end-to-end (curl can't reach the endpoints) or — for a `visual` surface — when the visual walk is mandatory. **For a non-visual surface, `full` forces playwright on wire probes ONLY**; Stage 3b (visual walk) auto-skips regardless of mode because there's no UI surface. Reach for `skip` only when the handoff already cites every needed wire capture and (for a `visual` surface) screenshot.
+3. **probe-mode** — explicit flag value, or default `curl`. Validate: must be `skip | curl | full`. The default is curl-first because typical case shrinks 2–3 min playwright to <10s curl. Reach for `full` only when the dev backend is known auth-gated end-to-end (curl can't reach the endpoints) or — for a `web` surface — when the visual walk is mandatory. **For a non-visual surface, `full` forces playwright on wire probes ONLY**; Stage 3b (visual walk) auto-skips regardless of mode because there's no UI surface. Reach for `skip` only when the handoff already cites every needed wire capture and (for a `web` surface) screenshot.
 
 4. **feature name** — needed to construct paths in inputs 1 and 2. Derive from:
    - The operator's path argument: if it's under `docs/working/<feature>/...`, take the leaf segment.
