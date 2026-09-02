@@ -114,11 +114,15 @@ Procedure:
 Procedure:
 
 1. **Read `docs/features/template.md`.** Extract `^## ` headers in order. That ordered list IS the spec section list.
-2. **For each section in template order, run its named procedure** (below). Procedures populate from the intent ledger.
+2. **Author the `**Surface:**` metadata field (procedure below), then run each `## ` section's named procedure in template order** (below). Procedures populate from the intent ledger.
 3. **After all sections drafted, run the recreation-contract self-test.**
 4. **Write spec to `docs/features/<feature>.md`** once the test passes.
 
 ### Section procedures
+
+#### Spec metadata — `**Surface:**` (author before `## Context to load`)
+
+Author the `**Surface:**` field immediately under the `# <FEAT>-<NN>: …` title (per `docs/features/template.md`). Default it to the lane `SAID.surface:` resolved at Step 0 #3 — the feature **inherits the lane** medium; write `**Surface:** none` only when the scope declares the feature screenless / no user-visible surface (a Developer-Story data / infra feature). This field drives the uxtoc basis→contract lifecycle's **feature-level bearing gate** (`feature-ux-rules.md` R-CLI-02, feature-level variant): a surface-bearing feature's built surface is completeness-checked at `accept` against the persisted outline, while `none` opts out (the check SKIPs).
 
 #### `## Context to load alongside this spec`
 
@@ -189,6 +193,8 @@ For each entry in `Pieces of scope`, ≤ 3 acceptance statements. Each is observ
 - User-visible behavior (user does X, sees Y)
 - Integrator-visible API behavior (caller sends X, gets Y)
 - Measurable system property (response time, render count, bundle delta)
+
+**Conditional outline input — the `uxtoc` basis→contract lifecycle (surface-bearing features).** If the feature's `**Surface:**` is a medium (not `none`) AND `docs/working/<feature>/toc-elements.md` exists, read that persisted **normalized element list** (the operator's normalized form of the reviewed `uxtoc` outline — `## <Screen>` headers + one element id per line) **as author-input** — you *consume* it exactly as you consume `scope.md`, and you never *cite* its `docs/working/` path (so the no-`docs/working/`-citation rule holds) — then add **one acceptance line per screen** (its `## <Screen>` sections): the screen's designed elements are present or accounted-for, citing the durable UX spec the screen already cites, never the `toc-elements.md` path. Skip-if-absent (the `SC-STUB` discipline): a `Surface: none` feature, or a surface-bearing feature with no persisted outline, adds no such line. These lines count toward the ≤ 15-line budget — one per screen.
 
 Form per intent ledger AC form:
 - **Gherkin scenarios** (`Given / When / Then`) when the feature parameterizes end-user behavior across multiple inputs. Cap: ≤ 3 scenarios per piece, ≤ 3 pieces gherkined.

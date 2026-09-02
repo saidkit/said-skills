@@ -115,6 +115,7 @@ For each approved item, in classification order (mechanical → recorded-probe �
    - JSON wire probe → parse + compare assertion against captured bytes.
    - Screenshot / Playwright snapshot (a `web`-surface probe) → PASS if AC bullet says "captured" / "probe confirms X" and the artifact exists. The probe IS the evidence.
    - **NEVER re-execute the probe** (settled default; risks flakiness, BE drift, dev-server unavailability). Operator override via `--re-execute=<task-id>` is deferred to v1.1; not implemented.
+   - **Completeness Checker (the `uxtoc` basis→contract lifecycle).** When the feature's `**Surface:**` is a medium (not `none`), the reviewer set (`SAID.reviewers:`) includes a recipe-form `completeness` Checker whose L2-oracle verdict (`said_status.py --reviewer-gate`) is honored here as recorded evidence — `accept` reads the verdict, it **does NOT run or recompute** the check (the oracle recomputes *designed ⊆ (built ∪ accounted-drops)* from the persisted outline, so a fabricated verdict is caught upstream). **Bearing gate:** `Surface: none` → the Checker self-selects out (SKIP); a surface-bearing feature whose outline is missing → the reviewer-gate FAILs (absence is never a silent skip). `accept` stays read-only; this is a recorded-probe item, **not** a new classification bucket.
 
 3. **Manual.** Emit checklist line with AC text verbatim + linked artifact path (if any). Verdict = `MANUAL-PENDING` pending operator inline mark (`PASS` / `FAIL` written by operator before final report).
 
