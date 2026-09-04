@@ -713,16 +713,21 @@ def reviewer_gate(workdir, surface, reviewers, checker_index, head_sha, root="."
     return passed, details
 
 
-DEFAULT_CHECKERS_DIR = "plugins/said/agents"  # the plugin's own agent-form Checkers
+def _plugin_agents_dir():
+    """The said plugin's OWN `agents/` dir (absolute), resolved from this file's install
+    location — the dir the runtime loads Checkers from (same basis as the SAID_PLUGIN_ROOT
+    recompute). Works whether or not the target repo vendors the plugin."""
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "agents")
 
 
 def resolve_checkers_dir(root, arg):
-    """Resolve the agent-form Checker dir for the reviewer-gate. Precedence: an explicit
-    --checkers-dir wins; else the lane's `SAID.checkers-dir:` (read from <root>/CLAUDE.md's
-    ## Lane block); else `<root>/agents` (a starter drop-in checked out at the lane root);
-    else the plugins/said/agents default. So a lane that keeps its Checkers outside the plugin
-    dir resolves a declared id WITHOUT an explicit flag — the frontmatter-key invariant is
-    necessary, a discoverable location is the sufficient half."""
+    """Resolve the agent-form Checker dir the reviewer-gate VALIDATES. It MUST be the dir the
+    runtime LOADS the Checker from, or the gate validates a different object than the one that
+    runs — a per-project drop-in (e.g. `content/agents/`) that Claude Code never executes. So the
+    default is the plugin's OWN `agents/` (the executing Checker), NOT a repo-relative path.
+    Precedence: an explicit `--checkers-dir`; else the lane's `SAID.checkers-dir:` (only for a lane
+    that ships its OWN executing agents, e.g. under `.claude/agents/`, and points the gate there);
+    else the plugin's own agents dir. The resolvability invariant asserts on the *resolved* file."""
     if arg is not None:
         return arg
     try:
@@ -733,9 +738,7 @@ def resolve_checkers_dir(root, arg):
                     return m.group(1)
     except OSError:
         pass
-    if os.path.isdir(os.path.join(root, "agents")):
-        return "agents"
-    return DEFAULT_CHECKERS_DIR
+    return _plugin_agents_dir()
 
 
 def run_reviewer_gate(a):
