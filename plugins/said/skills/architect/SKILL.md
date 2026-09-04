@@ -66,6 +66,8 @@ Don't load anything else upfront — the operator's clarifying answers in Pass 1
 
 Procedure:
 
+0. **Consult the decision record first (retrieval-at-scope).** Before extracting the ledger or authoring anything, run **`said:retrieval`** on the feature — a read-only precedent sweep so the spec's defaults, the §Acceptance bar, and any resolved §D lean start from what the project already decided (prior ADRs, features, reversals), not a blank slate. Weigh precedent first; surface precedent-vs-scope conflicts to the operator rather than baking a guess. **Surface-agnostic** and **additive** — an empty record is a no-op. **Compose** `said:retrieval` (read-only, terminal); never re-implement the sweep.
+
 1. **Batch global clarifying questions** (one batch, up front):
    - **AC form.** Gherkin (end-user behavior parameterized across inputs) vs bullets (shape-only / structural / refactor / data-layer-only). Mixed acceptable when pieces differ.
    - **Story type.** User Story (default — end-user-visible behavior) vs Developer Story (zero end-user behavior change — shape-only feature, refactor, infra).

@@ -59,6 +59,10 @@ Resolve five inputs — by reading sources, not by asking — except where expli
 
 If any required resolution would force a guess, ASK the operator one focused question per gap — never the full questionnaire at once.
 
+## Step 1b: Consult the decision record first (retrieval-at-scope)
+
+Before spawning the agent, run **`said:retrieval`** on the feature question — a read-only precedent sweep so the scope starts from what the project already decided, not a blank slate. Pass its findings into the agent's spawn prompt (a `Precedent (said:retrieval): …` block) so the agent's §A framing and §D open-questions weigh precedent first, and surface precedent-vs-handoff conflicts in §D rather than resolving them silently. **Surface-agnostic** (every medium) and **additive** — an empty decision record is a no-op ("no precedent found — proposing without"), so this never blocks a greenfield refine. **Compose** `said:retrieval` (read-only, terminal); never re-implement the sweep here.
+
 ## Step 2: Spawn the agent
 
 Spawn `said:scope-refine-agent` via the Agent tool with the resolved inputs. The agent is generic — pass everything in the prompt; it has no memory of this conversation.

@@ -70,6 +70,8 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 
 4. **Read `docs/qa/feature-qa-checklist.md`** — the QA contract. Parse every rule entry's 5 fields (`id`, `source`, `applies-to`, `summary`, `verify`). The rule set the skill executes composes from three triggers (union) per Phase A: `applies-to: any` always-on + screen-shape filter (when known) + Refs-cite-driven match. Rules with no matching trigger are skipped; rules without `verify:` content surface as WARN.
 
+   **For a `SAID.surface: doc` lane:** the `SAID.commands:` umbrella resolved in #3 **is** the doc-gate — the mechanical rubric that FAILs on a closure⟺acceptance / void-source / voice-law / dangling-cross-reference defect (a doc lane's real, fail-able gate, not `make`). Treat an absent `docs/qa/feature-qa-checklist.md` as no-rules (skip, never FAIL — a doc lane may ship none), and surface the lane's declared `doc-editorial` reviewer (`plugins/said/agents/editorial-reviewer.md`, the semantic half) for operator awareness. This branch is gated on `surface: doc`; `web`/`cli`/`api`/`mcp` handling is unchanged.
+
 ## Phase A — Resolve plan (STOP for operator review)
 
 > **Stance: read in-scope tasks; parse `### Fix` for mechanical claims; parse `Refs:` for cited rules; build execution plan. No execution yet.**

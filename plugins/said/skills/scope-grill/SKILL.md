@@ -62,6 +62,8 @@ The §A/§B/§C/§D slot positions match the slots in `said:scope-refine-agent`'
 
 Drive focused questions. Pace: one or two questions at a time, never five at once — the operator's brain is the bottleneck. Pursue each section to a sane stopping point before moving on, but loop back when later answers reveal earlier gaps.
 
+**Before the first question — consult the decision record.** Run **`said:retrieval`** on the topic: a read-only precedent sweep, so §A/§C and every §D default start from what the project already decided (prior ADRs, features, reversals) rather than the operator's memory alone. Seed the draft with precedent; surface precedent-vs-idea conflicts as §D items (never resolve silently). **Surface-agnostic** and **additive** — an empty decision record is a no-op ("no precedent — grilling from scratch"). **Compose** `said:retrieval` (read-only, terminal); never re-implement the sweep here.
+
 Suggested order:
 
 1. **§A — Purpose** — "What pain does this solve? Who hits it? Why now? What's the user role(s) that interact with this?"
