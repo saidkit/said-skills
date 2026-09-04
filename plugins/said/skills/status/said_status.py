@@ -652,13 +652,19 @@ def index_checkers(*paths):
                 m = re.search(r"^[ \t>*-]*%s:\s*(.+?)\s*$" % re.escape(key), block, re.M)
                 if m:
                     meta[key] = m.group(1).strip()
-            if meta.get("said-checker"):
-                idx[meta["said-checker"]] = meta
+            cid = meta.get("said-checker")
+            if cid:
+                if cid in idx:  # duplicate said-checker id: deterministic first-wins (files sorted), surfaced not silent
+                    sys.stderr.write("  ! index_checkers: duplicate said-checker id %r — keeping first, ignoring %s\n" % (cid, path))
+                    continue
+                idx[cid] = meta
     return idx
 
 
 def validate_reviewer(workdir, cid, meta, head_sha, root="."):
     """Validate one expected reviewer's L1 verdict. Returns (ok, reason)."""
+    if meta is None:  # declared reviewer id resolves to no Checker — nominal; a verdict can never redeem it
+        return False, "reviewer %r does not resolve to a Checker (nominal — no said-checker match)" % cid
     hits = sorted(glob.glob(os.path.join(workdir, "review-%s-*.md" % glob.escape(cid))))
     if not hits:
         return False, "missing verdict artifact (review-%s-*.md)" % cid
@@ -707,10 +713,36 @@ def reviewer_gate(workdir, surface, reviewers, checker_index, head_sha, root="."
     return passed, details
 
 
+DEFAULT_CHECKERS_DIR = "plugins/said/agents"  # the plugin's own agent-form Checkers
+
+
+def resolve_checkers_dir(root, arg):
+    """Resolve the agent-form Checker dir for the reviewer-gate. Precedence: an explicit
+    --checkers-dir wins; else the lane's `SAID.checkers-dir:` (read from <root>/CLAUDE.md's
+    ## Lane block); else `<root>/agents` (a starter drop-in checked out at the lane root);
+    else the plugins/said/agents default. So a lane that keeps its Checkers outside the plugin
+    dir resolves a declared id WITHOUT an explicit flag — the frontmatter-key invariant is
+    necessary, a discoverable location is the sufficient half."""
+    if arg is not None:
+        return arg
+    try:
+        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8") as fh:
+            for line in fh:
+                m = re.match(r"^\s*[-*]?\s*SAID\.checkers-dir:\s*(\S+)", line)
+                if m:
+                    return m.group(1)
+    except OSError:
+        pass
+    if os.path.isdir(os.path.join(root, "agents")):
+        return "agents"
+    return DEFAULT_CHECKERS_DIR
+
+
 def run_reviewer_gate(a):
     """CLI dispatch for --reviewer-gate: prints per-reviewer verdicts, exits 0/1."""
     head = sh(["git", "-C", a.root, "rev-parse", "HEAD"]) or ""
-    idx = index_checkers(os.path.join(a.root, a.checkers_dir), a.recipe_rules)
+    checkers_dir = resolve_checkers_dir(a.root, a.checkers_dir)  # lane-declared / fallback chain
+    idx = index_checkers(os.path.join(a.root, checkers_dir), a.recipe_rules)
     revs = a.reviewers.split(",") if a.reviewers else []
     passed, details = reviewer_gate(a.workdir or ".", a.surface, revs, idx, head, a.root)
     for cid, ok, reason in details:
@@ -740,8 +772,8 @@ def main():
     ap.add_argument("--workdir", help="reviewer-gate: feature working dir holding verdict artifacts")
     ap.add_argument("--surface", help="reviewer-gate: the lane's SAID.surface medium")
     ap.add_argument("--reviewers", help="reviewer-gate: comma-sep declared reviewer ids")
-    ap.add_argument("--checkers-dir", default="plugins/said/agents",
-                    help="reviewer-gate: dir of agent-form Checker files (default: plugins/said/agents)")
+    ap.add_argument("--checkers-dir", default=None,  # None → resolve via lane SAID.checkers-dir → <root>/agents → plugin default
+                    help="reviewer-gate: dir of agent-form Checker files (default: lane SAID.checkers-dir: → <root>/agents → plugins/said/agents)")
     ap.add_argument("--recipe-rules", help="reviewer-gate: a docs/ux rules file to also scan for recipe-form Checkers")
     a = ap.parse_args()
 
