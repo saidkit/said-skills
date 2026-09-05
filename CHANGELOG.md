@@ -27,16 +27,19 @@ The `doc` lane conforms to the gates every lane runs. **Breaking** for a lane th
 ## [0.4.0] — 2026-09-04
 
 - **Added:** the `doc` lane's mechanical gate ships inside the plugin (`skills/review-qa/doc-gate.py`)
-  and runs natively for a `surface: doc` lane; `said:retrieval` (a read-only precedent sweep at scope).
+  and runs natively for a `surface: doc` lane.
 - **Added (withdrawn in 0.5.0):** a per-lane bar file `docs/qa/doc-gate.md` with `--bar`, `--init`,
   `--explain`.
-- **Changed:** the `doc-editorial` agent names its L1 verdict artifact and its optional inputs.
+- **Changed:** the `doc-editorial` agent names its optional inputs.
 
 ## [0.3.7] — 2026-09-04
 
 - **Fixed:** the reviewer gate validates the Checker that RUNS — the checkers-dir defaults to the
   plugin's own `agents/`, resolved from `said_status.py`'s install location, never a per-project copy;
   a duplicate `said-checker:` id is surfaced, never last-writer-wins.
+- **Changed:** the scope skills (`scope-refine`, `scope-grill`, `architect`) run `said:retrieval` as a
+  read-only precedent sweep before proposing defaults; `review-qa` and `accept` recognise a `doc`
+  surface; the `doc-editorial` agent names its L1 verdict artifact.
 
 ## [0.3.6] — 2026-08-29
 
