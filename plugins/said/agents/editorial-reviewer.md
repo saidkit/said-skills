@@ -25,11 +25,16 @@ the failure mode a doc lane ships when nothing reads it adversarially.
 ## Inputs
 - The shippable artifacts (copy · positioning · research) + the task logs.
 - The named **current source(s)** every figure is supposed to trace to.
-- The lane's **editorial brief** — `<docs-root>/qa/editorial-brief.md`, **optional** (absent = no
-  brief; never an error). It carries the judgment the mechanical gate's regexes cannot: who this
-  lane writes for, its voice beyond the banned lexicon, what counts as a supportable claim, what
-  is off-limits. Read it first and hold the artifacts to it. A brief only ever *raises* the bar
-  you apply — it never excuses a finding the attack order below would raise.
+- The lane's **QA checklist** — `<docs-root>/qa/feature-qa-checklist.md`, loaded **whole** (echo its
+  `SC-HEADER` `token · N checks`; missing → HALT, never a silent read). Its **editorial context**
+  (the preamble: who this lane writes for, its voice beyond the banned lexicon, what counts as a
+  supportable claim, what is off-limits) and its **semantic rows** (the editorial rules a regex
+  cannot carry) are your contract. Read them first and hold the artifacts to them; a semantic row
+  is discharged by your verdict, never by the operator. The context only ever *raises* the bar you
+  apply — it never excuses a finding the attack order below would raise.
+- **Scope.** Per task: the task's shipped artifacts. At **feature scope** (invoked with a feature
+  id): every artifact the feature ships, read against each other — attack #3 (cross-artifact
+  contradiction) and source currency across tasks are the point of that read.
 
 ## Attack order — report every finding as `FAIL <file:line> — <defect> — <fix shape>`
 
@@ -54,7 +59,8 @@ the failure mode a doc lane ships when nothing reads it adversarially.
 Per finding, one line with `file:line` evidence and the fix shape. Close with
 `VERDICT: PASS (a fresh read finds nothing new)` or `VERDICT: FAIL (<n> open)`,
 and write the L1 verdict artifact the reviewer-gate reads:
-`docs/working/<feature-id>/review-doc-editorial-<task>.md`, with the header
+`docs/working/<feature-id>/review-doc-editorial-<task>.md` (per task) or
+`docs/working/<feature-id>/review-doc-editorial-<feature-id>.md` (feature scope), with the header
 `checker-id: doc-editorial` · `target-sha: <the reviewed ref's HEAD sha>` ·
 `capture-evidence-ref: <a workdir-relative or absolute path to your reading-notes — save them beside the verdict so the gate can resolve the ref>` ·
 `verdict: PASS|FAIL` · `timestamp: <ISO-8601>`. Without this file at that path

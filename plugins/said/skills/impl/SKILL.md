@@ -86,6 +86,7 @@ Resolve inputs and ground in calibration sources before Phase A starts:
    - **Secondary** — if `Makefile` present: prefer `make pre-commit`; fall back to `make qa` / `check` / `all`.
    - **Tertiary** — if `package.json` present (JS/TS only): scripts named `pre-commit` / `qa` / `check` / `validate`; invoke via `npm run` or `bun run` per lockfile.
    - **Quaternary** — operator-prompt: "What's this project's full quality-gate command + per-step typecheck + per-step test?" Cache for session; never persist to SKILL.md.
+   - **Doc terminal — `SAID.surface: doc`.** The `SAID.commands:` value is a plugin-provided verb: `doc-gate` expands, run from the lane root as ONE Bash line, to `set -o pipefail; python3 <skill-dir>/../review-qa/doc-gate.py --repo-root . --tasks '<SAID.task-log glob for this feature>' --artifacts <SAID.code-mount> --banned <docs-root>/qa/banned-lexicon.txt <the lane's arguments after the verb> 2>&1 | tee <SAID.working>/doc-gate-<id>.log` — the engine is the `review-qa` skill's bundled script, reached by the sibling-skill path (skills are siblings under the plugin root). `<id>` = this task's id. Exit 2 is a **HALT**, never a verdict. For a `doc` lane `<typecheck>`, `<tests>` and `<lint>` ALL bind to this umbrella (it is fast and idempotent), so Phase B and Phase C run unchanged. The Secondary/Tertiary/Quaternary steps never apply to a `doc` lane.
 
    Cache placeholder bindings for Phase B / Phase C reference:
    - `<typecheck>` — fast verifier per-rule (e.g., `make typecheck`, `bunx tsc --noEmit`, `go vet ./...`).
@@ -140,9 +141,9 @@ Procedure:
 
 > **Stance: turn `[ ]` into `[x]` rule-by-rule. TDD red-green-refactor by default; declarative-test or no-test for declared structural carve-outs. One rule, one confirmation in chat. NO batching. NO "I'll defer X to a Pass 2" thinking. `<typecheck>` after every changed file.**
 
-## Step 0.SC — Load the surface contract (SC-STUB v1)
+## Step 0.SC — Load the surface contract (SC-STUB v2)
 
-Run this ONLY when about to reason over a surface-shape rule (a screen/UI shape). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
+Run this ONLY when about to reason over a surface-shape rule — a screen for `web`, an artifact class for `doc`, an operator-invoked skill for `cli` (the shape vocabulary is the registry's `applies-to` values). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
 1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
 2. Registry absent → bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).
@@ -170,7 +171,7 @@ Phase B continues until all Acceptance `[ ]` bullets except visual-parity are fl
 
 ## Phase C — Verify and close
 
-> **Stance: read the task body cold. Walk the migrated URL side-by-side with the reference URL. Run quality gates. Invoke `/said:review-ux` for visual-surface features. Run the close-of-task 5-step. Flip Status. Hand off to operator for commit.**
+> **Stance: read the task body cold. Walk the migrated URL side-by-side with the reference URL. Run quality gates. Invoke `/said:review-ux` for a lane with an agent-form Checker. Run the close-of-task 5-step. Flip Status. Hand off to operator for commit.**
 
 Procedure:
 
@@ -182,7 +183,7 @@ Procedure:
 
 2. **Quality gates:** run `<quality-gates-umbrella>` (resolved in Step 0 #8 — typically `make pre-commit` or equivalent). If the project lacks an umbrella target, chain `<typecheck> && <tests> && <lint>` plus any project-defined dead-code check. Per-merge build commands (e.g., `make build`) and project-specific test scoping (e.g., parity tests under `src/engine/` for <PROJECT>) are project conventions invoked via the resolved targets — not skill-driven literals. If any gate fails → STOP and report; fix; rerun. Don't close on red.
 
-3. **Invoke `/said:review-ux`** if the surface is `web` with UI changes. Pass the task-id; the skill spawns `said:review-ux-agent` against the surface's loaded UX checklist filtered by screen shape; returns structured PASS / FAIL / SOFT-FLAG report.
+3. **Invoke `/said:review-ux`** when the lane declares an agent-form Checker for its medium in `SAID.reviewers:` — `web-ux` (a `web` surface with UI changes) runs the web arm, `doc-editorial` (a `doc` surface) runs the doc arm. Pass the task-id; the skill resolves the arm from `SAID.reviewers:`, spawns the surface's reviewer against its loaded contract (the UX checklist filtered by screen shape, or the QA checklist's editorial rows), and returns a structured PASS / FAIL / SOFT-FLAG report.
    - Any FAIL → RETURN TO PHASE B for the failing rule.
    - SOFT-FLAGs only → operator decides whether to address now or defer.
 

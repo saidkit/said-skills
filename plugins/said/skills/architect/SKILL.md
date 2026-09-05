@@ -271,9 +271,9 @@ Procedure:
 4. **Generate summary table.** One row per task: ID / Title / Status. All Status = `Todo` initially. **IDs follow `SAID.id-shape:`** (`<PREFIX><NN>-<NN>` single-lane, `<PREFIX><NN>-<LANE>-<NN>` multi-lane — feature segment collapses the dash; task counter 2-digit zero-padded). Numbering: **per-lane monotonic counter** — each `(feature, lane)` pair starts at `01` independently (two lanes' initial tasks both numbered `01`, not `01 + 02`).
 5. **For a surface-governed task, run Step 0.SC, then classify + resolve from the LOADED registry — never inline** (a structural / non-surface task skips it). Classify each task's screen shape; resolve its rule bundle + stencils by filtering the loaded registry (cite rule ids). Ambiguous `applies-to` → ask the operator.
 
-## Step 0.SC — Load the surface contract (SC-STUB v1)
+## Step 0.SC — Load the surface contract (SC-STUB v2)
 
-Run this ONLY when about to reason over a surface-shape rule (a screen/UI shape). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
+Run this ONLY when about to reason over a surface-shape rule — a screen for `web`, an artifact class for `doc`, an operator-invoked skill for `cli` (the shape vocabulary is the registry's `applies-to` values). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
 1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
 2. Registry absent → bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).

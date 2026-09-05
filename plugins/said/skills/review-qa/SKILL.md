@@ -63,25 +63,13 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
    - **Secondary** — if `Makefile` present: prefer `make pre-commit`; fall back to `make qa` / `check` / `all`.
    - **Tertiary** — if `package.json` present (JS/TS only): scripts named `pre-commit` / `qa` / `check` / `validate`; invoke via `npm run` or `bun run` per lockfile.
    - **Quaternary** — operator-prompt: "What's this project's full quality-gate command + per-step typecheck / test / lint commands?" Cache for session.
+   - **Doc terminal — `SAID.surface: doc`.** The `SAID.commands:` value is a plugin-provided verb, not a shell command: `doc-gate` expands, run from the lane root as ONE Bash line, to `set -o pipefail; python3 <skill-dir>/doc-gate.py --repo-root . --tasks '<SAID.task-log glob for this feature>' --artifacts <SAID.code-mount> --banned <docs-root>/qa/banned-lexicon.txt <the lane's arguments after the verb> 2>&1 | tee <SAID.working>/doc-gate-<id>.log` (`<id>` = this invocation's task or feature id; `<skill-dir>` = this skill's own installed dir, as `status` runs `said_status.py`). The arguments after the verb (`--soft <rule>` / `--off <rule>`) are the lane's whole bar. Exit 2 (a root matched nothing, an unknown rule, every rule off) is a **HALT** — a config error, never a verdict. The Secondary/Tertiary/Quaternary steps never apply to a `doc` lane.
 
    Cache placeholder bindings for Phase B:
    - `<quality-gates-umbrella>` — full chain (e.g., `make pre-commit`).
    - `<typecheck>`, `<tests>`, `<lint>` — per-gate fallback if no umbrella resolves.
 
 4. **Read `docs/qa/feature-qa-checklist.md`** — the QA contract. Parse every rule entry's 5 fields (`id`, `source`, `applies-to`, `summary`, `verify`). The rule set the skill executes composes from three triggers (union) per Phase A: `applies-to: any` always-on + screen-shape filter (when known) + Refs-cite-driven match. Rules with no matching trigger are skipped; rules without `verify:` content surface as WARN.
-
-   **For a `SAID.surface: doc` lane:** the mechanical rubric is the plugin's own **`doc-gate.py`** — shipped beside this skill and run **natively**: resolve it from this skill's own installed directory (the same way the `status` skill runs `said_status.py` from its skill dir), never a vendored per-project copy, so `claude plugin update` ships fixes and no consumer names a `content/gate/` path. Run it over the lane's task logs (the `SAID.task-log:` glob) + its **shippable artifact root** — `SAID.code-mount:`, the subset that *ships* (e.g. `content/site`), **not the whole lane tree**: a doc lane's `docs/`, working notes, and research/keyword corpora are ungated and must sit OUTSIDE `code-mount`, or the gate false-FAILs on prose that quotes bans or documents fabrications. Scope `--artifacts` to `code-mount`, never the lane root. The voice bar is **config** in the lane's own `docs/qa/` (not code):
-
-   ```
-   python3 <this-skill-dir>/doc-gate.py --repo-root <lane-root> \
-     --tasks '<SAID.task-log glob>' --artifacts <SAID.code-mount> \
-     --banned <docs-root>/qa/banned-lexicon.txt \
-     --bar <docs-root>/qa/doc-gate.md
-   ```
-
-   **The lane's bar is data, resolved declaration-first.** `--bar` is `<docs-root>/qa/doc-gate.md` — the lane's quality bar, a readable doc whose first fenced ```doc-gate block carries `key: value` lines (`rule <id>: on|soft|off [reason: …]` · `lexicon: <path>` · `void-markers: a, b, c` · `custom <id>: on|soft <regex>`, at most 8). An **absent** bar file is the default bar (every rule on — byte-identical to a lane that declares nothing), never an error; the engine prints the **effective bar** on every run, so a softened rule is always visible, and it refuses (exit 2) an all-off bar, an unknown key, a malformed line, or `off` without a reason. On a FAIL, re-run with `--explain` to get, per finding, its rule-id and the exact bar line that relaxes it; a lane starts a bar with `doc-gate.py --init --bar <docs-root>/qa/doc-gate.md`. Judgment a regex cannot carry belongs in the lane's `<docs-root>/qa/editorial-brief.md`, read by the `doc-editorial` reviewer — not in the bar, never in a per-lane script. No consumer names a script path; the plugin owns the engine, the lane owns the bar.
-
-   It FAILs on a closure⟺acceptance / void-source / voice-law / dangling-cross-reference defect (a doc lane's real, fail-able gate, not `make`), and exits **2** — config error, never PASS — if a `--tasks`/`--artifacts` root matches zero files (a typo'd glob or wrong cwd cannot slip through green). Treat an absent `docs/qa/banned-lexicon.txt` as no-lexicon (the exclamation voice-law still runs; skip the banned-term check) and an absent `docs/qa/feature-qa-checklist.md` as no-rules (a doc lane may ship none). Surface the lane's declared `doc-editorial` reviewer (`SAID.reviewers:`, the semantic half — the independent editorial read a grep can't do) for operator awareness. A doc lane declares **no** `SAID.commands` gate line — the mechanical gate is this plugin script, not a project umbrella — so an absent `SAID.commands` for a `surface: doc` lane is expected here; do NOT fall through to the step-3 operator-prompt umbrella resolution. This branch is gated on `surface: doc`; `web`/`cli`/`api`/`mcp` handling is unchanged.
 
 ## Phase A — Resolve plan (STOP for operator review)
 
@@ -143,7 +131,7 @@ Procedure:
    - **File deletion / presence:** `! [ -e <path> ]` or `[ -e <path> ]` check. PASS / FAIL.
    - **Quality gate sub-claim** (e.g., "tsc clean"): already covered by umbrella above; mark per-claim verdict from umbrella result.
 
-3. **Rule-set assertions.** For each rule in the composed rule set (per Phase A § 2), run its `verify:` action. PASS / FAIL based on assertion's exit code or expected condition. Some `verify:` actions are mechanical bash; some are semantic (read-and-assert) and require operator review on output → MANUAL-PENDING; some carry default-SOFT-PASS semantics (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`) and fire only when conditions warrant.
+3. **Rule-set assertions.** For each rule in the composed rule set (per Phase A § 2), run its `verify:` action. A **semantic** row on a lane whose declared reviewer (`SAID.reviewers:`) covers it is **discharged by that reviewer's recorded verdict for the task** (`docs/working/<feature-id>/review-<checker-id>-<task>.md`, `verdict: PASS`) — never left MANUAL-PENDING to the operator on such a lane; the row that proves the verdict exists is mechanical, the rows that read as its content are discharged together. PASS / FAIL based on assertion's exit code or expected condition. Some `verify:` actions are mechanical bash; some are semantic (read-and-assert) and require operator review on output → MANUAL-PENDING; some carry default-SOFT-PASS semantics (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`) and fire only when conditions warrant.
 
 4. **Refs without mapping:** spec / project-doc cites with no rule match → WARN. Operator manually verifies. Never auto-PASS.
 

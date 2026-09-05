@@ -65,9 +65,9 @@ Resolve inputs and ground in existing context:
 7. **Read `docs/features/template-tasks.md`** in full — for authoring discipline AND the id-shape stencil. **LOAD-WHOLE the `SAID.lanes:` registry** (a mapping — the §Lanes registry on the umbrella `## Lane` block; ADR-SAID-S04) and echo its token+count before use; it is the source of the legal lane set — never parse example task IDs to derive it. Validate the step-4 `lane=` flag now against the declared lanes: if `<LANE>` is not declared, BLOCK per step 4. If the project declares a single lane (no `SAID.lanes:` registry), reject any `lane=` flag.
 8. **For a surface-governed task (a screen/UI shape), run Step 0.SC, then classify + resolve from the LOADED registry — never inline** (a structural / data-layer / non-surface task skips it). Classify the task's screen shape; resolve its rule bundle + stencils by filtering the loaded registry (taxonomy/routing/stencils live there). Ambiguous `applies-to` → ASK in Step 1's batch prompt; never guess or fall back to an inline list.
 
-## Step 0.SC — Load the surface contract (SC-STUB v1)
+## Step 0.SC — Load the surface contract (SC-STUB v2)
 
-Run this ONLY when about to reason over a surface-shape rule (a screen/UI shape). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
+Run this ONLY when about to reason over a surface-shape rule — a screen for `web`, an artifact class for `doc`, an operator-invoked skill for `cli` (the shape vocabulary is the registry's `applies-to` values). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
 1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
 2. Registry absent → bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).

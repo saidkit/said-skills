@@ -101,7 +101,7 @@ On the first substantive turn, resolve the ordered stage sequence **from the SAI
 SAID cycle for <id> — resolved from the map:
   [ ] Scope      → /said:scope-refine (handoff) | /said:scope-grill (thin idea)
   [ ] Architect  → /said:architect  (optional design-seed/inspect: /said:uxtoc)
-  [ ] Implement  → /said:impl (+ /said:review-ux per web task)
+  [ ] Implement  → /said:impl (+ /said:review-ux per task on a lane with an agent-form Checker)
   [ ] Deliver    → /said:review-qa → /said:review-ux → /said:accept → /said:debrief
 ```
 
@@ -121,7 +121,9 @@ Deterministic: the same reconstructed phase always yields the same entry. **Neve
 
 **Change front door (Step-0 SHORT / TINY).** `said:triage <what>` (skip if the location is named) → `said:add-task <owning-feat> [bug]`. `add-task` creates the `Todo`, so Step 1 then reconstructs **Implement** and the table above drives it — **Scope + Architect skipped**. If the owning feature is **Closed**, do not take this door on your own: **ask first (Step 0)** — the operator picks reopen (`add-task`, reopens `Todo>0`; `debrief` re-appends a close) vs a new small feature.
 
-**Eval at Deliver.** For a feature with an evaluable surface, run the surface-appropriate eval before `debrief` (a UAT/e2e via Playwright MCP where available for a `web` surface; contract/e2e checks for an `api` / `mcp` / `cli` surface) and record a real verdict into the eval artifact — failures as failures, never "not run". `n/a` only for a Developer-Story with no evaluable surface. An operator-confirmed **skip** is allowed only on explicit word, written as `skipped(recorded)`; under an autonomy macro that skip is a **hard blocker** (`goal: stop`) — the one wait autonomy cannot self-approve. Tooling unavailable → do not fabricate a pass; emit `UAT pending` → `goal: stop` naming the exact run owed.
+**Eval at Deliver.** For a feature with an evaluable surface, run the surface-appropriate eval before `debrief` (a UAT/e2e via Playwright MCP where available for a `web` surface; contract/e2e checks for an `api` / `mcp` / `cli` surface; for a `doc` surface the **doc Eval** below) and record a real verdict into the eval artifact — failures as failures, never "not run". `n/a` only for a Developer-Story with no evaluable surface. An operator-confirmed **skip** is allowed only on explicit word, written as `skipped(recorded)`; under an autonomy macro that skip is a **hard blocker** (`goal: stop`) — the one wait autonomy cannot self-approve. Tooling unavailable → do not fabricate a pass; emit `UAT pending` → `goal: stop` naming the exact run owed.
+
+**The doc Eval (a `doc` surface).** Spawning nothing (this skill never spawns to decide), after `accept` and at HEAD: (a) re-run the lane's umbrella inline — `SAID.commands: doc-gate`, expanded by the resolution chain's doc terminal — over the WHOLE code-mount and every task log of the feature, teeing to `docs/working/<id>/doc-gate-eval-<id>.log` (its own name; `debrief`'s later re-run does not tee); (b) read `docs/working/<id>/review-doc-editorial-<id>.md` — the feature-scope verdict `/said:review-ux <id>` wrote at this Deliver row — as recorded evidence. FAIL if the umbrella is non-zero, or that verdict reads FAIL, or it is missing although review-ux ran; record both results into `docs/working/<id>/QA-eval-<id>.md` (the Eval artifact the Step-1 probe reads). Like a `cli` lane's contract re-run, this is a Deliver-time re-execution plus a read of the recorded judgment — the cross-artifact read itself is review-ux's.
 
 **Omission is never silent.** A mandatory stage skipped or deferred without an explicit, recorded operator confirmation → **withhold `said closed: yes` and emit `goal: stop — unconfirmed omission: <stage>`**. Never present a mandatory stage as an optional offer ("if you want…"). Under autonomy this is the one wait that cannot be dropped — it forces the confirmation.
 

@@ -18,19 +18,14 @@ Rules (each on|soft|off; on FAILs the gate, soft WARNs, off is skipped):
   voice-exclaim  C3  an exclamation mark in prose.
   voice-lexicon  C3  a term from the lane's banned lexicon.
   dangling-ref   C4  a local path cited by an artifact that does not exist on disk.
-  custom:<id>        a lane's own regex rule, from its bar file.
 
-THE BAR — per-lane data, never code. `--bar <docs-root>/qa/doc-gate.md`: the
-engine machine-reads ONLY the first fenced block tagged ```doc-gate (prose outside
-it is free — the file documents its own bar). Each line splits on the FIRST ": ":
-  rule <id>: on|soft|off [reason: <text>]   (`off` REQUIRES a reason)
-  lexicon: <path>                           (relative to the bar file's directory)
-  void-markers: a, b, c                     (REPLACES the built-in marker set)
-  custom <id>: on|soft <regex>              (severity first; the regex is the rest; max 8)
-Absent bar (or a bar with no ```doc-gate block) = the default bar: all rules on,
-the built-in markers, the lexicon from `--banned`. A gate is never neutered
-silently: the EFFECTIVE BAR prints on every run; all rules off, an unknown key, a
-malformed line, `off` without a reason, or more than 8 custom rules → exit 2.
+THE EFFECTIVE RULE SET — arguments, never a file. The lane's umbrella line
+(`SAID.commands: doc-gate [--soft <rule>] [--off <rule>]`) carries every relaxation;
+the skills' resolution chain expands the verb to this script with the lane's paths.
+A softened rule prints `[WARN] <rule>` and never fails the run; an off rule prints
+nothing. A gate is never neutered silently: the EFFECTIVE RULE SET prints on every
+run; every rule off, or an unknown rule name → exit 2. A lane's own checks are rows
+in its `docs/qa/feature-qa-checklist.md`, never engine config.
 
 Exit 0 = clean (WARNs allowed). Exit 1 = ≥1 FAIL. Exit 2 = usage/config error.
 
@@ -75,8 +70,6 @@ UNCHECKED = re.compile(r"^\s*-\s*\[\s\]", re.MULTILINE)
 
 RULES = ("closure", "void-source", "voice-exclaim", "voice-lexicon", "dangling-ref")
 SEVERITIES = ("on", "soft", "off")
-CUSTOM_CAP = 8
-FENCE_TAG = "doc-gate"
 
 
 class Finding:
@@ -91,20 +84,24 @@ class Finding:
 
 
 class BarError(Exception):
-    """A config error in the bar file — exit 2, never PASS or FAIL."""
+    """A config error in the effective rule set — exit 2, never PASS or FAIL."""
 
 
 class Bar:
-    """The effective bar: rule severities (+ off reasons), lexicon, markers, custom rules."""
+    """The effective rule set: severities from --soft/--off, the lexicon, the built-in markers."""
 
-    def __init__(self, default_lexicon):
-        self.source = "default (no bar file)"
+    def __init__(self, default_lexicon, soft=(), off=()):
         self.rules = {r: ("on", None) for r in RULES}
+        for r in soft:
+            self.rules[r] = ("soft", "--soft")
+        for r in off:
+            self.rules[r] = ("off", "--off")
+        n = sum(1 for r in RULES if self.rules[r][0] != "on")
+        self.source = "default (every rule on)" if n == 0 else f"arguments ({n} rule(s) relaxed)"
         self.lexicon = default_lexicon
         self.lexicon_src = "--banned" if default_lexicon else "none"
         self.void_re = VOID_MARKERS
         self.markers_src = "built-in"
-        self.custom = []  # (id, sev, compiled regex, pattern text)
 
     def sev(self, rule):
         return self.rules[rule][0]
@@ -145,129 +142,14 @@ def _resolve(roots, exts=(".md",)):
     return files, empty
 
 
-# --- the bar file ------------------------------------------------------------
-
-def _fenced_block(text):
-    """The body of the FIRST ```doc-gate fenced block, or None if the file has none."""
-    m = re.search(r"^```" + re.escape(FENCE_TAG) + r"[ \t]*\n(.*?)^```", text, re.MULTILINE | re.DOTALL)
-    return m.group(1) if m else None
-
-
-def parse_bar(path, default_lexicon):
-    """Parse the bar file into a Bar. Missing file / no block → the default bar (never an error).
-    Unknown key · malformed line · `off` without reason · all rules off · >CUSTOM_CAP custom
-    rules → BarError (exit 2): a bar can be tuned, never silently neutered."""
-    bar = Bar(default_lexicon)
-    if not path or not os.path.isfile(path):
-        return bar
-    block = _fenced_block(_read(path))
-    if block is None:
-        bar.source = f"default ({path}: no ```{FENCE_TAG} block)"
-        return bar
-    bar.source = path
-    bar_dir = os.path.dirname(os.path.abspath(path))
-    seen_rules = set()
-    for n, raw in enumerate(block.splitlines(), 1):
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if ": " not in line:
-            raise BarError(f"malformed line {n} in {path}: {raw!r} (expected `key: value`)")
-        key, value = line.split(": ", 1)
-        key, value = key.strip(), value.strip()
-        parts = key.split(None, 1)
-        head = parts[0]
-        if head == "rule":
-            if len(parts) != 2 or parts[1] not in RULES:
-                raise BarError(f"unknown rule {key!r} (line {n}); rules: {', '.join(RULES)}")
-            rid = parts[1]
-            toks = value.split(None, 1)
-            sev = toks[0] if toks else ""
-            if sev not in SEVERITIES:
-                raise BarError(f"malformed line {n}: rule {rid} needs on|soft|off, got {value!r}")
-            reason = None
-            rest = toks[1].strip() if len(toks) > 1 else ""
-            if rest:
-                if not rest.startswith("reason:"):
-                    raise BarError(f"malformed line {n}: rule {rid} trailing {rest!r} (expected `reason: <text>`)")
-                reason = rest[len("reason:"):].strip() or None
-            if sev == "off" and not reason:
-                raise BarError(f"rule {rid}: off requires reason: <text> (line {n}) — an off rule must say why")
-            if rid in seen_rules:
-                raise BarError(f"duplicate rule {rid} (line {n}) — a rule is declared once; the bar must not contradict itself")
-            seen_rules.add(rid)
-            bar.rules[rid] = (sev, reason)
-        elif head == "lexicon" and len(parts) == 1:
-            p = value if os.path.isabs(value) else os.path.join(bar_dir, value)
-            if not os.path.isfile(p):
-                raise BarError(f"lexicon file not found: {value!r} (line {n}; resolved {p}) — the bar names a lexicon that is not there")
-            bar.lexicon, bar.lexicon_src = p, f"bar lexicon: {value}"
-        elif head == "void-markers" and len(parts) == 1:
-            terms = [t.strip() for t in value.split(",") if t.strip()]
-            if not terms:
-                raise BarError(f"malformed line {n}: void-markers needs at least one term")
-            bar.void_re = re.compile(r"\b(" + "|".join(re.escape(t) for t in terms) + r")\b", re.IGNORECASE)
-            bar.markers_src = "bar: " + ", ".join(terms)
-        elif head == "custom":
-            if len(parts) != 2:
-                raise BarError(f"malformed line {n}: custom needs an id (`custom <id>: on|soft <regex>`)")
-            cid = parts[1]
-            if any(c[0] == cid for c in bar.custom):
-                raise BarError(f"duplicate custom rule {cid} (line {n})")
-            toks = value.split(None, 1)
-            if len(toks) != 2 or toks[0] not in ("on", "soft"):
-                raise BarError(f"malformed line {n}: custom {cid} needs `on|soft <regex>`, got {value!r}")
-            try:
-                rx = re.compile(toks[1])
-            except re.error as e:
-                raise BarError(f"custom {cid}: bad regex {toks[1]!r} ({e})")
-            bar.custom.append((cid, toks[0], rx, toks[1]))
-        else:
-            raise BarError(f"unknown key {key!r} (line {n}); keys: rule <id> · lexicon · void-markers · custom <id>")
-    if len(bar.custom) > CUSTOM_CAP:
-        raise BarError(f"custom rules exceed the cap: {len(bar.custom)} > {CUSTOM_CAP} — judgment beyond a few regexes belongs in the editorial brief, not the bar")
-    return bar
-
+# --- the effective rule set ---------------------------------------------------
 
 def refuse_if_neutered(bar):
-    """All rules off — whether by the bar, by alias flags, or both — is refused. Checked AFTER
-    the legacy alias flags are applied, so a four-off bar plus `--allow-exclaim` cannot slip
-    through as a nominal green."""
+    """All rules off is refused — a gate that cannot fail is not a gate (the
+    effective set is the --soft/--off arguments; there is no bar file)."""
     if all(bar.sev(r) == "off" for r in RULES):
         raise BarError("all rules off — a gate that cannot fail is not a gate (nominal-gate refusal)")
 
-
-def default_bar_text():
-    """The commented default bar `--init` writes: every knob shown, the defaults live."""
-    return f"""# doc-gate bar — this lane's mechanical quality bar (data, not code)
-
-The `said` plugin's doc-gate reads ONLY the fenced ```{FENCE_TAG} block below; everything
-else in this file is yours to explain the bar to a reader. One `key: value` per line
-(split on the first `: `). Rules are `on` (FAIL), `soft` (WARN), or `off` — and `off`
-requires a `reason:` so a silenced rule is never silent. Turning every rule off is
-refused (exit 2). Run the gate with `--explain` to see, per finding, the exact line
-here that would relax it. Judgment a regex cannot carry — tone, whether a claim is
-supportable, audience fit — belongs in `editorial-brief.md` beside this file.
-
-```{FENCE_TAG}
-rule closure: on
-rule void-source: on
-rule voice-exclaim: on
-rule voice-lexicon: on
-rule dangling-ref: on
-# A comment is a whole line starting with `#` — never trailing text after a value.
-# To use a knob below, remove ONLY its leading `# `.
-# The banned lexicon, relative to this file (the default is this sibling, if present):
-# lexicon: banned-lexicon.txt
-# REPLACES the built-in void-marker set with your own list:
-# void-markers: fabricated, do not ship
-# Your own rules — up to 8; severity first (on|soft), then the regex, verbatim:
-# custom no-first-person: soft \\b(I|we)\\b
-```
-"""
-
-
-# --- checks ------------------------------------------------------------------
 
 def _label(sev):
     return "FAIL" if sev == "on" else "WARN"
@@ -363,30 +245,6 @@ def check_voice(artifact_roots, bar, sev_exclaim, sev_lexicon):
     return out
 
 
-def check_custom(artifact_roots, bar):
-    """custom:<id> — the lane's own regex rules. A rule that matched nothing across the whole
-    scan is reported as a WARN: a rule that cannot fire is suspect (a typo'd regex is nominal)."""
-    out = []
-    hits = {cid: 0 for cid, _s, _rx, _p in bar.custom}
-    if not bar.custom:
-        return out
-    for path in _iter_files(artifact_roots):
-        for text, line, offset in _prose_lines(path):
-            for cid, sev, rx, _pat in bar.custom:
-                for m in rx.finditer(line):
-                    hits[cid] += 1
-                    out.append(Finding(
-                        _label(sev), f"custom:{cid}", path, _lineno(text, offset + m.start()),
-                        f"custom rule `{cid}` matched: “{m.group(0)}”",
-                    ))
-    for cid, _sev, _rx, pat in bar.custom:
-        if hits[cid] == 0:
-            out.append(Finding("WARN", f"custom:{cid}", bar.source, None,
-                               f"custom rule `{cid}` never fires (regex {pat!r} matched no scanned "
-                               f"file) — a rule that cannot fail is suspect; check the regex"))
-    return out
-
-
 def check_dangling(artifact_roots, repo_root, sev):
     """dangling-ref (C4) — a local path cited by an artifact that does not exist on disk."""
     out = []
@@ -422,24 +280,15 @@ BANNER = "doc-gate — mechanical rubric for a doc lane\n" + "-" * 44
 
 
 def print_bar(bar, n_tasks, n_arts):
-    """The effective bar, on EVERY run — a softened gate is visible, never silent."""
-    print(f"effective bar: {bar.source}")
+    """The effective rule set, on EVERY run — a softened gate is visible, never silent."""
+    print(f"effective rules: {bar.source}")
     for r in RULES:
         sev, reason = bar.rules[r]
         print(f"  {r}: {sev}" + (f" (reason: {reason})" if reason else ""))
     print(f"  lexicon: {bar.lexicon or 'none'} [{bar.lexicon_src}]")
     print(f"  void-markers: {bar.markers_src}")
-    if bar.custom:
-        print("  custom: " + ", ".join(f"{cid} ({sev})" for cid, sev, _rx, _p in bar.custom))
     print(f"  scope: {n_tasks} task file(s) + {n_arts} artifact file(s)")
     print("-" * 44)
-
-
-def relax_line(check):
-    """The exact bar line that would soften this finding one notch."""
-    if check.startswith("custom:"):
-        return f"custom {check[len('custom:'):]}: soft <regex>"
-    return f"rule {check}: soft   (or: rule {check}: off reason: <why>)"
 
 
 def main(argv=None):
@@ -449,57 +298,34 @@ def main(argv=None):
     ap.add_argument("--tasks", nargs="*", default=[],
                     help="task-log files/globs (closure)")
     ap.add_argument("--artifacts", nargs="*", default=[],
-                    help="shippable artifact files/dirs (void-source · voice · dangling-ref · custom)")
+                    help="shippable artifact files/dirs (void-source · voice · dangling-ref)")
     ap.add_argument("--banned", default=None, help="default banned-lexicon file (one term/line)")
-    ap.add_argument("--bar", default=None,
-                    help="the lane's bar file (<docs-root>/qa/doc-gate.md); absent = the default bar")
-    ap.add_argument("--allow-exclaim", action="store_true",
-                    help="alias for `rule voice-exclaim: off` (kept for compatibility)")
-    ap.add_argument("--refs-soft", action="store_true",
-                    help="alias for `rule dangling-ref: soft` (kept for compatibility)")
-    ap.add_argument("--explain", action="store_true",
-                    help="per finding: its rule-id, why it fired, the bar line that relaxes it")
-    ap.add_argument("--init", action="store_true",
-                    help="write the commented default bar to --bar <path> and exit (refuses to overwrite; see --force)")
-    ap.add_argument("--force", action="store_true", help="with --init: overwrite an existing bar file")
+    ap.add_argument("--soft", action="append", default=[], metavar="RULE",
+                    help="relax a rule to WARN (repeatable); one of: " + ", ".join(RULES))
+    ap.add_argument("--off", action="append", default=[], metavar="RULE",
+                    help="turn a rule off (repeatable); every rule off is refused")
     args = ap.parse_args(argv)
-
-    if args.init:
-        if not args.bar:
-            ap.error("--init needs --bar <path> (where to write the bar)")
-        if os.path.exists(args.bar) and not args.force:
-            print(f"  [CONFIG] {args.bar} already exists — a tuned bar is not overwritten; pass --force to replace it")
-            return 2
-        os.makedirs(os.path.dirname(os.path.abspath(args.bar)) or ".", exist_ok=True)
-        with open(args.bar, "w", encoding="utf-8") as fh:
-            fh.write(default_bar_text())
-        print(f"wrote the default bar to {args.bar} — edit the ```{FENCE_TAG} block; run with --bar to use it")
-        return 0
 
     if not args.tasks and not args.artifacts:
         ap.error("nothing to check: pass --tasks and/or --artifacts")
 
     default_lexicon = args.banned if (args.banned and os.path.isfile(args.banned)) else None
-    try:
-        bar = parse_bar(args.bar, default_lexicon)
-    except BarError as e:
+    unknown = [r for r in args.soft + args.off if r not in RULES]
+    if unknown:
         print(BANNER)
-        print(f"  [CONFIG] {e}")
+        for r in unknown:
+            print(f"  [CONFIG] unknown rule: {r} (rules: {', '.join(RULES)})")
         print("-" * 44)
-        print("CONFIG-ERROR · the bar file is not a valid bar — fix it; a broken bar never PASSes.")
+        print("CONFIG-ERROR · an unknown rule was named — nothing was checked.")
         return 2
-    # legacy flags are severity aliases (reported in the header like any override)
-    if args.allow_exclaim:
-        bar.rules["voice-exclaim"] = ("off", "--allow-exclaim")
-    if args.refs_soft and bar.sev("dangling-ref") == "on":
-        bar.rules["dangling-ref"] = ("soft", "--refs-soft")
+    bar = Bar(default_lexicon, soft=args.soft, off=args.off)
     try:
         refuse_if_neutered(bar)
     except BarError as e:
         print(BANNER)
         print(f"  [CONFIG] {e}")
         print("-" * 44)
-        print("CONFIG-ERROR · the effective bar (bar file + flags) has every rule off — refused.")
+        print("CONFIG-ERROR · the effective rule set has every rule off — refused.")
         return 2
 
     # Non-vacuity: a --tasks/--artifacts root that matches zero files means the gate would check
@@ -523,7 +349,6 @@ def main(argv=None):
     if bar.sev("void-source") != "off":
         findings += check_void_source(args.artifacts, bar, bar.sev("void-source"))
     findings += check_voice(args.artifacts, bar, bar.sev("voice-exclaim"), bar.sev("voice-lexicon"))
-    findings += check_custom(args.artifacts, bar)
     if bar.sev("dangling-ref") != "off":
         findings += check_dangling(args.artifacts, args.repo_root, bar.sev("dangling-ref"))
 
@@ -536,9 +361,6 @@ def main(argv=None):
         print("PASS · no findings")
     for f in fails + warns:
         print(f)
-        if args.explain:
-            print(f"        rule-id: {f.check}")
-            print(f"        relax: {relax_line(f.check)}")
     print("-" * 44)
     print(f"scanned {len(task_files)} task file(s) + {len(art_files)} artifact file(s)")
     print(f"{'FAIL' if fails else 'PASS'} · {len(fails)} FAIL · {len(warns)} WARN")
