@@ -25,6 +25,11 @@ the failure mode a doc lane ships when nothing reads it adversarially.
 ## Inputs
 - The shippable artifacts (copy · positioning · research) + the task logs.
 - The named **current source(s)** every figure is supposed to trace to.
+- The lane's **editorial brief** — `<docs-root>/qa/editorial-brief.md`, **optional** (absent = no
+  brief; never an error). It carries the judgment the mechanical gate's regexes cannot: who this
+  lane writes for, its voice beyond the banned lexicon, what counts as a supportable claim, what
+  is off-limits. Read it first and hold the artifacts to it. A brief only ever *raises* the bar
+  you apply — it never excuses a finding the attack order below would raise.
 
 ## Attack order — report every finding as `FAIL <file:line> — <defect> — <fix shape>`
 

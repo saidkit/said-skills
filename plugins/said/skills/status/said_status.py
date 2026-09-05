@@ -685,8 +685,8 @@ def validate_reviewer(workdir, cid, meta, head_sha, root="."):
         cmd = (meta or {}).get("said-recompute")
         if not cmd:
             return False, "%s Checker declares no said-recompute (unverifiable)" % judge
-        # SAID-08-06 — a plugin-shipped recompute script resolves via SAID_PLUGIN_ROOT (this
-        # oracle's own plugin dir), so it works whether or not the target vendors the plugin.
+        # A plugin-shipped recompute script resolves via SAID_PLUGIN_ROOT (this oracle's own
+        # plugin dir), so it works whether or not the target vendors the plugin.
         plugin_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         env = {**os.environ, "SAID_WORKDIR": os.path.abspath(workdir), "SAID_CAPTURE": cap_path,
                "SAID_PLUGIN_ROOT": plugin_root}
@@ -775,8 +775,8 @@ def main():
     ap.add_argument("--workdir", help="reviewer-gate: feature working dir holding verdict artifacts")
     ap.add_argument("--surface", help="reviewer-gate: the lane's SAID.surface medium")
     ap.add_argument("--reviewers", help="reviewer-gate: comma-sep declared reviewer ids")
-    ap.add_argument("--checkers-dir", default=None,  # None → resolve via lane SAID.checkers-dir → <root>/agents → plugin default
-                    help="reviewer-gate: dir of agent-form Checker files (default: lane SAID.checkers-dir: → <root>/agents → plugins/said/agents)")
+    ap.add_argument("--checkers-dir", default=None,  # None → resolve via lane SAID.checkers-dir → the plugin's own agents/ (no lane-root/agents fallback)
+                    help="reviewer-gate: dir of agent-form Checker files (default: lane SAID.checkers-dir: → the plugin's own plugins/said/agents)")
     ap.add_argument("--recipe-rules", help="reviewer-gate: a docs/ux rules file to also scan for recipe-form Checkers")
     a = ap.parse_args()
 
