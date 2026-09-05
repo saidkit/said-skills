@@ -2,6 +2,42 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.5.0] — 2026-09-05
+
+The `doc` lane conforms to the gates every lane runs. **Breaking** for a lane that carried a
+`docs/qa/doc-gate.md` bar file.
+- **Changed:** `doc-gate.py` — `--soft <rule>` / `--off <rule>` compose the effective rule set
+  (every rule off is refused); the bar file, `--bar`, `--init`, `--force`, `--explain`,
+  `--allow-exclaim` and `--refs-soft` are removed; finding lines and the no-argument run are unchanged.
+- **Changed:** `impl` and `review-qa` resolve a `doc` lane's umbrella through a doc terminal in the
+  command-resolution chain — `SAID.commands: doc-gate` is a plugin-provided verb expanded to the
+  shipped engine (pipefail, a per-invocation log). review-qa's doc-specific carve-outs are gone; a
+  semantic checklist row is discharged by the declared reviewer's recorded verdict.
+- **Changed:** `review-ux` has two arms — the web arm (Steps 1–2) and a doc arm that runs the plugin's
+  editorial reviewer per task and per feature against the lane's QA checklist, recording an inline
+  degradation when it cannot spawn; `impl`'s Phase C trigger reads "an agent-form Checker for the medium".
+- **Changed:** `accept` indexes `review-<checker-id>-*.md`, lists an editorial verdict among recorded
+  evidence, and reads an absent feature `Surface:` as the lane's medium; `said` records a doc Eval at
+  Deliver (`QA-eval-<id>.md`, no spawn); the `Step 0.SC` block (impl, architect, add-task) has a
+  medium-neutral trigger (SC-STUB v2).
+- **Changed:** the `doc-editorial` agent reads the lane's QA checklist (its editorial context and
+  semantic rows) instead of a brief, and names its feature-scope verdict.
+- **Docs:** the README describes the doc lane in the umbrella-plus-rows vocabulary.
+
+## [0.4.0] — 2026-09-04
+
+- **Added:** the `doc` lane's mechanical gate ships inside the plugin (`skills/review-qa/doc-gate.py`)
+  and runs natively for a `surface: doc` lane; `said:retrieval` (a read-only precedent sweep at scope).
+- **Added (withdrawn in 0.5.0):** a per-lane bar file `docs/qa/doc-gate.md` with `--bar`, `--init`,
+  `--explain`.
+- **Changed:** the `doc-editorial` agent names its L1 verdict artifact and its optional inputs.
+
+## [0.3.7] — 2026-09-04
+
+- **Fixed:** the reviewer gate validates the Checker that RUNS — the checkers-dir defaults to the
+  plugin's own `agents/`, resolved from `said_status.py`'s install location, never a per-project copy;
+  a duplicate `said-checker:` id is surfaced, never last-writer-wins.
+
 ## [0.3.6] — 2026-08-29
 
 **`said:board`** — loading feedback, header restructure, and real-repo fixes:

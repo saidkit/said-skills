@@ -60,10 +60,19 @@ Per finding, one line with `file:line` evidence and the fix shape. Close with
 `VERDICT: PASS (a fresh read finds nothing new)` or `VERDICT: FAIL (<n> open)`,
 and write the L1 verdict artifact the reviewer-gate reads:
 `docs/working/<feature-id>/review-doc-editorial-<task>.md` (per task) or
-`docs/working/<feature-id>/review-doc-editorial-<feature-id>.md` (feature scope), with the header
-`checker-id: doc-editorial` · `target-sha: <the reviewed ref's HEAD sha>` ·
-`capture-evidence-ref: <a workdir-relative or absolute path to your reading-notes — save them beside the verdict so the gate can resolve the ref>` ·
-`verdict: PASS|FAIL` · `timestamp: <ISO-8601>`. Without this file at that path
+`docs/working/<feature-id>/review-doc-editorial-<feature-id>.md` (feature scope), whose header is the
+**first five lines of the file, one `key: value` per line, each key exactly once, in this order, no
+blank line inside, the body only after a blank line**:
+
+```
+checker-id: doc-editorial
+target-sha: <the reviewed ref's HEAD sha>
+capture-evidence-ref: <a workdir-relative or absolute PATH to your reading-notes — a bare path, no `#` fragment; save the notes beside the verdict so the gate can resolve the ref>
+verdict: PASS|FAIL
+timestamp: <ISO-8601>
+```
+
+Without this file at that path
 with those keys, the gate has nothing to validate. Reviewer ≠ builder:
 you report, the builder fixes, you re-read until a fresh pass finds nothing new.
 Rising severity across passes ⇒ say so — the search is in the wrong place
