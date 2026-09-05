@@ -44,7 +44,7 @@ import sys
 
 # --- marker sets -------------------------------------------------------------
 
-# void-source — a shippable artifact should never carry these (the built-in set; a bar's
+# void-source — a shippable artifact should never carry these (the built-in set; a rules's
 # `void-markers:` replaces it). A fabricated figure, an unpublishable placeholder, or a
 # *voided* source cited as if live.
 VOID_MARKERS = re.compile(
@@ -83,11 +83,11 @@ class Finding:
         return f"  [{self.sev}] {self.check}  {loc}\n        {self.msg}"
 
 
-class BarError(Exception):
+class RuleSetError(Exception):
     """A config error in the effective rule set — exit 2, never PASS or FAIL."""
 
 
-class Bar:
+class RuleSet:
     """The effective rule set: severities from --soft/--off, the lexicon, the built-in markers."""
 
     def __init__(self, default_lexicon, soft=(), off=()):
@@ -144,11 +144,11 @@ def _resolve(roots, exts=(".md",)):
 
 # --- the effective rule set ---------------------------------------------------
 
-def refuse_if_neutered(bar):
+def refuse_if_neutered(rules):
     """All rules off is refused — a gate that cannot fail is not a gate (the
-    effective set is the --soft/--off arguments; there is no bar file)."""
-    if all(bar.sev(r) == "off" for r in RULES):
-        raise BarError("all rules off — a gate that cannot fail is not a gate (nominal-gate refusal)")
+    effective set is the --soft/--off arguments; there is no rules file)."""
+    if all(rules.sev(r) == "off" for r in RULES):
+        raise RuleSetError("all rules off — a gate that cannot fail is not a gate (nominal-gate refusal)")
 
 
 def _label(sev):
@@ -204,12 +204,12 @@ def _prose_lines(path):
         offset += len(line)
 
 
-def check_void_source(artifact_roots, bar, sev):
+def check_void_source(artifact_roots, rules, sev):
     """void-source (C2) — a shippable artifact carrying a fabrication / void-source marker."""
     out = []
     for path in _iter_files(artifact_roots):
         for text, line, offset in _prose_lines(path):
-            for m in bar.void_re.finditer(line):
+            for m in rules.void_re.finditer(line):
                 out.append(Finding(
                     _label(sev), "void-source", path, _lineno(text, offset + m.start()),
                     f"shippable artifact carries a fabrication/do-not-ship/voided-source "
@@ -218,12 +218,12 @@ def check_void_source(artifact_roots, bar, sev):
     return out
 
 
-def check_voice(artifact_roots, bar, sev_exclaim, sev_lexicon):
+def check_voice(artifact_roots, rules, sev_exclaim, sev_lexicon):
     """voice-exclaim (C3) — exclamation in prose · voice-lexicon (C3) — the banned lexicon."""
     out = []
     banned = []
-    if sev_lexicon != "off" and bar.lexicon:
-        for ln in _read(bar.lexicon).splitlines():
+    if sev_lexicon != "off" and rules.lexicon:
+        for ln in _read(rules.lexicon).splitlines():
             ln = ln.split("#", 1)[0].strip()
             if ln:
                 banned.append(re.compile(r"\b" + re.escape(ln) + r"\b", re.IGNORECASE))
@@ -279,14 +279,14 @@ def check_dangling(artifact_roots, repo_root, sev):
 BANNER = "doc-gate — mechanical rubric for a doc lane\n" + "-" * 44
 
 
-def print_bar(bar, n_tasks, n_arts):
+def print_rules(rules, n_tasks, n_arts):
     """The effective rule set, on EVERY run — a softened gate is visible, never silent."""
-    print(f"effective rules: {bar.source}")
+    print(f"effective rules: {rules.source}")
     for r in RULES:
-        sev, reason = bar.rules[r]
+        sev, reason = rules.rules[r]
         print(f"  {r}: {sev}" + (f" (reason: {reason})" if reason else ""))
-    print(f"  lexicon: {bar.lexicon or 'none'} [{bar.lexicon_src}]")
-    print(f"  void-markers: {bar.markers_src}")
+    print(f"  lexicon: {rules.lexicon or 'none'} [{rules.lexicon_src}]")
+    print(f"  void-markers: {rules.markers_src}")
     print(f"  scope: {n_tasks} task file(s) + {n_arts} artifact file(s)")
     print("-" * 44)
 
@@ -318,10 +318,10 @@ def main(argv=None):
         print("-" * 44)
         print("CONFIG-ERROR · an unknown rule was named — nothing was checked.")
         return 2
-    bar = Bar(default_lexicon, soft=args.soft, off=args.off)
+    rules = RuleSet(default_lexicon, soft=args.soft, off=args.off)
     try:
-        refuse_if_neutered(bar)
-    except BarError as e:
+        refuse_if_neutered(rules)
+    except RuleSetError as e:
         print(BANNER)
         print(f"  [CONFIG] {e}")
         print("-" * 44)
@@ -344,19 +344,19 @@ def main(argv=None):
         return 2
 
     findings = []
-    if bar.sev("closure") != "off":
-        findings += check_closure(args.tasks, bar.sev("closure"))
-    if bar.sev("void-source") != "off":
-        findings += check_void_source(args.artifacts, bar, bar.sev("void-source"))
-    findings += check_voice(args.artifacts, bar, bar.sev("voice-exclaim"), bar.sev("voice-lexicon"))
-    if bar.sev("dangling-ref") != "off":
-        findings += check_dangling(args.artifacts, args.repo_root, bar.sev("dangling-ref"))
+    if rules.sev("closure") != "off":
+        findings += check_closure(args.tasks, rules.sev("closure"))
+    if rules.sev("void-source") != "off":
+        findings += check_void_source(args.artifacts, rules, rules.sev("void-source"))
+    findings += check_voice(args.artifacts, rules, rules.sev("voice-exclaim"), rules.sev("voice-lexicon"))
+    if rules.sev("dangling-ref") != "off":
+        findings += check_dangling(args.artifacts, args.repo_root, rules.sev("dangling-ref"))
 
     fails = [f for f in findings if f.sev == "FAIL"]
     warns = [f for f in findings if f.sev == "WARN"]
 
     print(BANNER)
-    print_bar(bar, len(task_files), len(art_files))
+    print_rules(rules, len(task_files), len(art_files))
     if not findings:
         print("PASS · no findings")
     for f in fails + warns:
