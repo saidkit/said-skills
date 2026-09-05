@@ -7,8 +7,8 @@ gate (`make pre-commit`) cannot see and that an editorial read is slow to catch
 by hand. The semantic half — two artifacts that now contradict, a figure whose
 "current source" is itself stale, invented prose the greps miss — is the
 editorial reviewer agent (reviewer != builder): the `doc-editorial` Checker the
-lane names in `SAID.reviewers:`, which reads the lane's prose brief
-(`<docs-root>/qa/editorial-brief.md`) for the judgment a regex cannot carry.
+lane names in `SAID.reviewers:`, which reads the lane's `docs/qa/feature-qa-checklist.md`
+(its editorial context and semantic rows) for the judgment a regex cannot carry.
 
 Rules (each on|soft|off; on FAILs the gate, soft WARNs, off is skipped):
   closure        C1  a `Status: Done` task with any unchecked `- [ ]` acceptance
