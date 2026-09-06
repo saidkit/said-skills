@@ -122,6 +122,7 @@
       if(inDetail()){focusCursor();e.preventDefault();return;}
       if(CUR){clearCursor();e.preventDefault();return;}
       return;}
+    if(vw()==='backlog')return;  // a read-only list: help + Escape only, no row cursor to move
     var down=(k==='ArrowDown'||k==='j'),up=(k==='ArrowUp'||k==='k'),
         left=(k==='ArrowLeft'||k==='h'),right=(k==='ArrowRight'||k==='l');
     if(vw()==='kanban'){
@@ -151,7 +152,9 @@
   window.setTaskFilter=function(btn){var m=btn.getAttribute('data-mode');window.__tfilter=m;applyTF(btn.closest('.d-tasks'),m);};
 
   function refreshVisible(){if(!window.htmx)return;var v=vw();
-    if(v==='kanban'){var kk=$('kanban');if(kk)htmx.trigger(kk,'refresh');}else htmx.trigger('#roster','refresh');}
+    if(v==='kanban'){var kk=$('kanban');if(kk)htmx.trigger(kk,'refresh');}
+    else if(v==='backlog'){var bl=$('backlog-list');if(bl)htmx.trigger(bl,'refresh');}
+    else htmx.trigger('#roster','refresh');}
   window.refreshVisible=refreshVisible;
   // Manual refresh: force a live derive (busts the server's short-TTL guard). __fresh is read
   // synchronously by the fragment's hx-vals while htmx.trigger issues the request, then reset.
@@ -176,9 +179,36 @@
     }
     if(t.querySelector){var ds=t.querySelector('.d-tasks');if(ds&&window.__tfilter)applyTF(ds,window.__tfilter);}});
 
+  // ---------- local writes (only present when the board was started connected) ----------
+  // No token, no network call: these post to the board's own origin and write local files.
+  // The custom header + JSON body force a preflight, which the server answers for nobody.
+  function csrf(){var m=document.querySelector('meta[name="said-board-csrf"]');return m?m.content:'';}
+  function say(form,msg,err){var s=form.querySelector('.bl-msg');if(!s)return;
+    s.textContent=msg;s.classList.toggle('err',!!err);
+    if(!err)setTimeout(function(){if(s.textContent===msg)s.textContent='';},2400);}
+  function post(path,payload){
+    return fetch(path,{method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json','X-Said-Board':'1','X-Said-Board-Csrf':csrf()},
+      body:JSON.stringify(payload)}).then(function(r){return r.json().catch(function(){return {ok:false,error:'bad response'};});});}
+  window.addTodo=function(form){var i=form.elements.text,t=(i.value||'').trim();
+    if(!t){return false;}
+    post('/todo',{text:t}).then(function(r){
+      if(!r.ok){say(form,r.error||'could not add',true);return;}
+      i.value='';say(form,'added');refreshVisible();
+    }).catch(function(){say(form,'could not add',true);});
+    return false;};
+  window.saveConnect=function(form){var v=(form.elements.app.value||'').trim();
+    post('/connect',{app:v}).then(function(r){
+      say(form,r.ok?'saved · reload to apply':(r.error||'could not save'),!r.ok);
+    }).catch(function(){say(form,'could not save',true);});
+    return false;};
+
   // No auto-poll: status refreshes on a full page load and via the header refresh button only.
   apply(localStorage.getItem('sb-theme')||(sysDark()?'dark':'light'));
-  var sv=localStorage.getItem('sb-view')||'list';document.body.setAttribute('data-view',sv);
+  // a stored view whose toggle is not on this page (Backlog on an unconnected board) falls back
+  var sv=localStorage.getItem('sb-view')||'list';
+  if(!document.querySelector('.vtoggle .btn[data-view="'+cssEsc(sv)+'"]'))sv='list';
+  document.body.setAttribute('data-view',sv);
   document.querySelectorAll('.vtoggle .btn').forEach(function(b){b.classList.toggle('btn-active',b.getAttribute('data-view')===sv);});
   restoreLane();
 })();
