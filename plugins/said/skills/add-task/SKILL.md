@@ -25,6 +25,8 @@ This skill is the **add** half of Phase 2's task lifecycle. The **execute** half
 
 **Boundary.** This skill REQUIRES an existing tasks file. If the feature has no tasks file yet, it's an INITIAL Phase 2 case — redirect to `/said:architect`.
 
+**Main context only — the one writer of the append-only log.** This skill appends to a shared append-only file and its Step 1 needs the operator, so it runs in the main context. Inside a subagent or a fan-out arm there is no operator and no second writer is allowed (one log, one writer): a task discovered there is returned as an **owed item** for main to append via this skill — never appended from the arm.
+
 ## When this fires
 
 The user invokes:
@@ -123,7 +125,7 @@ Before writing, validate the answers against template-tasks.md discipline. Rewri
 - **STRICT template adherence (HARD).** Use ONLY the section list in `docs/features/template-tasks.md`: Problem / Approach / Reading list / Acceptance / Fix / Deviations / Gotchas / Out of scope (+ optional `### Root cause` subsection under Problem for bugs). NEVER invent new `###` headers ("Frozen rules to satisfy", "Wire contract probes", "Visual parity reference", "Cross-feature contracts", "Spec changes", "Files modified", "Implementation notes", "Lessons learned", "Discovery" — all forbidden). Frozen-rule conformance / wire probes / visual parity / cross-feature contracts fold into Approach + Acceptance per the rules below. Task bloat dies here.
 - **Approach: no step-lists.** "1. Do X. 2. Do Y." → rewrite as "what-to-build" framing with key decisions called out. If the operator's Approach reads as imperative numbered steps, contract to declarative end-state prose.
 - **Approach: cite frozen-rule anchors inline** when the task touches surface-governed shapes. Use the rule ids the loaded registry routed at Step 0.SC. Example: "Reshape per the routed rules — cite ids (e.g. `<ux-spec> #NN, #MM`)." Anchors only — no verbatim paraphrase. Implementer opens the source via Reading list `(full read)`.
-- **Approach: no implementation-detail leakage.** Function signatures, file enumerations, code samples that aren't load-bearing → cut and cite the upstream ADR/UX-spec/spec section. A code sample is load-bearing only when the sample ITSELF carries a decision the prose can't (e.g., end-state folder layout for a data-layer-only feature; a literal doc-patch wording).
+- **Approach: no implementation-detail leakage — but name the write-target.** Function signatures, exhaustive file enumerations, code samples that aren't load-bearing → cut and cite the upstream ADR/UX-spec/spec section. **Do name the unit(s) / file(s) the task edits** — its write-target — as a key decision: a task-level fan-out derives each task's write-set from `Refs:` ∪ the code-mount files the Approach names, so a what-to-build that names no target cannot be partitioned and falls to the serial set. Naming the write-target is not enumerating every touched file. A code sample is load-bearing only when the sample ITSELF carries a decision the prose can't (e.g., end-state folder layout for a data-layer-only feature; a literal doc-patch wording).
 - **Alternatives considered: only when reasonable.** If the operator listed an alternative that no cold reader would have picked, drop it (per template's bloat-scan rule).
 - **Reading list: per-task DELTA only.** If the operator cited files already in the spec's Context-to-load, cut the duplicates — the spec covers the umbrella; the task cites only what's specifically additional. **Flag `(full read)` on UX specs whose anchors are cited in Approach** — implementer re-opens the source at Phase 3 (Implement) start, not CLAUDE.md summaries.
 - **Acceptance: observable bullets, conformance content folds in.** Cite spec / ADR / UX-spec anchors; never restate. Skip every category that doesn't apply:
@@ -150,7 +152,7 @@ Classify the new task vs the companion spec (anchors from Step 0 step 6). This g
 
 **Mode note.** `auto` does not change this: a Gap/Contradicts is an owed architect action — recorded-and-stopped, never auto-written (the spec-write capability is removed; charter boundary). `bug` tasks default to Covered (bug = code/spec divergence, not a new requirement); the gate still runs to catch the rare spec-silent case, flagging it the same way.
 
-## Step 4 — Append + apply confirmed spec edit
+## Step 4 — Append (the tasks log only)
 
 **Write the task (this skill writes the tasks log only — never the spec):**
 

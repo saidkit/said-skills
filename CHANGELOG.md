@@ -21,6 +21,12 @@ Task-level fan-out for a single-lane cycle — arms build, main decides.
 - **Changed:** `review-qa` now asserts a Done task's `### Fix` is **present and non-placeholder** before
   parsing its claims (new checklist rule R-QA-07 + a Phase-A pre-check) — an empty `### Fix` on a Done
   task no longer passes vacuously. Earned from the SAID-09 independent acceptance review.
+- **Changed:** `add-task` and `architect` Approach rules now **name the task's write-target** (the
+  unit/file it edits) as a key decision — the fan-out partition derives write-sets from it — while still
+  forbidding file enumerations; `add-task` states it runs **main-context only** as the one writer of the
+  append-only log (a task discovered inside a fan-out arm is owed to main, never appended there).
+- **Fixed:** `add-task`'s Step 4 heading still read "Append + apply confirmed spec edit" — a stale
+  pre-SAID-05 remnant contradicting its own body ("writes the tasks log only — never the spec"); corrected.
 
 ## [0.5.0] — 2026-09-05
 
