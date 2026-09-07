@@ -2,6 +2,26 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.6.0] — 2026-09-07
+
+Task-level fan-out for a single-lane cycle — arms build, main decides.
+- **Added:** `said:impl <task> arm` / `said:impl <task> close`. A fan-out **arm** builds one task under
+  forced autonomy (no operator, no log write, no commit), declaring its files before any edit and
+  returning a close block; **close** applies that block in main and runs Phase C. `said:said` fans out a
+  feature's write-disjoint `Todo` tasks — opt-in word `fan-out` — to concurrent arms via the Workflow
+  tool, then closes them serially in main; intersecting and own-log tasks stay a serial set. The
+  append-only log, gate verdicts and every decision stay in the main context.
+- **Changed:** `impl`'s long-reserved fan-out mode is now defined; the stale "no nested subagent
+  spawning" note is corrected **plugin-wide** — in `impl`, in the one line `flow` quoted, and in the
+  `scope-audit` / `scope-refine-agent` agents (whose inline-audit design is unchanged, only the stated
+  reason) — to the real per-subagent limits: the Workflow tool and the operator exist only in the main
+  context (nested spawning itself is permitted).
+- **Changed:** `said:said` tolerates a depth-1 invocation and records a fan-out as skipped there (no
+  Workflow tool in a subagent); stale macro names removed from its depth clause.
+- **Changed:** `review-qa` now asserts a Done task's `### Fix` is **present and non-placeholder** before
+  parsing its claims (new checklist rule R-QA-07 + a Phase-A pre-check) — an empty `### Fix` on a Done
+  task no longer passes vacuously. Earned from the SAID-09 independent acceptance review.
+
 ## [0.5.0] — 2026-09-05
 
 The `doc` lane conforms to the gates every lane runs. **Breaking** for a lane that carried a

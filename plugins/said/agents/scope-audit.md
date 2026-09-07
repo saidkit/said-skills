@@ -4,9 +4,9 @@ description: >
   SAID/Phase 0 (Scope) audit — canonical 5-section shape spec for
   per-dir codebase audits during Stage 2 of said:scope-refine-agent.
   IMPORTANT: This file is a SHAPE SPEC, not an auto-spawned subagent.
-  Claude Code does not permit nested subagent spawning, so the
-  scope-refine orchestrator follows this contract INLINE (parallel
-  Read+Grep batches per in-scope dir, all in one assistant message).
+  the scope-refine orchestrator follows this contract INLINE by design
+  (parallel Read+Grep batches per in-scope dir, all in one assistant
+  message) — inline keeps the audit in the orchestrator's own context.
   The orchestrator reads this file once before Stage 2 to learn the
   return shape, then audits each dir inline with that shape. The 5
   sections are: File inventory / Imports & consumers / Gaps vs target
@@ -18,7 +18,7 @@ tools: Read, Grep, Glob, Bash
 
 # said:scope-audit — Single-dir codebase audit (Phase 0 / Scope shape spec)
 
-This file is the **canonical shape spec** for per-dir codebase audits during Stage 2 of `said:scope-refine-agent`. **It is NOT spawned as a subagent** — Claude Code does not support nested subagent spawning (subagents cannot spawn other subagents). The scope-refine orchestrator reads this file once at the start of Stage 2, then runs per-dir audits INLINE via parallel Read+Grep batches following the contract below.
+This file is the **canonical shape spec** for per-dir codebase audits during Stage 2 of `said:scope-refine-agent`. **It is NOT spawned as a subagent** — the audit is kept **inline by design** (it keeps every dir's audit in the orchestrator's own context, no sub-agent round-trips). The scope-refine orchestrator reads this file once at the start of Stage 2, then runs per-dir audits INLINE via parallel Read+Grep batches following the contract below.
 
 When you (the scope-refine orchestrator) audit a single dir, your job is: read the dir, compare it against the target shape, surface gaps and runtime issues. You do NOT write code. You do NOT pick a side when the dir diverges from the target shape — surface the gap and let Stage 4 classify it.
 

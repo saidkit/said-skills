@@ -13,8 +13,8 @@ Drives one feature across every lane it touches, in a single session, with each 
 
 ## Why this is a skill and not an agent
 
-**Claude Code does not permit nested subagent spawning** 
-(`said/skills/impl/SKILL.md` — *"Claude Code constraint: no nested subagent spawning"*).
+**A governed lane cycle cannot run inside a subagent — it has no operator, and the fan-out (Workflow) tool is main-context-only**
+(`said/skills/impl/SKILL.md` — the rewritten fan-out rule; nested spawning itself is permitted, so "cannot spawn" is not the reason).
 `/said:impl`, `/said:triage`, `/said:scope-refine` and `/said:review-ux` all spawn agents. A subagent asked to "be the backend lane" hits a wall at the first gate and hand-rolls the chain — the exact emulation failure the methodology exists to prevent.
 Skills compose freely: a skill is instructions loaded into the one agent that has skill reach.
 **So every governed lane cycle runs in the main context, and subagents are used only for read-only work needing genuine context isolation.**

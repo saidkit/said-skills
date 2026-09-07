@@ -7,9 +7,9 @@ description: >
   unresolved conflicts and open questions surfaced in §D for operator
   decision rather than silently resolved. Stage 2 codebase audits run
   inline as parallel Read+Grep batches (one batch per in-scope dir,
-  all calls in one assistant message) — Claude Code does not permit
-  nested subagent spawning, so the audit-shape spec at
-  said:scope-audit.md is followed inline. Stage 3 live-system
+  all calls in one assistant message) — the audit-shape spec at
+  said:scope-audit.md is followed inline by design (it keeps each
+  dir's audit in this agent's own context). Stage 3 live-system
   probes (wire shape, visual contract) stay sequential because the
   playwright session is shared. Output is scope-shape (NOT spec-shape) —
   Phase 1 (Architect) spec generation is a separate step that runs once §D empties.
@@ -122,11 +122,10 @@ Derive the **in-scope feature dir list** for Stage 2. Source order:
 
 ### Stage 2 — Codebase audit  (PARALLEL via batched Read+Grep)
 
-This is the parallelizable stage. **Do NOT attempt to spawn
-`said:scope-audit` sub-subagents** — Claude Code does not
-support nested subagent spawning (subagents cannot spawn other
-subagents; `Agent` / `Task` tools have no effect from inside a
-subagent's context). Instead, audit each in-scope dir INLINE via
+This is the parallelizable stage. **Audit each in-scope dir INLINE**, not by spawning
+`said:scope-audit` sub-subagents — inline is the design (it keeps
+every dir's audit in this agent's own context, avoiding sub-agent
+round-trips). Run each in-scope dir INLINE via
 parallel Read + Grep + Glob calls batched in a single assistant
 message — Read calls within one assistant turn execute concurrently,
 which is the closest equivalent to the original fan-out design.
@@ -407,9 +406,9 @@ If any [ ] fails, finish before presenting.
   draft — those are blockers, not deferrals.
 - Applying the spec template (Context-to-load, Acceptance Criteria,
   Feature Tasks) — that's Phase 1 (Architect)'s job.
-- Trying to spawn Stage 2 sub-subagents — not supported by Claude
-  Code (nested spawning silently no-ops). Use inline parallel
-  Read+Grep batches per the Stage 2 procedure.
+- Trying to spawn Stage 2 sub-subagents instead of the inline
+  batches — the Stage 2 procedure is inline by design (parallel
+  Read+Grep per dir in one message; it keeps the audit local).
 - Issuing Stage 2 Read+Grep calls serially across dirs — defeats the
   parallelism; batch the per-dir calls into one or two assistant
   messages so tool calls run concurrently.

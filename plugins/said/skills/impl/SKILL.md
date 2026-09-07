@@ -9,7 +9,9 @@ description: >
   "/said:impl <task-id|feature-id> [<task-id> ...]" — feature-id is
   auto-derived from the task-id prefix (regex captures `<PREFIX>` + `<NN>`
   → `<PREFIX>-<NN>`); a bare feature-id runs whole-feature mode (every
-  `Status: Todo` task in order).
+  `Status: Todo` task in order). Two SKILL-level fan-out forms
+  `/said:impl <task-id> arm` and `/said:impl <task-id> close` let `said:said`
+  build write-disjoint tasks concurrently (arms build, main decides).
   NOT for backlog additions — that's `/said:add-task`. NOT for spec
   authoring — that's `/said:architect`.
 ---
@@ -18,7 +20,7 @@ description: >
 
 This skill drives a Phase 2-architected task from `Status: Todo` to `Status: Done` through three phases: Phase A classifies + inventories the work against the task's Acceptance checklist; Phase B implements rule-by-rule under TDD discipline; Phase C verifies via side-by-side walk + quality gates + `/said:review-ux` + close-of-task 5-step review. Phase 2 is the input boundary (this skill reads what `/said:architect` produced); commit + push are the output boundary (operator-triggered, never auto-driven).
 
-The skill itself is the orchestrator — there is NO separate agent. You — the main agent — drive three sequential phases within ONE invocation. Each phase declares its stance up front so verification work and implementation don't blur. **Operator pauses at every phase boundary are mandatory; no auto-progression.**
+The skill itself is the orchestrator — there is NO separate agent. You — the main agent — drive three sequential phases within ONE invocation. Each phase declares its stance up front so verification work and implementation don't blur. **Operator pauses at every phase boundary are mandatory in the interactive forms; no auto-progression.** (The `arm` fan-out form is the exception — it forces autonomy and returns every pause as an owed item; see **Fan-out forms**.)
 
 **Single-pass goal.** Multiple "Pass 1 / Pass 2 / Pass 3" entries in a closed task's `### Fix` block = failure mode. The whole point of conformance-fold Acceptance (Phase 2 settlement) + 3-phase driver is to make every task close single-pass. If you find yourself thinking "I'll defer X to a Pass 2" mid-Phase B — STOP. Either widen Phase B to satisfy X now, or surface X as an operator decision (declare scope-creep, or split into a new task via `/said:add-task`).
 
@@ -31,6 +33,8 @@ The user invokes:
 - `/said:impl <task-id>` — single-task run; feature-id auto-derived (see Step 0).
 - `/said:impl <task-id-1> <task-id-2> ...` — explicit batch; all task-ids must share one feature.
 - `/said:impl <feature-id>` — whole-feature mode: drives every `Status: Todo` task in file order with operator pause between. Idempotent — re-running picks up at the next `Status: Todo` after closures.
+- `/said:impl <task-id> arm` — **fan-out arm** (SKILL-level, issued only by `said:said`): Step 0 + Phase A + Phase B under forced autonomy — no operator pause, no log write, no commit — returning a close block (owed items included). See **Fan-out forms**.
+- `/said:impl <task-id> close` — **fan-out close** (main): apply an arm's returned close block, then run Phase C. See **Fan-out forms**.
 
 If a task ID doesn't resolve, batch task-ids don't share a feature, or a task is already `Status: Done` — BLOCK + redirect (`/said:add-task <feature-id>` for follow-ups, never amend closed tasks; `/said:architect` for new features).
 
@@ -60,7 +64,7 @@ Two canonical operator flows feed tasks into `/said:impl`:
 
 (Skip `/said:triage` when root cause is already known.)
 
-No one-shot wrapper exists by design. Mandatory operator pauses at each phase boundary are the discipline that prevents the multi-pass churn the 3-phase driver replaces.
+No one-shot wrapper exists for the interactive forms by design. Mandatory operator pauses at each phase boundary are the discipline that prevents the multi-pass churn the 3-phase driver replaces. (The `arm` fan-out form forces autonomy — a subagent has no operator — so it returns every owed decision to main instead; **Fan-out forms**.)
 
 ## Step 0 — Preflight
 
@@ -72,6 +76,7 @@ Resolve inputs and ground in calibration sources before Phase A starts:
    - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` (e.g., `<FEAT>-NN`, or a suffixed per-lane feature-id such as `PROJ-01-BE` / `PROJ-02-BE-widgets`) AND a tasks file resolves (bare `<arg>.tasks.md` OR slug-suffixed `<arg>-*.tasks.md` via the resolver below) → **whole-feature mode**; build batch = every `Status: Todo` heading in file order. (The "AND a tasks file resolves" guard is load-bearing: a per-task id like `PROJ-01-FE-07` matches the shape but has no `PROJ-01-FE-07.tasks.md`, so it correctly falls through to the task regexes below.)
    - Args matching the canonical new-task regex `^([A-Z]+)(\d+)-.+$` → feature-id = `${1}-${2}` (dash collapsed inside the feature segment is re-inserted to produce the feature-id); **single-task or explicit batch mode**.
    - Legacy fallback (projects pre-migration): args matching `^([A-Z]+-\d+)-.+$` → feature-id is the leading captured segment. Post-migration projects won't trigger this path — their task IDs already match the canonical regex above.
+   - **Trailing `arm` / `close` word** (fan-out forms, issued only by `said:said`): a single task-id followed by `arm` or `close` selects the fan-out form (see **Fan-out forms**) — `arm` builds under forced autonomy and returns a close block; `close` applies a returned block in main. A bare task-id (no trailing word) is the interactive single-task run above.
    - Resolve tasks file path from `SAID.task-log:` on the `## Lane` block; no key → HALT (operator declares it), never glob-guess. If the declared file is absent, scan its dir for a slug-suffixed `<feature-id>*.tasks.md` match (slug-suffixed convention, e.g., `TEST-01-tests.tasks.md` for feature `TEST-01`); if exactly one match, use it; if multiple matches, ASK the operator which to use. Symmetric with the companion-spec fallback in step 2.
    - Verify every task arg has a `## <task-id>:` heading in the resolved tasks file. All args in a batch must share one feature.
    - BLOCK + redirect on failure: missing tasks file (no glob match) → `/said:architect`; missing task heading → `/said:add-task`.
@@ -212,6 +217,22 @@ Procedure:
 
 For batch runs (multiple task IDs): pause for operator `proceed` before re-entering Phase A on the next task. NO auto-progression across tasks.
 
+## Fan-out forms — `arm` and `close`
+
+Two SKILL-level forms let `said:said` fan out a feature's **write-disjoint** tasks (`ADR-SAID-S09`: arms build, main decides). `said:said` spawns them via the Workflow tool, one arm per disjoint task — **never from inside this skill** (a subagent has no Workflow tool). Decisions, gate verdicts, closes and the append-only log stay in main.
+
+### `/said:impl <task-id> arm` — build under **forced autonomy**, decide nothing
+Runs Step 0 + Phase A + Phase B under **forced autonomy** — no operator pause (a subagent has no operator, so no STOP is honoured), no task-log write, no commit:
+1. **Declaration before write.** The arm's first output, **before any edit**, is the file set it intends to touch, compared to the partition it received from main. A file outside the partition is returned as an **owed item before any edit** — the arm **never widens** its partition.
+2. **Decide nothing — return owed items.** Every point the interactive form would STOP (an unsatisfiable Approach at Phase A step 8; a carve-out that turns out to be new behavior; a mid-flight scope classification; an S/M/L escalation to `add-task`; a SOFT-FLAG / soft-finding deferral) is **returned as an owed item, never resolved**. Per-rule `<typecheck>` evidence is one line per rule in the block (not a chat confirmation).
+3. **No Phase C.** The arm never runs Phase C (quality gates, `/said:review-ux`, code-review, the close). Those run in main at `close`.
+4. **Channel = the return value.** The arm's only output is its schema-validated **close block** (below); it writes **no working-dir artifact** — `said:said` reconstructs the phase from the feature's canonical artifacts (the task log written at `close`), not from an arm file.
+
+The **close block** the arm returns: `status` (proposed `Done (YYYY-MM-DD)` — main decides + stamps the date), `fix` (one verification line), `deviations` / `gotchas` (optional), `refs` (ADR / UX-spec / feature-spec paths created or edited), `acceptance` (per-bullet `[x]` / `[N/A — reason]`), `owed` (decisions returned, not resolved), `files` (declared + actual changed files — scopes the close diff and the partition check), `evidence` (per-rule `<typecheck>` results, test counts). No new `###` headers.
+
+### `/said:impl <task-id> close` — apply in **main**, run Phase C
+Runs in **main**. Applies the arm's returned close block (main decides `Status:` and stamps the date), then runs **Phase C** exactly as the interactive form does — quality gates, `/said:review-ux` for every Checker the lane declares (`ADR-SAID-S06` §2), generic code-review with the diff **scoped to the arm's declared `files`** (`git diff -- <files>`), the close-of-task 5-step, the exhaustive close-mutation flip, the summary-table row. It checks the arm's **actual diff against its declaration**: a file outside the declaration is an **owed item** (the task does not close clean). A staged FAIL is impl's own "RETURN TO PHASE B", repaired **inline in main once**, then owed — never a second pipeline pass, never a silent revert. Closes are **serial** across tasks — only main writes the append-only log.
+
 ## Step Final — Exit
 
 Report:
@@ -233,7 +254,7 @@ Hard exit. Implementation is done; commit is operator-triggered. Do NOT commit. 
 - **Don't subsume `/said:review-ux`.** The UX gate is deliberately separate; this skill INVOKES it at Phase C, doesn't replace it. The split exists because "implementation agent declares done, QA agent rubber-stamps" is the regression-shipping pattern the separation guards against.
 - **Don't batch rules in Phase B.** "I'll satisfy three rules at once in one commit" = discipline collapse. One rule, one confirmation, one chat message. The agent's tendency to bulk-edit is the failure mode this discipline exists to prevent.
 - **Reference comments: `// <task-id>` only.** NOT `// <task-id>: <anything>` — the suffix is what produced the prose problem.
-- **Don't auto-progress phase boundaries.** Operator pauses at Phase A → Phase B and Phase B → Phase C are mandatory. If the operator reply is silent or ambiguous, ASK rather than proceed.
+- **Don't auto-progress phase boundaries.** Operator pauses at Phase A → Phase B and Phase B → Phase C are mandatory in the interactive forms. If the operator reply is silent or ambiguous, ASK rather than proceed. (The `arm` fan-out form has no operator to pause for — it runs A→B under forced autonomy and returns owed items; **Fan-out forms**.)
 - **Don't run on `Status: Done` tasks.** BLOCK; for follow-ups on COMMITTED Done tasks (`git log --all --grep <task-id>` non-empty), redirect to `/said:add-task`. Pre-commit Done tasks MAY be amended in place per template-tasks.md pre-commit carve-out — operator gate via mid-flight rule below.
 - **Don't silently fold mid-flight scope additions.** When operator's message during any phase introduces a requirement not in the task's Approach, STOP and classify before proceeding:
    - **Within scope** (Approach implicitly covers it) → proceed.
@@ -244,7 +265,7 @@ Hard exit. Implementation is done; commit is operator-triggered. Do NOT commit. 
 - **Don't extend or wrap a generic multi-pass feature-development skill.** Those produce the multi-pass churn this driver escapes. `/said:impl` supersedes them for SAID-architected features (any feature with `docs/features/<feature>.tasks.md`); a generic feature skill stays available for non-SAID one-off feature work.
 - **Don't make TDD optional.** TDD is the default discipline. Structural carve-out (folder moves / import retargeting / doc edits) is rare; declare it explicitly at Phase A with one-sentence justification. Silently skipping TDD on a TDD-fit task is the discipline-collapse failure mode.
 - **Don't silently skip Phase C code-review.** It's CRITICAL for code quality and runs by default. Skip ONLY when structural carve-out was declared at Phase A OR the operator explicit-overrides for trivial-surface tasks with reason logged in chat. Quality gates + `/said:review-ux` together do NOT catch deep logic / security / race-condition bugs — those need a dedicated code-review subagent.
-- **Don't auto-spawn implementation agents from inside this skill.** Claude Code constraint: no nested subagent spawning. If an `--autonomous` mode is ever built (deferred), fan-out happens at SKILL level only.
+- **Don't spawn fan-out arms from inside this skill.** Fan-out is spawned at SKILL level by `said:said` via the Workflow tool, one arm per write-disjoint task — never from inside impl (`ADR-SAID-S09`). The real platform constraints (recorded in `ADR-SAID-S09`): the **Workflow tool exists only in the main context** (a subagent cannot fan out), and a subagent has **no operator** (`AskUserQuestion` is removed — pauses return as data). Nested subagents ARE permitted (three layers by default), so "cannot spawn" is not the reason; arms simply **never run Phase C** — the umbrella gate needs a quiescent tree, a review-FAIL loop inside an arm has no operator or bound, and the gate decision is main's. The `arm` / `close` forms (**Fan-out forms**) are that fan-out, defined.
 - **Don't bypass `Refs:` write-set discipline.** Refs is for ADR / UX-spec / feature-spec paths the task **creates or edits**. Reading list is the read-set. Refs is not for citing everything relevant.
 - **Don't commit.** Commit is operator-triggered. The skill writes the task close + reports state; operator runs `git add` + `git commit` with the right commit-msg prefix per project convention.
 - **Don't load source UX specs upfront in Step 0.** The task body's Reading list `(full read)` flag governs what to open at Phase A. Pre-loading specs the task doesn't cite is context bloat.

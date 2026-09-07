@@ -78,6 +78,7 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 Procedure:
 
 1. **Parse `### Fix` blocks** for mechanical claims (regex on canonical shapes):
+   - **Fix-presence (assert first, mechanical):** before parsing claims, assert the `### Fix` body is present and non-placeholder — the block between `### Fix` and the next `###` has a non-blank, non-`<!-- … -->` line. An empty or scaffold-only body (`<!-- Filled at close … -->`) is a **FAIL** (impl's close rule makes the fill a mandatory close-mutation), never a silent zero-claim pass. (This is `R-QA-07`.)
    - **Test count delta** — match `Tests (\d+) → (\d+)` or `(\d+) pass` or `(\d+) tests` patterns. Extract claimed end-count.
    - **Quality-gate clean** — match `tsc + lint clean`, `tests pass`, `knip clean`, etc. Each → re-run the resolved per-gate command at Phase B.
    - **Grep result** — match `` `grep -rn <pattern> <path>` returns (\d+) results `` or `... shows (\d+) matches` shapes. Extract pattern + path + expected count. On parse failure → mark for operator-prompt fallback (Q2=c).
@@ -101,7 +102,7 @@ Procedure:
    |---|---|
    | <umbrella command> | <source — SAID.commands: / Makefile / package.json> |
 
-   ### Fix-claim re-checks
+   ### Fix presence + claim re-checks
    | source | claim | re-verify command |
    |---|---|---|
    | <feat-id>.tasks.md:<line> (<task-id>) | <claim — e.g., Tests N → M> | <re-verify command> |
@@ -125,7 +126,7 @@ Procedure:
 
 1. **Quality gates (Q4=a — full umbrella always).** Run `<quality-gates-umbrella>` (resolved in Step 0 #3) in one shot. Capture exit code + stdout/stderr. PASS / FAIL by exit code.
 
-2. **Fix-claim re-checks.** For each parsed claim:
+2. **Fix presence + claim re-checks.** For each parsed claim:
    - **Test count (Q1=b — ≥-tolerant):** re-run `<tests>`, parse count from output, verify `actual >= claim_end`. PASS if so; FAIL if actual < claim (test deletion or regression).
    - **Grep (Q2=c — extract + prompt fallback):** run extracted grep command verbatim; verify count matches claim. On parse failure earlier (Phase A flagged), operator-prompt now: "Fix claim at `<file:line>` reads: <verbatim>. What re-verify command captures this assertion?" Operator-supplied command then runs.
    - **File deletion / presence:** `! [ -e <path> ]` or `[ -e <path> ]` check. PASS / FAIL.
