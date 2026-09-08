@@ -1,6 +1,6 @@
 # impl — Phase A procedure (Classify + Inventory)
 
-Read from the spine (`SKILL.md` Step 0 #12) at the moment it names; every rule here is standing for the whole phase.
+Read from the spine (`SKILL.md` Contract rule 1) at the moment it names; every rule here is standing for the whole phase.
 
 ## Common compositions (upstream → this skill)
 
@@ -40,8 +40,8 @@ Procedure:
    - **L** (~300+ LOC, multi-screen or multiple rule clusters): full inventory; flag any pieces that should split into separate task IDs (escalate to operator if so — that's an `/said:add-task` decision).
 
 2. **Declare discipline** in one sentence:
-   - **Test-first (default)** — the red is a checkable pre-commitment that fails before the work: the failing `<tests>` run where the lane binds one (Step 0 #8), otherwise the task's still-unchecked Acceptance item; green = it passes / is checked with `file:line` evidence; then refactor. How tests are placed and what may be mocked comes from the lane's `## Earned rules` (Step 0 #9), never from a remembered convention.
-   - **Structural — declarative-test/no-test (carve-out)** — pure folder moves, import retargeting, or edits to documentation that is **not the lane's deliverable** (a code lane's README, a comment). On a `doc` or knowledge lane the document **is** the deliverable: its tasks take the test-first path, never this carve-out. Justify the carve-out in one sentence. Never silently skip test-first.
+   - **Test-first (default)** — the red is a checkable pre-commitment that fails before the work, `per profile.red`; green = it passes / is checked with `file:line` evidence; then refactor. How tests are placed and what may be mocked comes from the lane's `## Earned rules` (Step 0 #9), never from a remembered convention.
+   - **Structural — declarative-test/no-test (carve-out)** — only for work the loaded profile's `carve-out` slot admits, `per profile.carve-out`. Justify the carve-out in one sentence. Never silently skip test-first, and never widen the slot.
 
 3. **If S — output classification + discipline + plan paragraph. STOP. Skip steps 4–6.**
 
@@ -57,7 +57,7 @@ Procedure:
    |---|---|---|---|
    | `<ux-spec>` #NN, #MM satisfied (from loaded registry) | no | `<screen file>:42` mounts an inline control; needs the rule's component per #MM | Replace inline state with the lane's list-state hook; mount the lane's toolbar component |
    | GET `/<entity>/terms` — response schema matches captured bytes | no | Captured `{data, pageCount, totalCount}`; client schema expects `{items, total, page, limit}` | Rewrite the list-response schema to the wire shape |
-   | Surface-parity: matches the reference | no | Not checked | Phase C side-by-side walk (visual surface) |
+   | Surface-parity: matches the reference | no | Not checked | Phase C parity check `per profile.parity` |
    | Spec §14 names `features/<entity>/components/<entity>-users-table` | no | Not on disk | CREATE |
    | Spec §14 names `features/<entity>/components/<entity>-users-table-columns` | no | Not on disk | CREATE |
 
