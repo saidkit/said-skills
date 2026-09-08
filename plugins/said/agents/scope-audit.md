@@ -52,7 +52,7 @@ You do NOT read:
 
 - `<path>` — `<one-line purpose>`
 
-Example: `services/<entity>.api.ts` — axios+Zod calls for `/<entity>` endpoints; exports `list<Entity>`, `get<Entity>`, `update<Entity>`.
+Example: `services/<entity>.<adapter>` — the lane's HTTP client + schema validator calls for `/<entity>` endpoints; exports `list<Entity>`, `get<Entity>`, `update<Entity>`.
 
 Batch reads in parallel calls when the dir has >5 files.
 
@@ -82,7 +82,7 @@ For each violation, write one bullet:
 
 - `<R-ID>` (`<ADR / UX citation>`) — `<file:line or path:symbol>` — `<one-line statement of the gap>`
 
-Example: `<R-ID>` (`<ADR-ID>` service trio) — `services/<entity>.service.ts:10` — branches on `IS_MOCK` inline instead of selecting between `.api.ts` and `.mock.ts`.
+Example: `<R-ID>` (`<ADR-ID>` service trio) — `services/<entity>.service.ts:10` — branches on the runtime-mode flag inline instead of selecting between the real adapter and the mock adapter.
 
 If a cited rule has no violation in this dir, do NOT list it. This section is for violations only.
 

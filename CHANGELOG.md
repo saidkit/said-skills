@@ -2,6 +2,15 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.7.0] — 2026-09-08
+
+`said:impl` carries no stack of its own — a lane's `## Earned rules` is its implementation discipline, re-read at every step and proven at close.
+- **Changed (breaking for un-rolled lanes):** `said:impl` reads the lane's `CLAUDE.md` `## Earned rules` section at Step 0 by heading and **halts when the heading is missing** (an empty section proceeds). Add the section — one rule per `- ` line, an `R-*` id, a link to its ADR — plus a `## Significant ADRs (skill-referenced)` table and one reminder line under `## Claude Code Reminders`.
+- **Changed:** the discipline is *test-first* with the red defined without naming a lane — the failing `<tests>` run where the lane binds one, otherwise the task's still-unchecked Acceptance item. The origin project's framework, mock and component identifiers, and the inline wire-probe procedure, are gone from `impl`; a lane that needs wire capture states it as its own rule.
+- **Added:** before every Phase B confirmation unit (per Acceptance item in an arm) `impl` re-reads the section from disk, echoes its count, and writes one briefing line per applicable rule; each task's `### Fix` now carries `Rules applied: <ids | none> (block: N)`.
+- **Added:** `said:review-qa` verifies that line (bundled `earned-rules.py`, reached by `impl` via the sibling-skill path): an id absent from the section or a count above the actual → FAIL; a count below the actual → WARN (the block grew since the close); an absent line → FAIL for closes on/after 2026-09-08, WARN before; a lane without the heading → WARN before that date, FAIL after.
+- **Changed:** the standing re-anchor step and a self-re-read line sit at the top of `impl` (inside the part of a skill that survives a context compaction).
+
 ## [0.6.0] — 2026-09-07
 
 Task-level fan-out for a single-lane cycle — arms build, main decides.
@@ -20,13 +29,13 @@ Task-level fan-out for a single-lane cycle — arms build, main decides.
   Workflow tool in a subagent); stale macro names removed from its depth clause.
 - **Changed:** `review-qa` now asserts a Done task's `### Fix` is **present and non-placeholder** before
   parsing its claims (new checklist rule R-QA-07 + a Phase-A pre-check) — an empty `### Fix` on a Done
-  task no longer passes vacuously. Earned from the SAID-09 independent acceptance review.
+  task no longer passes vacuously. Earned from an independent acceptance review of the fan-out release.
 - **Changed:** `add-task` and `architect` Approach rules now **name the task's write-target** (the
   unit/file it edits) as a key decision — the fan-out partition derives write-sets from it — while still
   forbidding file enumerations; `add-task` states it runs **main-context only** as the one writer of the
   append-only log (a task discovered inside a fan-out arm is owed to main, never appended there).
 - **Fixed:** `add-task`'s Step 4 heading still read "Append + apply confirmed spec edit" — a stale
-  pre-SAID-05 remnant contradicting its own body ("writes the tasks log only — never the spec"); corrected.
+  pre-consume-contract remnant contradicting its own body ("writes the tasks log only — never the spec"); corrected.
 
 ## [0.5.0] — 2026-09-05
 

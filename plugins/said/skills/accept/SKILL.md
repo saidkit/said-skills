@@ -106,7 +106,7 @@ For each approved item, in classification order (mechanical → recorded-probe �
 1. **Mechanical.** Infer the assertion from AC text and execute via Bash / Read / grep. Examples:
    - "tsc + lint clean" → run `<typecheck>` + `<lint>` (resolved per project, same chain as `/said:impl` Step 0 #8).
    - "Tests 575 → 578" → run `<tests>`; parse count; verify ≥ 578.
-   - "grep -rn IS_MOCK src/ returns 0" → re-run grep; verify count matches.
+   - "grep -rn `<forbidden-token>` src/ returns 0" → re-run grep; verify count matches.
    - "File `<path>` deleted" → check `! [ -e <path> ]`.
    - "Spec §14 names `<path>`" → check file presence + structural match against spec.
    - ADR-rule conformance (when assertion is well-defined) → run the assertion.

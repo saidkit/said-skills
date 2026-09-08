@@ -3,7 +3,7 @@ name: impl
 description: >
   SAID/Phase 3 (Implement) driver — drives a feature task from `Status: Todo`
   to `Status: Done` through three phases: Phase A (Classify + Inventory),
-  Phase B (Implement rule-by-rule under TDD discipline), Phase C (Verify +
+  Phase B (Implement rule-by-rule under test-first discipline), Phase C (Verify +
   close-of-task 5-step). Composes with `/said:review-ux` at Phase C close
   for features with a visual surface. Triggered ONLY by the explicit command
   "/said:impl <task-id|feature-id> [<task-id> ...]" — feature-id is
@@ -18,7 +18,7 @@ description: >
 
 # Feature Impl — Phase 3 (Implement): Per-Task Driver
 
-This skill drives a Phase 2-architected task from `Status: Todo` to `Status: Done` through three phases: Phase A classifies + inventories the work against the task's Acceptance checklist; Phase B implements rule-by-rule under TDD discipline; Phase C verifies via side-by-side walk + quality gates + `/said:review-ux` + close-of-task 5-step review. Phase 2 is the input boundary (this skill reads what `/said:architect` produced); commit + push are the output boundary (operator-triggered, never auto-driven).
+This skill drives a Phase 2-architected task from `Status: Todo` to `Status: Done` through three phases: Phase A classifies + inventories the work against the task's Acceptance checklist; Phase B implements rule-by-rule under test-first discipline; Phase C verifies via side-by-side walk + quality gates + `/said:review-ux` + close-of-task 5-step review. Phase 2 is the input boundary (this skill reads what `/said:architect` produced); commit + push are the output boundary (operator-triggered, never auto-driven).
 
 The skill itself is the orchestrator — there is NO separate agent. You — the main agent — drive three sequential phases within ONE invocation. Each phase declares its stance up front so verification work and implementation don't blur. **Operator pauses at every phase boundary are mandatory in the interactive forms; no auto-progression.** (The `arm` fan-out form is the exception — it forces autonomy and returns every pause as an owed item; see **Fan-out forms**.)
 
@@ -40,32 +40,6 @@ If a task ID doesn't resolve, batch task-ids don't share a feature, or a task is
 
 If the operator's request is to plan or architect a NEW feature — this is the WRONG skill. Redirect to `/said:architect`. If to add a new task — redirect to `/said:add-task`.
 
-## Common compositions (upstream → this skill)
-
-Two canonical operator flows feed tasks into `/said:impl`:
-
-**A — Planned feature** (Phase 1 → 2 → 3):
-
-```
-/said:scope-refine docs/working/<feature>/handoff.md
-/said:architect docs/working/<feature>/scope.md
-/said:impl <task-id>
-```
-
-(Use `/said:scope-grill` instead of `/said:scope-refine` for thin-idea ideation without a handoff doc.)
-
-**B — Ad-hoc bug fix** (Triage → Append → Drive):
-
-```
-/said:triage <bug>
-/said:add-task <feature-id> bug
-/said:impl <task-id>
-```
-
-(Skip `/said:triage` when root cause is already known.)
-
-No one-shot wrapper exists for the interactive forms by design. Mandatory operator pauses at each phase boundary are the discipline that prevents the multi-pass churn the 3-phase driver replaces. (The `arm` fan-out form forces autonomy — a subagent has no operator — so it returns every owed decision to main instead; **Fan-out forms**.)
-
 ## Step 0 — Preflight
 
 Resolve inputs and ground in calibration sources before Phase A starts:
@@ -84,7 +58,7 @@ Resolve inputs and ground in calibration sources before Phase A starts:
 3. **Read task body in full.** Locate `## <task-id>:` in the tasks file and read the whole entry. Verify `Status:` is `Todo (YYYY-MM-DD)`; BLOCK on Done per "When this fires" redirect.
 4. **Skim companion spec § Per-feature scope** for this task's piece. Don't full-read the spec — the task body's Reading list is canonical.
 5. **Read `docs/features/template-tasks.md`** in full. Phase C's close-of-task 5-step review enforces it.
-6. **Resolve surface + reviewers.** Read `SAID.surface:` (the medium; required — an omitted key HALTs, never a last-resort default) and `SAID.reviewers:` (the Checkers, a list read WHOLE) from the `## Lane` block.
+6. **Resolve surface + reviewers.** Read `SAID.surface:` (the medium; required — an omitted key HALTs, never a last-resort default) and `SAID.reviewers:` (the Checkers, a list read WHOLE) from the `## Lane` block. Read `SAID.code-review:` (scalar; `on` | `off`; absent → `on`).
 7. **Skim project calibration.** Scan `docs/features/*.tasks.md` for the most recent closed task with a multi-pass `### Fix` block (failure mode this driver prevents) and the most recent single-pass close (target shape every task lands on). If the project has no closed tasks yet, skip — the rules below stand on their own.
 8. **Resolve project quality-gate commands.** Skill never hardcodes language-specific commands. Resolution chain (first-match wins):
    - **Primary** — the `## Lane` `SAID.commands:` key (in `CLAUDE.md`): the umbrella target (`pre-commit`, `qa`, `check`, `all`).
@@ -99,139 +73,36 @@ Resolve inputs and ground in calibration sources before Phase A starts:
    - `<lint>` — lint command (e.g., `make lint`, `bunx biome lint`, `golangci-lint run`).
    - `<quality-gates-umbrella>` — full chain at Phase C close (e.g., `make pre-commit`).
 
+9. **Resolve the lane's implementation rules — `## Earned rules`.** Run the bundled counter from the sibling skill: `python3 ${CLAUDE_SKILL_DIR}/../review-qa/earned-rules.py count <lane-root>/CLAUDE.md`, where `<lane-root>` is the directory holding the `CLAUDE.md` whose `## Lane` block Step 0 #1 read — the root every `SAID.<axis>:` path is relative to. The section is the lines from the anchored heading `^## Earned rules` (leading-words match; canonical form `## Earned rules (full context in linked ADR)`) to the next `^## ` heading or EOF; the rule count `N` is its `^- ` lines (indented sub-bullets do not count); a rule id is the first whole token matching `R-[A-Z]+-[A-Z0-9-]+` on a line — a line without one is applied but uncitable. Echo `N rules` and the ids. Never count or recall the rules yourself — the loaded section is the only source.
+   - **No heading (the counter exits 3) → HALT, vocally:** *add a `## Earned rules` section to the lane's `CLAUDE.md` (one rule per `- ` line, an `R-*` id, a link to its ADR), then re-run.* Never proceed without it, never invent a rule. In the `arm` form the HALT is returned immediately as the close block — the arm builds nothing.
+   - **Heading present, `N = 0` → proceed silently** (nothing earned yet is a valid state).
+10. **Resolve the lane's `## Significant ADRs (skill-referenced)` table** — a shortname → this-lane's-ADR-file lookup, one row per shortname (the names a lane's rule lines or a task's `Refs:` cite). Absent table → the shortnames stay unbound; never a HALT.
+11. **Re-anchor (standing, every unit).** Before each Phase B confirmation unit (Phase B step 4), re-read the `## Earned rules` section **from disk** — the section's text (the rule lines, for the briefing) and the counter (for `N` and the ids); the section, not the whole file — echo `N rules`, and write one briefing line per applicable rule: `<R-id or line text>: <rule> — applied how: <plan>` (one line per applicable rule, no elaboration). Name the ids applied, with the change site's `file:line`, in the unit's confirmation. The structural path and S-size tasks read the section once at Phase B entry; **every path** reads it once more at Phase C entry — the close-time read the `Rules applied:` line's `N` comes from.
+12. **Standing reads — the procedure lives beside this file.** This spine carries the contract, Step 0, the phase stances, and the close; each phase's procedure is a reference file. **At Phase A start `Read ${CLAUDE_SKILL_DIR}/references/phase-a.md`; at Phase B start `Read ${CLAUDE_SKILL_DIR}/references/phase-b.md`; at Phase C start `Read ${CLAUDE_SKILL_DIR}/references/phase-c.md`; when Step 0 #1 selects the `arm` or `close` form, `Read ${CLAUDE_SKILL_DIR}/references/fan-out.md` before Phase A.** After a context compaction only this spine is re-attached (its first 5,000 tokens); these Reads are how the procedure comes back — never proceed into a phase from memory of it. If this spine itself is missing from context, `Read ${CLAUDE_SKILL_DIR}/SKILL.md` first.
+
 Don't load source UX specs upfront — the task body's Reading list `(full read)` flag governs what to open at Phase A. Don't pull additional ADRs — Phase A's inventory surfaces task-specific needs.
 
 ## Phase A — Classify + Inventory
 
 > **Stance: read the task. Classify it. Declare implementation discipline. Inventory current state against the Acceptance checklist with file:line evidence. Verification work, not coding. Report and STOP.**
 
-Procedure:
-
-1. **Classify task size as S / M / L** per the defaults below:
-   - **S** (≤~50 LOC, bug fix or polish, single screen, ≤2 rule-anchors cited in Approach): skip the inventory table; declare classification + discipline; produce a one-paragraph plan; STOP for operator OK; jump to Phase B.
-   - **M** (~50–300 LOC, single screen-shape, 3–6 rule-anchors): full inventory.
-   - **L** (~300+ LOC, multi-screen or multiple rule clusters): full inventory; flag any pieces that should split into separate task IDs (escalate to operator if so — that's an `/said:add-task` decision).
-
-2. **Declare discipline** in one sentence:
-   - **TDD (default)** — red-green-refactor: stubs → failing tests → green → refactor. No mocks (mock services are production code under `IS_MOCK` per the service-adapter-ADR; NEVER `vi.mock()`).
-   - **Structural — declarative-test/no-test (carve-out)** — pure folder moves / import retargeting / doc edits where there's no new behavior to test. Justify the carve-out in one sentence. Never silently skip TDD.
-
-3. **If S — output classification + discipline + plan paragraph. STOP. Skip steps 4–6.**
-
-4. **Read in parallel** — every Reading-list UX spec flagged `(full read)`, AND every current-implementation file under the entity's feature dir cited in Reading list (or implied by Approach — e.g., `features/<entity>/` if the task migrates that entity). UX specs ground the rule anchors; current-impl files ground the "Evidence" column in step 6. Cite each in the inventory output with one-line anchor (e.g., "Read the routed rule spec — its rules in scope per task Approach"; "Read `features/<entity>/screens/Browser.tsx:1-120` — current shape baseline").
-
-5. **Run wire-contract probes** for every endpoint cited in the task's Acceptance:
-   - `web` surface with playwright available: navigate the dev server route via `mcp__playwright__browser_navigate`; capture network via `mcp__playwright__browser_network_requests`. Save response payload to `docs/working/<feature-id>/<task-id>-wire-<endpoint-slug>.json`.
-   - Otherwise: `curl -H "Authorization: Bearer <dev-bypass-JWT>" <endpoint>`; capture stdout to the same path.
-   - For each captured response, note drift between captured bytes and the FE schema in the task body's Approach. **Drift = blocker; surface in inventory.**
-   - If the dev server is down, ASK the operator to start it (`make dev` or equivalent) before re-running Phase A.
-
-6. **Inventory table.** One row per `[ ]` Acceptance bullet, **plus one row per file named in the companion spec's §Implementation pointers (or equivalent file list)**. If a spec-named file doesn't exist on disk, the row's `Work` column reads `CREATE`. Phase A cannot complete with a spec-named file unaccounted-for — silently skipping a mandated component is the slip vector this rule closes. Columns: Bullet / Currently satisfied? (yes / no / partial) / file:line evidence / Work to satisfy.
-
-   Example shape:
-
-   | Acceptance bullet | Satisfied? | Evidence | Work |
-   |---|---|---|---|
-   | `<ux-spec>` #NN, #MM satisfied (from loaded registry) | no | `features/<entity>/screens/Browser.tsx:42` mounts inline `<Input>`; needs the rule's component per #MM | Replace inline state with `useTableQueryParams`; mount `<DataTableToolbar>` |
-   | GET `/<entity>/terms` — response schema matches captured bytes | no | Captured `{data, pageCount, totalCount}`; client schema expects `{items, total, page, limit}` | Rewrite `<entity>TermListResponseSchema` to wire shape |
-   | Surface-parity: matches the reference | no | Not checked | Phase C side-by-side walk (visual surface) |
-   | Spec §14 names `features/<entity>/components/<entity>-users-table.tsx` | no | Not on disk | CREATE |
-   | Spec §14 names `features/<entity>/components/<entity>-users-table-columns.tsx` | no | Not on disk | CREATE |
-
-7. **STOP for operator review.** Brief status: "Phase A complete. Inventory above; <N> bullets unsatisfied, <M> with wire drift flagged. Reply OK to proceed to Phase B (Implement), or flag anything to revise first."
-
-8. **Escalation path — Approach unsatisfiable.** If the inventory reveals the task's Approach is structurally unable to satisfy Acceptance (wire shape differs from client schema in ways the task didn't anticipate; an Acceptance bullet has no work that can satisfy it without violating a Boundary; a cited rule conflicts with another cited rule), do NOT proceed to Phase B. Surface the gap to operator with one-line diagnosis + recommended re-spec path: `/said:architect <scope-path> output-name=<feature-id>-v2` for re-architecture, or `/said:add-task <feature-id>` if the gap is a follow-up scope. Proceeding against an unsatisfiable Approach is how Pass 1 / Pass 2 / Pass 3 drift begins.
+Procedure: `Read ${CLAUDE_SKILL_DIR}/references/phase-a.md` (Step 0 #12) and follow it.
 
 ## Phase B — Implement
 
-> **Stance: turn `[ ]` into `[x]` rule-by-rule. TDD red-green-refactor by default; declarative-test or no-test for declared structural carve-outs. One rule, one confirmation in chat. NO batching. NO "I'll defer X to a Pass 2" thinking. `<typecheck>` after every changed file.**
+> **Stance: turn `[ ]` into `[x]` rule-by-rule. Test-first by default — the lane's red, and the `## Earned rules` briefing before every unit (Step 0 #11); declarative-test or no-test for declared structural carve-outs. One rule, one confirmation in chat. NO batching. NO "I'll defer X to a Pass 2" thinking. `<typecheck>` after every changed file.**
 
-## Step 0.SC — Load the surface contract (SC-STUB v2)
-
-Run this ONLY when about to reason over a surface-shape rule — a screen for `web`, an artifact class for `doc`, an operator-invoked skill for `cli` (the shape vocabulary is the registry's `applies-to` values). A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
-
-1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
-2. Registry absent → bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).
-3. Present → LOAD it WHOLE; echo its `SC-HEADER` `token · N rules`. Missing/malformed sentinel → HALT. Never grep a single row.
-4. Reason over the LOADED registry only; cite rule ids. Never restate or re-derive a mapping from memory.
-
-Procedure:
-
-1. **For a surface-governed task, order rules by blast radius per the loaded registry** (Step 0.SC) — cheapest first (a non-surface task skips it). The bundle + ordering come from the loaded registry (cross-cutting rules first → entity-shape deepest → wire-contract reshape → visual-parity last), not hardcoded `docs/ux/*.md` filenames.
-   - Wire-contract reshape — response-schema rewrite per Phase A captured bytes.
-   - Visual-parity gaps — DEFERRED to Phase C side-by-side walk (visual surface only); don't pre-tune.
-   *(Stack-discipline vocab — `parseResponse`/`silentError`/`RouteSlot`, `PageHeader`/`SidebarInset` — stays inline; deferred to a later pass.)*
-
-2. **TDD path (default):** for each rule, write the failing test first (red), implement until green, refactor. Tests live next to source per the feature-structure-ADR; co-location is non-negotiable. **NEVER `vi.mock()`** — mock services are runtime-selected production code under `IS_MOCK`, not test mocks. Mocking the data layer for a test is the discipline-collapse failure mode.
-
-3. **Structural path (carve-out only):** skip the red phase — change the source, run `<typecheck>` + `<tests>` to verify no regression. New behavior REQUIRES TDD path; if a structural carve-out turns out to need new behavior mid-flight, ESCALATE to operator and re-declare discipline.
-
-4. **After each rule satisfied** — confirm in chat: file:line of change + which Acceptance `[ ]` bullet flips to `[x]` + `<typecheck>` result. Wait for operator's `next` (or equivalent) before starting the next rule. **NO batching multiple rules into one confirmation.** The discipline collapses immediately if you do.
-
-5. **Tag every changed callsite:** `// <task-id>` (no suffix).
-
-6. **Operator can pause anywhere** to course-correct. Treat any operator interjection as a STOP — finish the current `<typecheck>`, report state, wait for direction. The operator has full context the skill doesn't.
-
-Phase B continues until all Acceptance `[ ]` bullets except visual-parity are flipped. Visual-parity bullets close in Phase C.
+Procedure: `Read ${CLAUDE_SKILL_DIR}/references/phase-b.md` (Step 0 #12) and follow it — it carries Step 0.SC (the surface-contract load) and the **Anti-patterns**, which are standing for every phase, not only B (a mid-flight scope addition is classified, never silently folded, in any phase).
 
 ## Phase C — Verify and close
 
-> **Stance: read the task body cold. Walk the migrated URL side-by-side with the reference URL. Run quality gates. Invoke `/said:review-ux` for a lane with an agent-form Checker. Run the close-of-task 5-step. Flip Status. Hand off to operator for commit.**
+> **Stance: read the task body cold. Walk the migrated URL side-by-side with the reference URL. Run quality gates. Invoke `/said:review-ux` for a lane with an agent-form Checker. Run the close-of-task 5-step. Verify the close line, then flip Status. Hand off to operator for commit.**
 
-Procedure:
-
-1. **Side-by-side playwright walk** (visual surface only):
-   - Migrated URL (e.g., `/<entity>`) vs reference URL (from task's Acceptance bullet, e.g., `/tasks`).
-   - Enumerate every visible difference: toolbar / header / sheet / pagination / empty-state / chip styles / spacing.
-   - **If diff non-empty** → which Acceptance bullet is unsatisfied → RETURN TO PHASE B for that bullet. Don't paper over with "minor cosmetic" — every visible diff is the visual-parity bullet's scope.
-   - **If diff empty** → flip the visual-parity `[ ]` to `[x]`.
-
-2. **Quality gates:** run `<quality-gates-umbrella>` (resolved in Step 0 #8 — typically `make pre-commit` or equivalent). If the project lacks an umbrella target, chain `<typecheck> && <tests> && <lint>` plus any project-defined dead-code check. Per-merge build commands (e.g., `make build`) and project-specific test scoping (e.g., parity tests under `src/engine/` for <PROJECT>) are project conventions invoked via the resolved targets — not skill-driven literals. If any gate fails → STOP and report; fix; rerun. Don't close on red.
-
-3. **Invoke `/said:review-ux`** when the lane declares an agent-form Checker for its medium in `SAID.reviewers:` — `web-ux` (a `web` surface with UI changes) runs the web arm, `doc-editorial` (a `doc` surface) runs the doc arm. Pass the task-id; the skill resolves the arm from `SAID.reviewers:`, spawns the surface's reviewer against its loaded contract (the UX checklist filtered by screen shape, or the QA checklist's editorial rows), and returns a structured PASS / FAIL / SOFT-FLAG report.
-   - Any FAIL → RETURN TO PHASE B for the failing rule.
-   - SOFT-FLAGs only → operator decides whether to address now or defer.
-
-4. **Invoke generic code-review — CRITICAL for code quality.** Default: spawn a read-only code-review subagent via the Agent tool (use a dedicated code-reviewer agent if your harness provides one, else a `general-purpose` agent prompted for review; a faster model tier suffices for review iterations, consistent with `said:review-ux-agent`'s model choice). Prompt: task-id + spec path + task body + `git diff` of Phase B's changes + `CLAUDE.md` pointer. Focus: bugs / logic errors / security / race conditions / convention violations; confidence threshold ≥80 (the agent already enforces this).
-   - **Skip cases** (with reason logged in chat — never silent): structural carve-out declared at Phase A (no review-worthy delta); OR operator explicit-override for trivial-surface tasks (one-line bug fix, doc-only edit, etc.).
-   - **Critical findings** → RETURN TO PHASE B for the issue.
-   - **Soft findings** (≥80 confidence but not Critical) → operator decides: address now or defer.
-   - Single-reviewer is the SAID default; operator can spawn 2-3 parallel code-review subagents along distinct lenses (simplicity/DRY + bugs/correctness + conventions) if the surface warrants the heavier coverage.
-
-5. **Run close-of-task 5-step review per `docs/features/template-tasks.md`** — leak scan / gotcha harvest / deviation check / fill `### Fix` / bloat scan. Two nuances:
-   - **Leak-scan ADR/UX proposals** (forward-looking rules surfaced during implementation) promote directly to the destination ADR / `docs/ux/*.md` and cite the edited path in `Refs:`. If a rule needs more refinement before promotion, it stays in operator workspace as private process — never cited from task body.
-   - **`### Fix`** is one verification line (`Tests N → M; typecheck + lint clean.`) + optional one-liners for spec edits. NO file enumerations (git is canonical); NO test-output dumps; NO `**Files modified:**` blocks.
-
-6. **Flip Status** to `Done (YYYY-MM-DD)`. The ONLY mutations allowed at close:
-   - `Status:` line.
-   - `### Fix` body (from HTML-comment placeholder to filled).
-   - `### Deviations` body (optional, only if departed from Approach).
-   - `### Gotchas` body (optional, only if non-obvious learnings).
-   - `Refs:` line (only if task created or edited an ADR / UX-spec / feature-spec — write-set discipline).
-   - Acceptance bullets — flip `[ ]` to `[x]` (or `[N/A — reason]`).
-   - Summary table row — Status column update.
-
-   **NEVER invent new `###` headers when closing.** The template-tasks.md section list is exhaustive: Problem / Approach / Reading list / Acceptance / Fix / Deviations / Gotchas / Out of scope (+ optional `### Root cause` under Problem for bugs). Forbidden: `### Frozen rules to satisfy`, `### Wire contract probes`, `### Visual parity reference`, `### Cross-feature contracts`, `### Spec changes`, `### Files modified`, `### Implementation notes`, `### Lessons learned`, `### Discovery`, `### Pass N`. This skill is the last line of defense against ad-hoc section invention.
-
-7. **Hand off to operator for commit.** Brief status: "Task `<task-id>` closed at `Status: Done (YYYY-MM-DD)`. Quality gates green. `/said:review-ux` <PASS / SOFT-FLAGs deferred / N/A non-UI>. Code-review <PASS / Soft-deferred / SKIPPED — reason>. Commit when ready; commit-msg per the lane's `SAID.id-shape:` convention. Next task in batch: <next-task-id or 'none — batch complete'>."
-
-For batch runs (multiple task IDs): pause for operator `proceed` before re-entering Phase A on the next task. NO auto-progression across tasks.
+Procedure: `Read ${CLAUDE_SKILL_DIR}/references/phase-c.md` (Step 0 #12) and follow it.
 
 ## Fan-out forms — `arm` and `close`
 
-Two SKILL-level forms let `said:said` fan out a feature's **write-disjoint** tasks (`ADR-SAID-S09`: arms build, main decides). `said:said` spawns them via the Workflow tool, one arm per disjoint task — **never from inside this skill** (a subagent has no Workflow tool). Decisions, gate verdicts, closes and the append-only log stay in main.
-
-### `/said:impl <task-id> arm` — build under **forced autonomy**, decide nothing
-Runs Step 0 + Phase A + Phase B under **forced autonomy** — no operator pause (a subagent has no operator, so no STOP is honoured), no task-log write, no commit:
-1. **Declaration before write.** The arm's first output, **before any edit**, is the file set it intends to touch, compared to the partition it received from main. A file outside the partition is returned as an **owed item before any edit** — the arm **never widens** its partition.
-2. **Decide nothing — return owed items.** Every point the interactive form would STOP (an unsatisfiable Approach at Phase A step 8; a carve-out that turns out to be new behavior; a mid-flight scope classification; an S/M/L escalation to `add-task`; a SOFT-FLAG / soft-finding deferral) is **returned as an owed item, never resolved**. Per-rule `<typecheck>` evidence is one line per rule in the block (not a chat confirmation).
-3. **No Phase C.** The arm never runs Phase C (quality gates, `/said:review-ux`, code-review, the close). Those run in main at `close`.
-4. **Channel = the return value.** The arm's only output is its schema-validated **close block** (below); it writes **no working-dir artifact** — `said:said` reconstructs the phase from the feature's canonical artifacts (the task log written at `close`), not from an arm file.
-
-The **close block** the arm returns: `status` (proposed `Done (YYYY-MM-DD)` — main decides + stamps the date), `fix` (one verification line), `deviations` / `gotchas` (optional), `refs` (ADR / UX-spec / feature-spec paths created or edited), `acceptance` (per-bullet `[x]` / `[N/A — reason]`), `owed` (decisions returned, not resolved), `files` (declared + actual changed files — scopes the close diff and the partition check), `evidence` (per-rule `<typecheck>` results, test counts). No new `###` headers.
-
-### `/said:impl <task-id> close` — apply in **main**, run Phase C
-Runs in **main**. Applies the arm's returned close block (main decides `Status:` and stamps the date), then runs **Phase C** exactly as the interactive form does — quality gates, `/said:review-ux` for every Checker the lane declares (`ADR-SAID-S06` §2), generic code-review with the diff **scoped to the arm's declared `files`** (`git diff -- <files>`), the close-of-task 5-step, the exhaustive close-mutation flip, the summary-table row. It checks the arm's **actual diff against its declaration**: a file outside the declaration is an **owed item** (the task does not close clean). A staged FAIL is impl's own "RETURN TO PHASE B", repaired **inline in main once**, then owed — never a second pipeline pass, never a silent revert. Closes are **serial** across tasks — only main writes the append-only log.
+Two SKILL-level forms let `said:said` fan out a feature's write-disjoint tasks (arms build, main decides). Procedure: `Read ${CLAUDE_SKILL_DIR}/references/fan-out.md` when Step 0 #1 selects either form.
 
 ## Step Final — Exit
 
@@ -247,25 +118,3 @@ Report:
 - Next task in batch (or batch complete).
 
 Hard exit. Implementation is done; commit is operator-triggered. Do NOT commit. Do NOT push. Do NOT mark batch complete until all tasks closed.
-
-## Anti-patterns
-
-- **Don't merge with `/said:add-task`.** Add-task creates the backlog entry; this skill implements an existing entry. Separate skills, separate phases of the per-task lifecycle.
-- **Don't subsume `/said:review-ux`.** The UX gate is deliberately separate; this skill INVOKES it at Phase C, doesn't replace it. The split exists because "implementation agent declares done, QA agent rubber-stamps" is the regression-shipping pattern the separation guards against.
-- **Don't batch rules in Phase B.** "I'll satisfy three rules at once in one commit" = discipline collapse. One rule, one confirmation, one chat message. The agent's tendency to bulk-edit is the failure mode this discipline exists to prevent.
-- **Reference comments: `// <task-id>` only.** NOT `// <task-id>: <anything>` — the suffix is what produced the prose problem.
-- **Don't auto-progress phase boundaries.** Operator pauses at Phase A → Phase B and Phase B → Phase C are mandatory in the interactive forms. If the operator reply is silent or ambiguous, ASK rather than proceed. (The `arm` fan-out form has no operator to pause for — it runs A→B under forced autonomy and returns owed items; **Fan-out forms**.)
-- **Don't run on `Status: Done` tasks.** BLOCK; for follow-ups on COMMITTED Done tasks (`git log --all --grep <task-id>` non-empty), redirect to `/said:add-task`. Pre-commit Done tasks MAY be amended in place per template-tasks.md pre-commit carve-out — operator gate via mid-flight rule below.
-- **Don't silently fold mid-flight scope additions.** When operator's message during any phase introduces a requirement not in the task's Approach, STOP and classify before proceeding:
-   - **Within scope** (Approach implicitly covers it) → proceed.
-   - **Scope-creep, task uncommitted** (`git log --all --grep <task-id>` empty) → propose in-place amendment to Approach + Acceptance + `### Deviations` note documenting the late fold-in; re-run `/said:add-task` Step 3 spec coverage gate for the new requirement; operator confirms before write.
-   - **Scope-creep, task committed** → redirect operator to `/said:add-task <feature-id>` for the new requirement. Current task stays as shipped.
-  Never silently fold; never silently split. The classification IS the discipline.
-- **Don't invent new `###` headers when closing tasks.** The section list in template-tasks.md is exhaustive. Any new header is a regression to the multi-pass drift the conformance-fold settlement retired.
-- **Don't extend or wrap a generic multi-pass feature-development skill.** Those produce the multi-pass churn this driver escapes. `/said:impl` supersedes them for SAID-architected features (any feature with `docs/features/<feature>.tasks.md`); a generic feature skill stays available for non-SAID one-off feature work.
-- **Don't make TDD optional.** TDD is the default discipline. Structural carve-out (folder moves / import retargeting / doc edits) is rare; declare it explicitly at Phase A with one-sentence justification. Silently skipping TDD on a TDD-fit task is the discipline-collapse failure mode.
-- **Don't silently skip Phase C code-review.** It's CRITICAL for code quality and runs by default. Skip ONLY when structural carve-out was declared at Phase A OR the operator explicit-overrides for trivial-surface tasks with reason logged in chat. Quality gates + `/said:review-ux` together do NOT catch deep logic / security / race-condition bugs — those need a dedicated code-review subagent.
-- **Don't spawn fan-out arms from inside this skill.** Fan-out is spawned at SKILL level by `said:said` via the Workflow tool, one arm per write-disjoint task — never from inside impl (`ADR-SAID-S09`). The real platform constraints (recorded in `ADR-SAID-S09`): the **Workflow tool exists only in the main context** (a subagent cannot fan out), and a subagent has **no operator** (`AskUserQuestion` is removed — pauses return as data). Nested subagents ARE permitted (three layers by default), so "cannot spawn" is not the reason; arms simply **never run Phase C** — the umbrella gate needs a quiescent tree, a review-FAIL loop inside an arm has no operator or bound, and the gate decision is main's. The `arm` / `close` forms (**Fan-out forms**) are that fan-out, defined.
-- **Don't bypass `Refs:` write-set discipline.** Refs is for ADR / UX-spec / feature-spec paths the task **creates or edits**. Reading list is the read-set. Refs is not for citing everything relevant.
-- **Don't commit.** Commit is operator-triggered. The skill writes the task close + reports state; operator runs `git add` + `git commit` with the right commit-msg prefix per project convention.
-- **Don't load source UX specs upfront in Step 0.** The task body's Reading list `(full read)` flag governs what to open at Phase A. Pre-loading specs the task doesn't cite is context bloat.

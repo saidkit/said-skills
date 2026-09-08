@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: impl-compacted-context
+context:
+  add_dirs:
+    - fixtures/lane
