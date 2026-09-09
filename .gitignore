@@ -5,4 +5,4 @@ __pycache__/
 *.pyc
 .claude/settings.local.json
 /docs
-CLAUDE.md
+/CLAUDE.md

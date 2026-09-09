@@ -6,9 +6,9 @@ Read from the spine (`SKILL.md` Contract rule 1) at the moment it names; every r
 
 > **Stance: turn `[ ]` into `[x]` rule-by-rule. Test-first by default — the red is `per profile.red`, and the `## Earned rules` briefing comes before every unit (Contract rule 3); declarative-test or no-test for a carve-out `per profile.carve-out`, declared. One rule, one confirmation in chat. NO batching. NO "I'll defer X to a Pass 2" thinking. `<typecheck>` after every changed file.**
 
-## Step 0.SC — Load the surface contract (SC-STUB v2)
+## Step 0.SC — Load the surface contract (SC-STUB v3)
 
-Run this ONLY when about to reason over a surface-shape rule — the shape vocabulary is the loaded registry's own `applies-to` values, never a list recalled from memory. A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
+Run this ONLY when about to reason over a surface-shape rule — the shape vocabulary is the loaded registry's own `applies-to` values, never a list recalled without it. A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
 1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
 2. Registry absent → bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).
