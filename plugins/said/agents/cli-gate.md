@@ -36,9 +36,31 @@ header the L2 oracle validates:
 ```
 checker-id: cli-gate
 target-sha: <the HEAD sha the gate ran against>
-capture-evidence-ref: <path to the captured gate output, relative to the working dir>
+capture-evidence-ref: recomputed | <capture log, lane-relative>
 verdict: PASS | FAIL
 timestamp: <ISO-8601>
+```
+
+**Capture by verdict** (this Checker is `said-capture: process-spawn` + `said-recompute:`, so the
+recompute *is* the proof — it never needs a stored capture to justify a PASS):
+
+| Gate result | `capture-evidence-ref` | What the body carries |
+|---|---|---|
+| **PASS** (all gates exit 0) | the sentinel `recomputed` — no log lands in the working dir | the verdict header + the per-command exit-code table below |
+| **FAIL** (any gate non-zero) | a written+cited `cli-gate-capture-<task>.log` **under `SAID.working:`** | the same table, and the log holds the failing gate's output |
+
+The lane-path rule (`ADR-SAID-S06` §7 L2): a FAIL capture is written under the feature's
+own working dir and cited lane-relative — **never a temp path** (`/tmp/…`, a scratchpad) in a verdict,
+because a verdict is read back at HEAD and a path outside the lane cannot be. On PASS the sentinel
+`recomputed` stands in for a path: the oracle re-runs the gate itself, so nothing is lost by keeping no
+log — and the sentinel is accepted *only* for a process-spawn + deterministic (oracle/metric) + recompute Checker on `verdict: PASS`.
+
+Exit-code table (the evidence on a green gate, one row per command the lane's `SAID.commands:` names):
+
+```
+command                                   exit
+claude plugin validate ./plugins/said     0
+cd docs/evaluation/<unit> && ./harness.sh 0
 ```
 
 ## Why it is an oracle (deterministic)

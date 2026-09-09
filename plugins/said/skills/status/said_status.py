@@ -674,9 +674,18 @@ def validate_reviewer(workdir, cid, meta, head_sha, root="."):
     cap = hdr.get("capture-evidence-ref")
     if not cap:
         return False, "no capture-evidence-ref"
-    cap_path = cap if os.path.isabs(cap) else os.path.join(workdir, cap)
-    if not os.path.isfile(cap_path):  # a dir/missing ref is not a capture
-        return False, "dangling capture (%s)" % cap
+    if cap == "recomputed":  # `recomputed`: a sentinel, not a file — valid only where the recompute below actually re-derives the verdict
+        if ((meta or {}).get("said-capture") != "process-spawn"
+                or not (meta or {}).get("said-recompute")
+                or (meta or {}).get("said-judge") not in ("oracle", "metric")):
+            return False, "`recomputed` allowed only for a process-spawn + deterministic (oracle/metric) + said-recompute Checker"
+        cap_path = cap  # the deterministic recompute below is the evidence (verdict already PASS-checked above)
+    else:  # lane-path rule: a verdict cites only a path inside its own working dir
+        cap_path = os.path.normpath(os.path.join(workdir, cap)); wd = os.path.normpath(workdir)
+        if os.path.isabs(cap) or not (cap_path == wd or cap_path.startswith(wd + os.sep)):
+            return False, "capture outside the lane working dir (%s)" % cap
+        if not os.path.isfile(cap_path):  # a dir/missing ref is not a capture
+            return False, "dangling capture (%s)" % cap
     tgt = hdr.get("target-sha")
     if head_sha and tgt != head_sha:  # absent tgt fails too — never skip the staleness check
         return False, "stale/missing target-sha (%s != HEAD %s)" % (tgt[:8] if tgt else "absent", head_sha[:8])
@@ -749,6 +758,8 @@ def run_reviewer_gate(a):
     revs = a.reviewers.split(",") if a.reviewers else []
     passed, details = reviewer_gate(a.workdir or ".", a.surface, revs, idx, head, a.root)
     for cid, ok, reason in details:
+        if (not ok) and (not a.recipe_rules) and "no said-checker match" in reason:  # nominal + no --recipe-rules: point the operator at recipe-form Checkers
+            reason += " — hint: a recipe-form Checker lives in a docs/ux rules file; pass --recipe-rules <that file>"
         print("  %s %s: %s" % (GLYPH["ok"] if ok else GLYPH["block"], cid, reason))
     print("reviewer-gate: %s" % ("PASS" if passed else "FAIL"))
     return 0 if passed else 1
