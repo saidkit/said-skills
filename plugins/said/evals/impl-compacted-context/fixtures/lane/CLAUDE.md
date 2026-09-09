@@ -10,7 +10,7 @@
 - SAID.id-shape:     <FEAT>-<NN>-<NN>
 - SAID.adr-prefix:   ADR-PROJ-*
 - SAID.surface:      none
-- SAID.impl-profile: code
+- SAID.profile:      code
 - SAID.reviewers:    []
 - SAID.commands:     make check
 

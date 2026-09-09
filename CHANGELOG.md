@@ -5,10 +5,10 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 ## [0.8.0] — 2026-09-09
 
 `said:impl` is a contract, a family-blind procedure, and one profile per family of deliverable.
-- **Added (breaking for un-keyed lanes):** `SAID.impl-profile: code | doc | work` on the `## Lane` block is required; `impl` loads `references/profile-<name>.md` at Step 0 and at every phase start, and halts naming the shipped profiles when the key is absent or names none of them. The value is never derived from `SAID.surface:`.
+- **Added (breaking for un-keyed lanes):** `SAID.profile: code | doc | work` on the `## Lane` block is required; `impl` loads `references/profile-<name>.md` at Step 0 and at every phase start, and halts naming the shipped profiles when the key is absent or names none of them. The value is never derived from `SAID.surface:`.
 - **Added:** `references/profile-{code,doc,work}.md` — six slots each (`gate · red · carve-out · tag · parity · code-review`), the only place a lane value may appear. A new family is one new file; the spine and the phase files never name a family.
 - **Changed:** the standing read instruction moved to a `## Contract` block at the head of the spine (ends before byte 3,000), so it survives any compaction cut; the spine is 14,076 bytes.
-- **Changed:** `SAID.code-review:` absent now means the profile's default (`code` on, `doc`/`work` off) instead of a constant `on`.
+- **Changed:** `SAID.code-review:` is an optional per-lane override; absent means the profile's `code-review` slot (`code` on, `doc`/`work` off) instead of a constant `on`.
 - **Changed:** the surface-contract consume block is SC-STUB v3 in `add-task`, `architect` and `impl`: the trigger sentence no longer lists media as examples — the shape vocabulary is the loaded registry's own `applies-to` values.
 
 ## [0.7.0] — 2026-09-08
