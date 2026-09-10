@@ -705,6 +705,22 @@ def validate_reviewer(workdir, cid, meta, head_sha, root="."):
     return True, "PASS"
 
 
+def _governs_surface(meta, surface):
+    """Whether a resolved Checker governs `surface` (ADR-SAID-S06 §3 self-selection). A Checker with
+    no said-governs, no `surface=` clause (it governs by shape, not medium), or `surface=any` governs
+    any surface (backward compat); otherwise it governs only the surface(s) its said-governs names."""
+    g = (meta or {}).get("said-governs")
+    if not g:
+        return True
+    m = re.search(r"surface\s*=\s*([A-Za-z0-9_,|-]+)", g)  # value stops at whitespace — no cross-token over-match
+    if not m:
+        return True
+    vals = [v.strip().lower() for v in re.split(r"[,|]+", m.group(1)) if v.strip()]
+    if not vals:  # a degenerate value (only separators) is not a surface restriction — govern-any, never a silent skip
+        return True
+    return "any" in vals or (surface or "").strip().lower() in vals
+
+
 def reviewer_gate(workdir, surface, reviewers, checker_index, head_sha, root="."):
     """L2 gate over the declared reviewer set. Returns (passed, [(id, ok, reason), ...])."""
     surface = (surface or "").strip()
@@ -714,11 +730,24 @@ def reviewer_gate(workdir, surface, reviewers, checker_index, head_sha, root="."
     if not reviewers:
         return False, [("reviewers", False,
                         "surface-bearing (%s) but no reviewers declared — declare reviewers:, or surface: none" % surface)]
-    details, passed = [], True
+    details, skipped, passed = [], [], True
     for cid in reviewers:
-        ok, reason = validate_reviewer(workdir, cid, checker_index.get(cid), head_sha, root)
+        meta = checker_index.get(cid)
+        # said-governs routing (ADR-SAID-S06 §3): a RESOLVED Checker that does not govern this surface
+        # is not required here; a governs-less Checker governs any; an unresolved (nominal) reviewer
+        # stays required, so a mismatched/absent said-governs is never a skip-the-gate lever
+        if meta is not None and not _governs_surface(meta, surface):
+            skipped.append((cid, (meta or {}).get("said-governs")))
+            continue
+        ok, reason = validate_reviewer(workdir, cid, meta, head_sha, root)
         details.append((cid, ok, reason))
         passed = passed and ok
+    if not details:  # empty-after-filter: a surface-bearing feature whose declared reviewers none govern is ungated
+        return False, [("reviewers", False,
+                        "surface-bearing (%s) but none of the declared reviewers govern surface=%s "
+                        "(a Checker's said-governs must match, or omit it to govern any)" % (surface, surface))]
+    for cid, gov in skipped:  # report the filtered Checkers — a skip is visible, never silent (no nominal-gate hole)
+        details.append((cid, True, "skipped — %s does not govern surface=%s (not required for this feature)" % (gov, surface)))
     return passed, details
 
 
@@ -760,7 +789,8 @@ def run_reviewer_gate(a):
     for cid, ok, reason in details:
         if (not ok) and (not a.recipe_rules) and "no said-checker match" in reason:  # nominal + no --recipe-rules: point the operator at recipe-form Checkers
             reason += " — hint: a recipe-form Checker lives in a docs/ux rules file; pass --recipe-rules <that file>"
-        print("  %s %s: %s" % (GLYPH["ok"] if ok else GLYPH["block"], cid, reason))
+        glyph = GLYPH["pending"] if (ok and reason.startswith("skipped")) else (GLYPH["ok"] if ok else GLYPH["block"])
+        print("  %s %s: %s" % (glyph, cid, reason))
     print("reviewer-gate: %s" % ("PASS" if passed else "FAIL"))
     return 0 if passed else 1
 
