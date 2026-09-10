@@ -24,7 +24,7 @@ import sys
 from datetime import date
 
 # --- grammar (the SAID task-log shape) --------------------------------------
-STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(Done|Todo|Canceled|Cancelled|Superseded|Backlog)\b", re.I)
+STATUS_RE = re.compile(r"^\s*(?:[-*+]\s+)?\*\*Status:\*\*\s*(Done|Todo|Canceled|Cancelled|Superseded|Backlog)\b", re.I)
 DATE_RE = re.compile(r"\((\d{4}-\d{2}-\d{2})\)")
 HEADER_RE = re.compile(r"^##\s+([A-Z]+-?\d+(?:-[A-Za-z0-9]+)+)\s*[:：]?\s*(.*?)\s*$")
 FOOTER_RE = re.compile(r"^##\s+Debrief close\b", re.I)

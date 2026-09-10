@@ -165,9 +165,9 @@ Use the canonical section order from template-tasks.md:
 ## <new-task-id>: <Title>
 # project-canonical shape — see `docs/features/template-tasks.md` stencil
 
-- **Status:** Todo (YYYY-MM-DD)
-- **Priority:** <High|Medium|Low>
-- **Refs:** <paths or empty>
+**Status:** Todo (YYYY-MM-DD)
+**Priority:** <High|Medium|Low>
+**Refs:** <paths or empty>
 
 ### Problem
 <problem text>
