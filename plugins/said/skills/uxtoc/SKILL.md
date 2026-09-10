@@ -55,6 +55,7 @@ The operator invokes:
 3. Ground in templates (one parallel-Read batch):
    - `docs/features/template.md` — feature-spec shape, including its `## Screen` sections (the screen-spec shape). If the project keeps standalone per-screen specs under `docs/screens/`, read one as a shape exemplar.
    - The **element grammar** (pane-type vocabulary) — resolved directly from `SAID.docs-root:` + `/ux/feature-ux-grammar.md` and LOADed whole if present (skip if the lane ships none), not a hardcoded list of screen-spec filenames.
+   - The **element-projection taxonomy** — `${CLAUDE_SKILL_DIR}/element-projection.md`, LOADed WHOLE + its VERIFY-TOKEN echoed (`UXP-V-1 · 7 containers`): the closed container set the `toc-checksum:` counts by (R-CLI-05).
 
 ## Pass 2 — Extract
 
@@ -89,6 +90,7 @@ Do not invent. If the spec is silent on a sub-attribute (e.g., column declares n
 ```
 # TOC: <feature or screen name>
 Source: <input path>
+toc-checksum: total=<N>,<SCREEN-ID>=<n>,…
 
 ## Scope  (only if scope.md is in input)
 - §A Purpose — <gloss>
@@ -181,6 +183,7 @@ For multi-screen feature inputs, repeat the `## Screen` section per screen in th
 If `output=<path>`:
 - Directory → write `<path>/toc.md`.
 - File path → write that path. If file exists, ask: overwrite, suffix `-2`, or abort.
+- **Checksum.** Every written `toc.md` carries a `toc-checksum: total=<N>,<SCREEN-ID>=<n>,…` line: `N` = the grand total of `(screen, key)` elements per the element-projection taxonomy (Pass 1), then each screen's count in emit order. Strict `key=value`, comma-separated, deterministic order, no free-form.
 - After write, print the resolved path to chat and a one-line summary (N screens, M panes).
 
 If `output=` omitted: print to chat only.
@@ -201,3 +204,12 @@ The skill is designed for rapid spec editing — emit → spot → edit → re-e
 - **No timestamps, no run metadata.** Header is just `# TOC: <name>` + `Source: <path>` — nothing else that changes between runs.
 - **No recommendations.** Re-running after an edit should show only structural diffs from the spec change, never a different verdict on the same content.
 - **Stable attribute names.** Use the canonical attribute names listed in Pass 3 (`title` not `header`, `render` not `renderer` or `cell`, `target` not `action` or `link`). Same name across all panes and elements.
+
+## Composition note — a design-seed loop by analogy (optional)
+
+A *composition* of skills, outside `uxtoc` (adds no `uxtoc` behavior):
+1. **Mirror exemplars** — run `uxtoc` on reference screens for their outlines.
+2. **Ideate by analogy** — draft a new screen's spec from them with a separate ideation skill, **outside** `uxtoc`.
+3. **Mirror the draft** — run `uxtoc` on it to inspect.
+
+Name no specific ideation skill as a dependency (R-CLI-07); `uxtoc` still only mirrors a spec (W2 — never generates, ranks, or evaluates).

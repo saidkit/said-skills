@@ -2,6 +2,16 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.9.0] — 2026-09-10
+
+The uxtoc basis→contract lifecycle runs off a single source of truth (`toc.md`).
+- **Added:** `uxtoc` emits a `toc-checksum: total=<N>,<SCREEN-ID>=<n>,…` line on `output=`, counted by the new `element-projection.md` taxonomy (LOAD-WHOLE + VERIFY-TOKEN).
+- **Changed:** the completeness check parses `toc.md` directly and verifies the checksum (FAIL → "re-run uxtoc"); the `toc-elements.md` intermediate is retired (reverses SAID-08 decision (a)).
+- **Added:** a hermetic web end-to-end fixture — outline → `architect` §AC fold → built manifest → `accept` recompute.
+- **Added:** a generative-composition note in `uxtoc`.
+- **Fixed:** `said:status` / `said:board` count a bulleted `- **Status:**` task line, not only the plain `**Status:**` form (`said_status.py` `STATUS_RE`).
+- **Changed:** `said:add-task`'s task stencil emits the canonical non-bulleted `**Status:**` / `**Priority:**` / `**Refs:**` form (matches `template-tasks.md`).
+
 ## [0.8.1] — 2026-09-09
 
 - **Changed (breaking):** the lane key is `SAID.profile:`, renamed from `SAID.impl-profile:` — the family of deliverable is a property of the lane, not of one skill.
