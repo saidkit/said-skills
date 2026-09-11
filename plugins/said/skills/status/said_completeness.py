@@ -45,7 +45,7 @@ def die(msg, code):
 
 def load_containers():
     """The closed container set, from the shared element-projection taxonomy (one source;
-    VERIFY-TOKEN, never re-derived from memory — R-CLI-05 / the said-skills consume contract)."""
+    loaded whole and pinned by its verify token, never re-derived from memory)."""
     here = os.path.dirname(os.path.abspath(__file__))
     root = os.environ.get("SAID_PLUGIN_ROOT")
     candidates = []

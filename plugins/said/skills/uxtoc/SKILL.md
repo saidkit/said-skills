@@ -55,7 +55,7 @@ The operator invokes:
 3. Ground in templates (one parallel-Read batch):
    - `docs/features/template.md` — feature-spec shape, including its `## Screen` sections (the screen-spec shape). If the project keeps standalone per-screen specs under `docs/screens/`, read one as a shape exemplar.
    - The **element grammar** (pane-type vocabulary) — resolved directly from `SAID.docs-root:` + `/ux/feature-ux-grammar.md` and LOADed whole if present (skip if the lane ships none), not a hardcoded list of screen-spec filenames.
-   - The **element-projection taxonomy** — `${CLAUDE_SKILL_DIR}/element-projection.md`, LOADed WHOLE + its VERIFY-TOKEN echoed (`UXP-V-1 · 7 containers`): the closed container set the `toc-checksum:` counts by (R-CLI-05).
+   - The **element-projection taxonomy** — `${CLAUDE_SKILL_DIR}/element-projection.md`, LOADed WHOLE + its VERIFY-TOKEN echoed (`UXP-V-1 · 7 containers`): the closed container set the `toc-checksum:` counts by. Load it whole, never re-derive it from memory.
 
 ## Pass 2 — Extract
 
@@ -212,4 +212,4 @@ A *composition* of skills, outside `uxtoc` (adds no `uxtoc` behavior):
 2. **Ideate by analogy** — draft a new screen's spec from them with a separate ideation skill, **outside** `uxtoc`.
 3. **Mirror the draft** — run `uxtoc` on it to inspect.
 
-Name no specific ideation skill as a dependency (R-CLI-07); `uxtoc` still only mirrors a spec (W2 — never generates, ranks, or evaluates).
+Name no specific ideation skill as a dependency; `uxtoc` still only mirrors a spec (never generates, ranks, or evaluates).

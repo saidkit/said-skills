@@ -124,7 +124,7 @@ Procedure:
 
 #### Spec metadata — `**Surface:**` (author before `## Context to load`)
 
-Author the `**Surface:**` field immediately under the `# <FEAT>-<NN>: …` title (per `docs/features/template.md`). Default it to the lane `SAID.surface:` resolved at Step 0 #3 — the feature **inherits the lane** medium; write `**Surface:** none` only when the scope declares the feature screenless / no user-visible surface (a Developer-Story data / infra feature). This field drives the uxtoc basis→contract lifecycle's **feature-level bearing gate** (`feature-ux-rules.md` R-CLI-02, feature-level variant): a surface-bearing feature's built surface is completeness-checked at `accept` against the persisted outline, while `none` opts out (the check SKIPs).
+Author the `**Surface:**` field immediately under the `# <FEAT>-<NN>: …` title (per `docs/features/template.md`). Default it to the lane `SAID.surface:` resolved at Step 0 #3 — the feature **inherits the lane** medium; write `**Surface:** none` only when the scope declares the feature screenless / no user-visible surface (a Developer-Story data / infra feature). This field drives the uxtoc basis→contract lifecycle's **feature-level bearing gate** (the feature-level variant of the lane's `feature-ux-rules.md` bearing contract): a surface-bearing feature's built surface is completeness-checked at `accept` against the persisted outline, while `none` opts out (the check SKIPs).
 
 #### `## Context to load alongside this spec`
 
