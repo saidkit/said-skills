@@ -706,7 +706,7 @@ def validate_reviewer(workdir, cid, meta, head_sha, root="."):
 
 
 def _governs_surface(meta, surface):
-    """Whether a resolved Checker governs `surface` (ADR-SAID-S06 §3 self-selection). A Checker with
+    """Whether a resolved Checker governs `surface` (ADR-SAID-S06 section 3 self-selection). A Checker with
     no said-governs, no `surface=` clause (it governs by shape, not medium), or `surface=any` governs
     any surface (backward compat); otherwise it governs only the surface(s) its said-governs names."""
     g = (meta or {}).get("said-governs")
@@ -733,7 +733,17 @@ def reviewer_gate(workdir, surface, reviewers, checker_index, head_sha, root="."
     details, skipped, passed = [], [], True
     for cid in reviewers:
         meta = checker_index.get(cid)
-        # said-governs routing (ADR-SAID-S06 §3): a RESOLVED Checker that does not govern this surface
+        # an un-instantiated said-governs placeholder on a REQUIRED Checker (a lane copied the recipe
+        # template's surface=<...> without instantiating it) is a config error, never a silent govern-any:
+        # the <...> value fails the surface= value regex below, which would otherwise fall through to
+        # govern-any and let the outline-less gate pass. Fire only for a resolved (required) Checker.
+        gv = (meta or {}).get("said-governs")
+        if meta is not None and gv and re.search(r"surface\s*=\s*<", gv):
+            details.append((cid, False, "malformed said-governs %r -- the recipe placeholder was never "
+                            "instantiated; set surface= to the lane's medium (config error)" % gv))
+            passed = False
+            continue
+        # said-governs routing (ADR-SAID-S06 section 3): a RESOLVED Checker that does not govern this surface
         # is not required here; a governs-less Checker governs any; an unresolved (nominal) reviewer
         # stays required, so a mismatched/absent said-governs is never a skip-the-gate lever
         if meta is not None and not _governs_surface(meta, surface):
