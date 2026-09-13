@@ -1,0 +1,54 @@
+{
+  "schema": "said-lane-wellformed",
+  "version": 1,
+  "description": "Machine-readable definition of a well-formed SAID lane. Read WHOLE (json.load) by said:setup (diagnose + repair a present lane's configuration) and said:install (scaffold a lane's configuration). It enumerates the ## Lane block axes, the required CLAUDE.md sections, the block-shape invariants, the docs skeleton, and the withdrawn axes -- each with a severity class and a self-contained remediation. This file, not a prose stencil, is the single source of truth for the current axis set; when an axis is added or withdrawn, this file is what changes.",
+  "severity_order": ["BLOCKER", "STALE", "ADVISORY"],
+  "severity_meaning": {
+    "BLOCKER": "a consumer HALTs, or a declared gate runs nothing (a nominal pass); fix before the lane is usable",
+    "STALE": "a withdrawn or drifted declaration a current lane should not carry",
+    "ADVISORY": "a recommended-but-not-fatal gap"
+  },
+  "axes": [
+    {"key": "SAID.lane", "kind": "scalar", "required": true, "severity_if_missing": "STALE", "remediation": "declare SAID.lane: <name> in the ## Lane block"},
+    {"key": "SAID.docs-root", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.docs-root: <path>; consumers resolve docs paths from it and HALT without it"},
+    {"key": "SAID.code-mount", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.code-mount: <path>[, <path>] naming where lane code lives"},
+    {"key": "SAID.feature-spec", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.feature-spec: <path pattern>; the spec-authoring and impl skills resolve it declaration-first and HALT without it"},
+    {"key": "SAID.task-log", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.task-log: <path pattern>; consumers HALT without it"},
+    {"key": "SAID.working", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.working: <path pattern> for per-feature working notes"},
+    {"key": "SAID.id-shape", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.id-shape: <verbatim shape, e.g. PROJ-01 or PROJ-01-BE-07>; task-id parsing HALTs without it"},
+    {"key": "SAID.adr-prefix", "kind": "scalar", "required": true, "severity_if_missing": "STALE", "remediation": "declare SAID.adr-prefix: <PREFIX>-*"},
+    {"key": "SAID.surface", "kind": "scalar", "required": true, "no_default": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.surface: <medium | none>; there is NO default, so a missing key HALTs every consumer that branches on the surface"},
+    {"key": "SAID.reviewers", "kind": "list", "read_whole": true, "required_if": "surface != none", "resolvability_check": true, "severity_if_missing": "BLOCKER", "remediation": "a surface-bearing lane names at least one Checker in SAID.reviewers: (read WHOLE), or sets SAID.surface: none; each named id must resolve to a real Checker or the gate reports PASS while running nothing"},
+    {"key": "SAID.profile", "kind": "scalar", "required": true, "no_default": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.profile: <code | doc | work>; an absent key or an unshipped name HALTs the implement phase"},
+    {"key": "SAID.commands", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.commands: <gate command>; it is the lane's quality gate, resolved language-neutrally"},
+    {"key": "SAID.version", "kind": "scalar", "required": false, "severity_if_missing": "ADVISORY", "remediation": "declare SAID.version: <starter>@<semver> to pin the starter axis set a lane was built on"},
+    {"key": "SAID.checkers-dir", "kind": "scalar", "required": false, "severity_if_missing": "ADVISORY", "remediation": "declare SAID.checkers-dir: <path> ONLY if the lane ships and executes its own Checkers"},
+    {"key": "SAID.code-review", "kind": "scalar", "required": false, "severity_if_missing": "ADVISORY", "remediation": "optional on | off override; absent falls back to the profile's code-review slot"},
+    {"key": "SAID.lanes", "kind": "list", "read_whole": true, "required": false, "severity_if_missing": "ADVISORY", "remediation": "a multi-lane repo declares the SAID.lanes: registry (read WHOLE) on the umbrella block, one row per lane pointing at that lane's own CLAUDE.md"}
+  ],
+  "withdrawn_axes": [
+    {"key": "SAID.surface-type", "severity": "STALE", "superseded_by": "SAID.surface + SAID.reviewers", "remediation": "replace SAID.surface-type: with SAID.surface: <medium> plus SAID.reviewers: [<checker>]; the surface-type enum was retired in favor of named Checkers"},
+    {"key": "SAID.project-type", "severity": "STALE", "remediation": "remove SAID.project-type: (removed axis); consumers read SAID.surface: instead"},
+    {"key": "SAID.contract-face", "severity": "STALE", "remediation": "remove SAID.contract-face: (never an axis); every lane has both a docs/ux and a docs/qa contract, resolved from docs-root"}
+  ],
+  "required_sections": [
+    {"heading": "## Lane", "match": "exact", "severity_if_missing": "BLOCKER", "remediation": "add the ## Lane block carrying the SAID.<axis> keys; a repo with no lane block is invisible to the whole cycle"},
+    {"heading": "## Earned rules", "match": "leading-words", "severity_if_missing": "BLOCKER", "remediation": "add a ## Earned rules heading (one rule per '- ' line, each with an R-* id and a link to its record); an absent heading HALTs the implement phase at close"},
+    {"heading": "## Significant ADRs", "match": "leading-words", "severity_if_missing": "ADVISORY", "remediation": "add the ## Significant ADRs (skill-referenced) shortname table binding each cited shortname to this lane's record file"},
+    {"heading": "## Claude Code Reminders", "match": "leading-words", "severity_if_missing": "ADVISORY", "remediation": "add ## Claude Code Reminders including the drive line 're-read ## Earned rules and name the ids you apply before each implementation step'"}
+  ],
+  "block_invariants": [
+    {"id": "one-line-value", "severity": "STALE", "rule": "each key carries its full scalar value on one line; no trailing comment marker, parenthetical, or aside a consumer must strip"},
+    {"id": "single-hit-scalar", "severity": "STALE", "rule": "a scalar SAID.<axis> key is named once in the file; the list keys SAID.lanes and SAID.reviewers are the exceptions, read WHOLE"},
+    {"id": "keys-only-block", "severity": "STALE", "rule": "from the first key to the last, every line is a key line; no prose, sub-bullet, stray bullet, or annotation between keys"}
+  ],
+  "docs_skeleton": [
+    {"path": "adr", "type": "dir", "severity_if_missing": "ADVISORY"},
+    {"path": "features", "type": "dir", "severity_if_missing": "ADVISORY"},
+    {"path": "working", "type": "dir", "severity_if_missing": "ADVISORY"},
+    {"path": "qa", "type": "dir", "severity_if_missing": "ADVISORY"},
+    {"path": "ux", "type": "dir", "severity_if_missing": "ADVISORY"},
+    {"path": "features/template.md", "type": "file", "severity_if_missing": "ADVISORY"},
+    {"path": "features/template-tasks.md", "type": "file", "severity_if_missing": "ADVISORY"}
+  ]
+}
