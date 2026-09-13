@@ -2,6 +2,15 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.10.0] — 2026-09-13
+
+Medium-agnostic uxtoc unit contract + no-seal completeness model. The design-outline engine (`uxtoc`, `element-projection.md`, `said_completeness.py`, `architect`) is now medium-agnostic: the engine owns the projection rule; each lane owns its vocabulary in a per-surface `docs/ux/feature-ux-grammar.md` grammar (one SC-HEADER section per surface, selected by `SAID.surface:`).
+- **Removed:** the `toc-checksum:` count-seal added in 0.9.0 — it fought the operator-editable `toc.md` and was same-count-blind. Completeness now rests on the comparison + the L2 oracle verdict-recompute + a capture manifest (declared-evidence; the author-independent executed capture is the deferred per-lane probe-table); `uxtoc` stamps `grammar:<token>` + `last-revised:` instead of a checksum.
+- **Changed:** `element-projection.md` reduced to the rule only (VERIFY-TOKEN `UXP-R-1`); the container set, attribute set, and scaffolding (`not-elements`) moved into the lane grammar. The element rule is attribute-set-aware — a key in the grammar's attribute set or `not-elements` set is not an element and never steals its parent's status, closing a projection bug where a nested attribute silently dropped an unbuilt element green.
+- **Changed:** `said_completeness.py` derives DESIGNED unit-driven from the injected grammar (`SAID_GRAMMAR`/`SAID_SURFACE`, `--grammar` argv else `die(2)`), cross-checks the `grammar:<token>` stamp (absent → FAIL); BUILT is read from a capture manifest (declared-evidence), and the grammar's `oracle-containers:` records which containers will be verified author-independently once the deferred per-lane capture probe-table lands.
+- **Changed:** `architect` folds one acceptance line per unit (generalized from per-screen) + stamps `last-revised:`; the completeness recipe row moves to `said-capture: manifest` (declared-evidence) with `said-env: SAID_GRAMMAR;SAID_SURFACE` (the executed cli/web capture is the deferred per-lane probe-table).
+- **Added:** a `cli` grammar section (`unit=Command`) for this lane; a `web` grammar (`unit=Screen`) delivered to the front lane cross-repo.
+
 ## [0.9.0] — 2026-09-10
 
 The uxtoc basis→contract lifecycle runs off a single source of truth (`toc.md`).

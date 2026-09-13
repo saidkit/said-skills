@@ -661,7 +661,7 @@ def index_checkers(*paths):
     return idx
 
 
-def validate_reviewer(workdir, cid, meta, head_sha, root="."):
+def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
     """Validate one expected reviewer's L1 verdict. Returns (ok, reason)."""
     if meta is None:  # declared reviewer id resolves to no Checker — nominal; a verdict can never redeem it
         return False, "reviewer %r does not resolve to a Checker (nominal — no said-checker match)" % cid
@@ -697,8 +697,14 @@ def validate_reviewer(workdir, cid, meta, head_sha, root="."):
         # A plugin-shipped recompute script resolves via SAID_PLUGIN_ROOT (this oracle's own
         # plugin dir), so it works whether or not the target vendors the plugin.
         plugin_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        # The per-surface lane grammar (unit + containers + attribute set) the completeness recompute
+        # reads, injected like SAID_PLUGIN_ROOT so a plugin-shipped recompute resolves it; a recompute
+        # that does not need it ignores it. SAID_SURFACE selects the grammar's surface section.
         env = {**os.environ, "SAID_WORKDIR": os.path.abspath(workdir), "SAID_CAPTURE": cap_path,
-               "SAID_PLUGIN_ROOT": plugin_root}
+               "SAID_PLUGIN_ROOT": plugin_root,
+               "SAID_GRAMMAR": os.path.join(os.path.abspath(root), "docs", "ux", "feature-ux-grammar.md")}
+        if surface:
+            env["SAID_SURFACE"] = surface
         rc = subprocess.run(cmd, shell=True, cwd=root, capture_output=True, env=env).returncode
         if rc != 0:
             return False, "recompute failed (exit %d)" % rc
@@ -749,7 +755,7 @@ def reviewer_gate(workdir, surface, reviewers, checker_index, head_sha, root="."
         if meta is not None and not _governs_surface(meta, surface):
             skipped.append((cid, (meta or {}).get("said-governs")))
             continue
-        ok, reason = validate_reviewer(workdir, cid, meta, head_sha, root)
+        ok, reason = validate_reviewer(workdir, cid, meta, head_sha, root, surface)
         details.append((cid, ok, reason))
         passed = passed and ok
     if not details:  # empty-after-filter: a surface-bearing feature whose declared reviewers none govern is ungated
