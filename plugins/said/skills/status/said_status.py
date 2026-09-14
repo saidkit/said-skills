@@ -797,16 +797,43 @@ def resolve_checkers_dir(root, arg):
     return _plugin_agents_dir()
 
 
+def _resolve_recipe_rules(root, arg):
+    """Resolve the recipe-form rules file the reviewer-gate scans for recipe-form Checkers.
+    An explicit --recipe-rules naming a missing file is a hard error (exit 2, the path named) --
+    never the silent skip index_checkers would take on a non-existent path. Absent, default it
+    from the lane block: the lane's SAID.docs-root: joined with ux/feature-ux-rules.md, if that
+    file exists -- the same declaration-first lane read resolve_checkers_dir does for
+    SAID.checkers-dir:. No lane key, or no such file -> None (a lane that ships no recipe registry;
+    the gate then points the operator at one)."""
+    if arg is not None:
+        cand = arg if os.path.exists(arg) else os.path.join(root, arg)  # a root-relative path resolves (the caller root-joins --checkers-dir too)
+        if not os.path.exists(cand):  # a file or a dir (index_checkers globs a dir); only a genuinely-missing path is the hard error
+            sys.stderr.write("reviewer-gate: --recipe-rules: no such file: %s\n" % arg)
+            sys.exit(2)
+        return cand
+    try:
+        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8") as fh:
+            for line in fh:
+                m = re.match(r"^\s*[-*]?\s*SAID\.docs-root:\s*(\S+)", line)
+                if m:
+                    cand = os.path.join(root, m.group(1), "ux", "feature-ux-rules.md")
+                    return cand if os.path.isfile(cand) else None
+    except OSError:
+        pass
+    return None
+
+
 def run_reviewer_gate(a):
     """CLI dispatch for --reviewer-gate: prints per-reviewer verdicts, exits 0/1."""
     head = sh(["git", "-C", a.root, "rev-parse", "HEAD"]) or ""
     checkers_dir = resolve_checkers_dir(a.root, a.checkers_dir)  # lane-declared / fallback chain
-    idx = index_checkers(os.path.join(a.root, checkers_dir), a.recipe_rules)
+    recipe_rules = _resolve_recipe_rules(a.root, a.recipe_rules)  # explicit (hard-error if missing) else lane-block default
+    idx = index_checkers(os.path.join(a.root, checkers_dir), recipe_rules)
     revs = a.reviewers.split(",") if a.reviewers else []
     passed, details = reviewer_gate(a.workdir or ".", a.surface, revs, idx, head, a.root)
     for cid, ok, reason in details:
-        if (not ok) and (not a.recipe_rules) and "no said-checker match" in reason:  # nominal + no --recipe-rules: point the operator at recipe-form Checkers
-            reason += " — hint: a recipe-form Checker lives in a docs/ux rules file; pass --recipe-rules <that file>"
+        if (not ok) and (recipe_rules is None) and "no said-checker match" in reason:  # nominal + no resolved registry: point the operator at recipe-form Checkers
+            reason += " - hint: a recipe-form Checker lives in a docs/ux rules file; pass --recipe-rules <that file>"
         glyph = GLYPH["pending"] if (ok and reason.startswith("skipped")) else (GLYPH["ok"] if ok else GLYPH["block"])
         print("  %s %s: %s" % (glyph, cid, reason))
     print("reviewer-gate: %s" % ("PASS" if passed else "FAIL"))
