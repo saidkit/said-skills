@@ -10,7 +10,7 @@ SAID skills reference things every project has but names differently -- your ADR
 
 ## Step 1 -- Adopt the docs layout (or remap it)
 
-SAID's default layout. If yours differs, note the remapping in your `## Lane` block (Step 3, the `SAID.docs-root:` / path keys); the conventions below are the only project paths the skills assume. One caveat if you remap `docs-root`: the completeness reviewer currently resolves the grammar at `docs/ux/feature-ux-grammar.md` under the lane root, so keep that file reachable there (or verify the completeness recompute finds your grammar).
+SAID's default layout. If yours differs, note the remapping in your `## Lane` block (Step 3, the `SAID.docs-root:` / path keys); the conventions below are the only project paths the skills assume. If you remap `docs-root`, the completeness reviewer resolves the grammar from your `SAID.docs-root:` (`<docs-root>/ux/feature-ux-grammar.md`), so a remapped layout works -- keep the grammar reachable under your docs-root.
 
 | Default path                        | Holds                                                                               |
 | ----------------------------------- | ----------------------------------------------------------------------------------- |

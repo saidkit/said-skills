@@ -704,7 +704,7 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
         # that does not need it ignores it. SAID_SURFACE selects the grammar's surface section.
         env = {**os.environ, "SAID_WORKDIR": os.path.abspath(workdir), "SAID_CAPTURE": cap_path,
                "SAID_PLUGIN_ROOT": plugin_root,
-               "SAID_GRAMMAR": os.path.join(os.path.abspath(root), "docs", "ux", "feature-ux-grammar.md")}
+               "SAID_GRAMMAR": os.path.join(os.path.abspath(root), _lane_key(root, "docs-root") or "docs", "ux", "feature-ux-grammar.md")}
         if surface:
             env["SAID_SURFACE"] = surface
         rc = subprocess.run(cmd, shell=True, cwd=root, capture_output=True, env=env).returncode
@@ -776,6 +776,21 @@ def _plugin_agents_dir():
     return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "agents")
 
 
+def _lane_key(root, key):
+    """Declaration-first read of a scalar `SAID.<key>:` from the lane's <root>/CLAUDE.md; returns
+    the raw value of the first match, or None. The one read-shape resolve_checkers_dir,
+    _resolve_recipe_rules, and the reviewer-gate grammar injection share (each keeps its own fallback)."""
+    try:
+        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8") as fh:
+            for line in fh:
+                m = re.match(r"^\s*[-*]?\s*SAID\.%s:\s*(\S+)" % re.escape(key), line)
+                if m:
+                    return m.group(1)
+    except (OSError, UnicodeDecodeError):  # a missing OR non-UTF8 CLAUDE.md -> fall through, never crash the gate
+        pass
+    return None
+
+
 def resolve_checkers_dir(root, arg):
     """Resolve the agent-form Checker dir the reviewer-gate VALIDATES. It MUST be the dir the
     runtime LOADS the Checker from, or the gate validates a different object than the one that
@@ -786,15 +801,8 @@ def resolve_checkers_dir(root, arg):
     else the plugin's own agents dir. The resolvability invariant asserts on the *resolved* file."""
     if arg is not None:
         return arg
-    try:
-        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8") as fh:
-            for line in fh:
-                m = re.match(r"^\s*[-*]?\s*SAID\.checkers-dir:\s*(\S+)", line)
-                if m:
-                    return m.group(1)
-    except OSError:
-        pass
-    return _plugin_agents_dir()
+    d = _lane_key(root, "checkers-dir")
+    return d if d is not None else _plugin_agents_dir()
 
 
 def _resolve_recipe_rules(root, arg):
@@ -811,15 +819,10 @@ def _resolve_recipe_rules(root, arg):
             sys.stderr.write("reviewer-gate: --recipe-rules: no such file: %s\n" % arg)
             sys.exit(2)
         return cand
-    try:
-        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8") as fh:
-            for line in fh:
-                m = re.match(r"^\s*[-*]?\s*SAID\.docs-root:\s*(\S+)", line)
-                if m:
-                    cand = os.path.join(root, m.group(1), "ux", "feature-ux-rules.md")
-                    return cand if os.path.isfile(cand) else None
-    except OSError:
-        pass
+    dr = _lane_key(root, "docs-root")
+    if dr is not None:
+        cand = os.path.join(root, dr, "ux", "feature-ux-rules.md")
+        return cand if os.path.isfile(cand) else None
     return None
 
 
