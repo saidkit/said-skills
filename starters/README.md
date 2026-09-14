@@ -14,20 +14,23 @@ A starter is its own cloneable git repo (e.g. a GitHub template) that a new proj
 | `docs/features/template-tasks.md` | task-log template + discipline                      | `said:architect`, `said:add-task` |
 | `docs/qa/feature-qa-checklist.md` | hygiene-gate rules (your `R-*` labels)              | `said:review-qa`                  |
 | `docs/adr/`                       | ADR templates + seed decisions                      | all phases (`Refs:`)              |
-| `CLAUDE.md` bindings              | Lane, id-shape, surface-type, rules, ADR short map  | all skills                        |
+| `CLAUDE.md` bindings              | `## Lane` (surface, reviewers, ...), id-shape, `## Earned rules`, ADR short map | all skills          |
 
 ## Representation contract
 
-Every surface additionally ships its representation contract — content per `surface-type`. A non-visual surface ships `docs/ux` too, with endpoint / schema / flag rules instead of screens - UX here means what consumer actually sees.
+Every surface additionally ships its representation contract — content per `surface`. A non-`web` surface ships `docs/ux` too, with endpoint / schema / flag rules instead of screens - UX here means what the consumer actually sees.
 
-- `docs/ux/`
-  - Engine consumer: `said:architect`, `said:review-ux`
-  - Purpose: the surface's design rules (screens for `visual`; endpoint / schema / flag rules for non-visual)
+- `docs/ux/feature-ux-rules.md`
+  - Engine consumer: `said:architect`, `said:add-task`, `said:impl`
+  - Purpose: the surface-contract rule registry (screen-shape taxonomy + routing) with a proof-of-load sentinel
+- `docs/ux/feature-ux-grammar.md`
+  - Engine consumer: `said:uxtoc`, the `completeness` Checker
+  - Purpose: the per-surface unit grammar (`unit`, `containers`, attribute set) — one `SC-HEADER` section per surface
 - `docs/ux/feature-ux-checklist.md`
   - Engine consumer: `said:review-ux`, `said:review-ux-agent`
-  - Purpose: UX-gate checklist (the `docs/ux` rules operationalized into `verify:` predicates) + the gate/wire label convention
+  - Purpose: UX-gate checklist (the surface's design rules operationalized into `verify:` predicates) + the gate/wire label convention
 
-Non-visual starters (server / CLI / library / MCP) still ship a `docs/ux` — its *content* is their surface's contract (endpoint / error-envelope rules for `api`, tool-schemas for `mcp`, flags / exit-codes for `cli`), not screen rules — and declare their lane's `surface-type` accordingly. `said:review-ux` gates against that surface's contract (schema / handshake / invocation) instead of a browser walk. A surface that lacks a `docs/ux` is a project deficiency the framework surfaces, not a supported mode.
+Non-`web` starters (server / CLI / library / MCP) still ship a `docs/ux` — its *content* is their surface's contract (endpoint / error-envelope rules for `api`, tool-schemas for `mcp`, flags / exit-codes for `cli`), not screen rules — and declare their lane's `surface` + `reviewers` accordingly. The lane's declared reviewers gate that surface's contract (schema / handshake / invocation) instead of a browser walk. A surface that lacks a `docs/ux` is a project deficiency the framework surfaces, not a supported mode.
 
 ## Starters
 
@@ -49,6 +52,6 @@ Non-visual starters (server / CLI / library / MCP) still ship a `docs/ux` — it
 1. Fork an existing starter (e.g. `said-next`) as your base, or author the docs from scratch per the contract above.
 2. Specialize each for the stack — real ADRs, real checklist rules (your own `R-*` labels), command resolution for the toolchain.
 3. Author the `CLAUDE.md` binding section (the contract in the adoption guide).
-4. Validate end-to-end: install the engine, apply the starter to a scratch repo, run a throwaway feature `/said:scope-grill` → `/said:debrief`.
+4. Validate end-to-end: install the engine, apply the starter to a scratch repo, run a throwaway feature `/said:scope-grill` -> `/said:debrief`.
 
 Starters are the main way to extend SAIDkit — contributions welcome at https://saidkit.dev.
