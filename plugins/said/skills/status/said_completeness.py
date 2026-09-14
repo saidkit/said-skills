@@ -22,14 +22,20 @@ yields zero designed elements (a hollow FAIL; a legitimately-emptied container i
 Honesty rests on the comparison + recompute + capture:
   - the comparison DESIGNED subset-of (BUILT union accounted-drops), with the attribute-group
     projection fix (a nested attribute never steals its parent element's status);
+  - the built-floor: at least one DESIGNED element must be built (BUILT intersect DESIGNED
+    non-empty); an outline whose every designed element is dropped ships nothing - the comparison then
+    holds vacuously, so completeness FAILs it; a legitimate partial-drop PASSes;
   - the L2 oracle verdict-recompute (said_status.py --reviewer-gate re-derives, never trusts a PASS);
-  - BUILT capture: BUILT is read from the capture manifest (declared-evidence). The author-independent
-    EXECUTED capture (cli --help, web DOM/manifest probe) is the per-lane probe-table, DEFERRED beyond
-    this release; until it lands, cli/web completeness is declared-evidence (manifest-based).
+  - BUILT capture: for a **cli** unit whose manifest declares a `cmd:`, the grammar's oracle-containers
+    are verified author-independently by executing that command's own `--help` read-only (command-path +
+    `--help` only - every invocation flag stripped; flags read from the option-definition lines, not
+    prose); a **non-cli (web)** unit runs its front-declared probe as-given (the front owns its
+    read-only-ness; no `--help`, no flag-strip); the rest is read from the capture manifest
+    (declared-evidence).
 
-Trust tiers are declaration-bound (grammar `oracle-containers:`): the containers that WILL be
-oracle-verified (author-independent) once the probe-table lands; until then every container is
-declared-evidence. The verdict reports the manifest capture + the oracle-intended count.
+Trust tiers are declaration-bound (grammar `oracle-containers:`): a container is oracle-verified where an
+executed capture actually runs (its unit declares a `cmd:`), else declared-evidence (manifest). The
+verdict reports the oracle-verified count and how many units ran an executed capture.
 
 Grammar resolution: `--grammar <path>` argv, else $SAID_GRAMMAR; the section is selected by
 $SAID_SURFACE. A missing grammar die(2)s with a named redirect; two matching surface-sections exit 2.
@@ -41,10 +47,13 @@ usage / missing-input / grammar error.
 """
 import os
 import re
+import shlex
+import subprocess
 import sys
 
 RULE_TOKEN = "UXP-R-1"
 KEY_RE = re.compile(r"^(\s*)-\s+(.+?):\s*$")   # a valueless bulleted key: `- <key>:`
+FLAG_RE = re.compile(r"(?<![\w-])(--?[A-Za-z][\w-]*)")   # a flag token in --help output
 
 
 def die(msg, code):
@@ -200,8 +209,9 @@ def parse_designed(path, unit, containers, attributes, not_elements):
 
 
 def read_manifest(cap):
-    """BUILT + DROPPED as (unit, key) pairs from an author/tool-written capture manifest."""
-    built, dropped = set(), set()
+    """BUILT + DROPPED as (unit, key) pairs, plus per-unit `cmd:` (the executed-capture command path),
+    from an author/tool-written capture manifest."""
+    built, dropped, cmds = set(), set(), {}
     unit = ""
     with open(cap, encoding="utf-8") as fh:
         for raw in fh:
@@ -211,7 +221,9 @@ def read_manifest(cap):
             if line.startswith("## "):
                 unit = line[3:].strip()
                 continue
-            if line.startswith("built:"):
+            if line.startswith("cmd:"):
+                cmds[unit] = line[len("cmd:"):].strip()
+            elif line.startswith("built:"):
                 built.add((unit, line[len("built:"):].strip()))
             elif line.startswith("dropped:"):
                 rest = line[len("dropped:"):].strip()
@@ -222,7 +234,89 @@ def read_manifest(cap):
                 if not reason.strip():
                     die("FAIL: dropped element '%s' has an empty reason" % eid.strip(), 1)
                 dropped.add((unit, eid.strip()))
-    return built, dropped
+    return built, dropped, cmds
+
+
+def capture_help(cmd_str):
+    """Read-only executed capture: run ONLY the command-path tokens + --help and return the
+    set of flag tokens the command's own --help lists in its OPTION LINES (author-independent BUILT for
+    the oracle tier).
+
+    Read-only guarantee (the leg that must never re-open the read-only hole (a flag from the invocation reaching the spawned process)):
+      - shlex-split the declared command and DROP every token starting with '-', so no flag from the
+        invocation ever executes (a mutating / `--dangerous` flag is stripped, never spawned);
+      - reject a token carrying a shell metacharacter or '=' (a `cmd:` is a command path, not a shell
+        line or an operand=value) - defense-in-depth on top of the no-shell spawn;
+      - keep the FULL command path (binary + every subcommand word), never a truncated parent;
+      - append only `--help`; run list-form (shell=False) with a timeout.
+    The `cmd:` names a read-only command path the lane maintainer declares (the same trust model as
+    `said-recompute` / `SAID.commands`), assumed to treat `--help` as a short-circuit; the engine cannot
+    tell a subcommand word from a positional operand, so a maintainer who declares a mutating command
+    path owns that - the engine's guarantee is that IT forwards no flag and appends only `--help`.
+
+    Extraction is scoped to OPTION LINES (first non-space char is '-'), never the whole capture, so a
+    flag named only in --help PROSE ("--x was removed; use --y") is not miscounted as built (P3-G).
+    """
+    bad = re.compile(r"[;&|<>`$()=]")   # shell control / redirect / subshell / operand=value
+    try:
+        toks = shlex.split(cmd_str)
+    except ValueError as e:
+        die("FAIL: capture cmd %r is not a parseable command (%s)" % (cmd_str, e), 2)
+    path = []
+    for t in toks:
+        if t.startswith("-"):
+            continue                    # a flag from the invocation - never executed
+        if bad.search(t):
+            die("FAIL: capture cmd token %r is not a command-path word (shell metacharacter or '=')" % t, 2)
+        path.append(t)
+    if not path:
+        die("FAIL: capture cmd %r has no command-path token (only flags?)" % cmd_str, 2)
+    try:
+        proc = subprocess.run(path + ["--help"], capture_output=True, text=True, timeout=10, check=False)
+    except (OSError, ValueError, subprocess.SubprocessError) as e:
+        die("FAIL: read-only capture spawn failed for %r: %s" % (" ".join(path), e), 1)
+    # Harvest flags from the OPTION-DEFINITION lines of --help. An option definition is INDENTED and
+    # opens with a flag token; take only its leading flag cluster (the flag + comma-separated aliases,
+    # stopping at the first non-flag token). So a flag named in a description ("--json  use instead of
+    # --ghost"), a usage synopsis ("usage: t [--ghost]"), a markdown bullet, or a column-0
+    # prose/deprecation line ("--ghost was removed; use --json") is NOT counted - author-independent and
+    # robust to the common prose-mention shapes.
+    #
+    # BOUND (honest, not a formal --help parser): an *indented* prose line that itself opens with a flag
+    # token ("  --ghost is planned") is indistinguishable from an option definition and IS counted - the
+    # oracle trusts the tool's own --help layout. So the guarantee is "a designed flag must appear as an
+    # option-definition-shaped line in the tool's own --help", not "the flag is implemented". A tool that
+    # lists a non-existent flag in option-definition shape is the tool's own --help bug. (SAID-17
+    # round-2 acceptance: the per-line prose heuristic cannot close this fully; see the ADR.)
+    OPT_RE = re.compile(r"[ \t]+(-{1,2}[A-Za-z][\w-]*(?:[ \t]*,[ \t]*-{1,2}[A-Za-z][\w-]*)*)")
+    flags = set()
+    for line in ((proc.stdout or "") + "\n" + (proc.stderr or "")).splitlines():
+        m = OPT_RE.match(line)
+        if m:
+            flags.update(FLAG_RE.findall(m.group(1)))
+    return flags
+
+
+def capture_web(cmd_str):
+    """Executed read-only capture for a non-cli (e.g. web) oracle tier: run the
+    front-supplied probe command AS DECLARED and read the built element keys it lists, one per line.
+    Unlike the cli `--help` capture there is no universal read-only convention to enforce, so the front
+    owns the probe's read-only-ness - the same trust model as `said-recompute` / `SAID.commands` (a
+    declared command the engine runs); the engine runs it list-form (shell=False) with a timeout, never
+    a shell. This ships the engine contract + a hermetic fixture; a real front lane supplies the concrete
+    DOM/route probe under its own SAID cycle."""
+    try:
+        argv = shlex.split(cmd_str)
+    except ValueError as e:
+        die("FAIL: capture cmd %r is not a parseable command (%s)" % (cmd_str, e), 2)
+    if not argv:
+        die("FAIL: capture cmd %r is empty" % cmd_str, 2)
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=10, check=False)
+    except (OSError, ValueError, subprocess.SubprocessError) as e:
+        die("FAIL: read-only capture spawn failed for %r: %s" % (" ".join(argv), e), 1)
+    out = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    return set(line.strip() for line in out.splitlines() if line.strip())
 
 
 def main():
@@ -265,25 +359,64 @@ def main():
         die("FAIL: toc.md yields zero designed elements (hollow - nothing to certify complete; no "
             "keyed elements under container headers, or set Surface: none)", 1)
 
-    # BUILT is read from the capture manifest (declared-evidence). The author-independent EXECUTED
-    # capture (cli --help / web DOM probe) is the per-lane probe-table, deferred beyond this release;
-    # the grammar's `oracle-containers:` records which containers WILL be oracle-verified once it lands.
-    # `recomputed` is not yet a valid capture - a manifest supplies BUILT for every container.
+    # BUILT capture. For a unit whose manifest declares a `cmd:`, the grammar's oracle-containers are
+    # verified author-independently by executing the command's own --help (capture_help, read-only);
+    # everything else is read from the manifest (declared-evidence). The bare `recomputed` sentinel
+    # carries no manifest, so there is no `cmd:` to spawn - unsupported.
     if cap == "recomputed":
-        die("executed capture (the `recomputed` sentinel) is deferred to the per-lane probe-table; "
-            "supply a capture manifest for BUILT", 2)
+        die("bare `recomputed` sentinel: no manifest, so no per-unit `cmd:` to spawn; supply a capture "
+            "manifest (its `cmd:` lines drive the executed --help capture, its `built:` lines the rest)", 2)
     if not os.path.isfile(cap):
         die("no capture manifest at %s" % cap, 2)
-    built, dropped = read_manifest(cap)
+    built, dropped, cmds = read_manifest(cap)
 
-    missing = sorted(u + " / " + e for (u, e) in designed if (u, e) not in built and (u, e) not in dropped)
+    # executed read-only capture for the oracle tier: a designed element in an oracle-container whose unit
+    # declares a `cmd:` is proven BUILT only if it appears in that command's own --help (a manifest
+    # `built:` line cannot bluff it). A unit without a `cmd:` stays declared-evidence (manifest).
+    oracle_built, executed_units, help_cache = set(), set(), {}
+    for (u, key) in designed:
+        if container_of.get((u, key)) not in g["oracle_containers"] or u not in cmds:
+            continue
+        if u not in help_cache:
+            # cli: the safe `--help` capture (flags from option lines); other surfaces (web): the
+            # front-supplied read-only probe (built keys, one per line). SAID_SURFACE selects.
+            help_cache[u] = capture_help(cmds[u]) if surface == "cli" else capture_web(cmds[u])
+            executed_units.add(u)
+        if key in help_cache[u]:
+            oracle_built.add((u, key))
+
+    def oracle_executed(u, key):
+        return u in executed_units and container_of.get((u, key)) in g["oracle_containers"]
+
+    missing = []
+    for (u, key) in sorted(designed):
+        if (u, key) in dropped:
+            continue
+        if oracle_executed(u, key):
+            if (u, key) not in oracle_built:
+                missing.append(u + " / " + key + " (oracle: absent from executed --help)")
+        elif (u, key) not in built:
+            missing.append(u + " / " + key)
     if missing:
         die("FAIL: designed elements neither built nor dropped: %s" % ", ".join(missing), 1)
 
+    # built-floor: at least one designed element must actually be built - by the executed capture (oracle
+    # tier) or the manifest (declared-evidence). Scoped to `designed` (not raw `built:`): a stray/stale
+    # key cannot satisfy it. Every designed element dropped => the comparison holds vacuously while the
+    # feature ships nothing; a legitimate partial-drop keeps >=1 designed element built and PASSes.
+    if not ((built & designed) | oracle_built):
+        die("FAIL: no designed element is built (every designed element dropped) - vacuous completeness; "
+            "a delivered feature builds at least one designed element", 1)
+
     oracle_intended = sum(1 for k in designed if container_of.get(k) in g["oracle_containers"])
-    print("completeness PASS: %d designed <= %d built + %d dropped "
-          "(capture: manifest/declared-evidence; %d in oracle-intended containers, executed capture deferred)"
-          % (len(designed), len(built), len(dropped), oracle_intended))
+    if executed_units:
+        cap_note = ("oracle-verified: %d/%d in %d executed-capture unit(s); rest manifest/declared-evidence"
+                    % (len(oracle_built), oracle_intended, len(executed_units)))
+    else:
+        cap_note = ("capture: manifest/declared-evidence; %d in oracle-intended containers "
+                    "(no executed capture declared)" % oracle_intended)
+    print("completeness PASS: %d designed <= %d built + %d dropped (%s)"
+          % (len(designed), len(built), len(dropped), cap_note))
     sys.exit(0)
 
 

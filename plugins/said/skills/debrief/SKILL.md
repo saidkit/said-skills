@@ -33,7 +33,7 @@ If spec § Related links to other feature specs, ask operator whether they are *
 
 If operator asks to author a new feature — wrong skill, redirect to `/said:architect`. If to add a follow-up task — redirect to `/said:add-task`.
 
-## Common compositions (upstream → this skill)
+## Common compositions (upstream -> this skill)
 
 After Phase 3 closes (all tasks Done, all quality gates green, operator's manual UX/QA pass complete):
 
@@ -45,12 +45,12 @@ After Phase 3 closes (all tasks Done, all quality gates green, operator's manual
 
 ## Step 0 — Preflight
 
-1. Resolve feature paths from `SAID.feature-spec:` + `SAID.task-log:` + `SAID.working:` on the `## Lane` block; no block/key → HALT (operator declares it), never glob-guess. The resolved working root is used for every Phase A/B/C output below. **ADR ids + dir:** from `SAID.adr-prefix:` + `SAID.docs-root:` — every promoted/minted ADR id, `Refs:` pointer, and the close-footer migration id binds to `SAID.adr-prefix:`; the ADR dir resolves under `SAID.docs-root:`.
+1. Resolve feature paths from `SAID.feature-spec:` + `SAID.task-log:` + `SAID.working:` on the `## Lane` block; no block/key -> HALT (operator declares it), never glob-guess. The resolved working root is used for every Phase A/B/C output below. **ADR ids + dir:** from `SAID.adr-prefix:` + `SAID.docs-root:` — every promoted/minted ADR id, `Refs:` pointer, and the close-footer migration id binds to `SAID.adr-prefix:`; the ADR dir resolves under `SAID.docs-root:`.
 2. Read both files in full.
-3. Status check. For each task entry, confirm `Status: Done`. If any open → BLOCK with: "Cannot debrief — N task(s) still open. Close them via `/said:impl <feature-id>` first." List the open IDs.
+3. Status check. For each task entry, confirm `Status: Done`. If any open -> BLOCK with: "Cannot debrief — N task(s) still open. Close them via `/said:impl <feature-id>` first." List the open IDs.
 4. Sibling check. If spec § Related cites other feature specs, ask operator: "Are these siblings (umbrella, must all close) or successors (post-Debrief)?" BLOCK only if siblings incomplete.
 5. Quality gate spot-check. Resolve and run the project's quality-gate command at runtime the same way `/said:review-qa` Step 0 resolves it. Halt if it goes red — the feature isn't actually closed.
-6. **Phase-3.5 gate check.** Glob `docs/working/<feature-id>/review-qa-*.md` and `accept-*.md` (most recent by mtime). (a) If **neither exists** → do not proceed silently: surface "No Phase-3.5 gate artifacts for `<feature-id>` — run `/said:review-qa` + `/said:accept` first, or confirm skip." **A confirmed skip is carried forward, not waved through — it is recorded at Phase C as the `Gate-skip` line of the `## Debrief close` footer (step 3), so the omission leaves an audit trail instead of a silent gap.** (b) If the latest `review-qa` **or** `accept` verdict is **FAIL** → BLOCK with redirect: "Resolve `/said:review-qa` / `/said:accept` failures before debrief." This is the gate `/said:review-qa` and `/said:accept` advertise (their "Gate effect for `/said:debrief`" sections) — without this read it never actually fires.
+6. **Phase-3.5 gate check.** Glob `docs/working/<feature-id>/review-qa-*.md` and `accept-*.md` (most recent by mtime). (a) If **neither exists** -> do not proceed silently: surface "No Phase-3.5 gate artifacts for `<feature-id>` — run `/said:review-qa` + `/said:accept` first, or confirm skip." **A confirmed skip is carried forward, not waved through — it is recorded at Phase C as the `Gate-skip` line of the `## Debrief close` footer (step 3), so the omission leaves an audit trail instead of a silent gap.** (b) If the latest `review-qa` **or** `accept` verdict is **FAIL** -> BLOCK with redirect: "Resolve `/said:review-qa` / `/said:accept` failures before debrief." This is the gate `/said:review-qa` and `/said:accept` advertise (their "Gate effect for `/said:debrief`" sections) — without this read it never actually fires.
 
 ## Phase A — Read + Scan + Propose (STOP for operator review)
 
@@ -74,7 +74,7 @@ Output: `docs/working/<feature-id>/debrief.md` with 5 sections. Then STOP.
    - Repeat what's elsewhere in the same spec.
    Each gets a proposed action: cut / collapse-to-pointer / merge.
 
-4. **§A.4 lessons candidates.** Read every Done task entry; harvest `### Gotchas` + `### Deviations`. Each surprise or hard-won insight is a lesson candidate. Format as draft `**<one-line statement>**. Why: <reason>. Source: <task ID>.` For tasks files > 100 KB, stream-read: § Summary Table → identify Done IDs → per-task grep `### Gotchas` + `### Deviations` line ranges; avoid full-file load.
+4. **§A.4 lessons candidates.** Read every Done task entry; harvest `### Gotchas` + `### Deviations`. Each surprise or hard-won insight is a lesson candidate. Format as draft `**<one-line statement>**. Why: <reason>. Source: <task ID>.` For tasks files > 100 KB, stream-read: § Summary Table -> identify Done IDs -> per-task grep `### Gotchas` + `### Deviations` line ranges; avoid full-file load.
 
 5. **§A.5 successor.** Ask operator: "Successor feature queued?" If yes, name it. If no, mark N/A.
 
@@ -86,11 +86,11 @@ Default finding row: `<file>:<line> | <proposed action> | <proposed destination>
 
 ## Phase B — Execute backports
 
-For each approved finding, in order: stale → leak → bloat → lessons → handoff.
+For each approved finding, in order: stale -> leak -> bloat -> lessons -> handoff.
 
 **One finding, one confirmation.** After each edit: report `<file>:<line>` + 1-sentence summary; await operator nod before next.
 
-- **Stale-state.** Flip `[ ]` → `[x]` (or `[N/A — <reason>]`). Sync § Feature Tasks summary table rows from `<feature>.tasks.md` `Status:` lines. Fix narrative tense (future → past) on shipped-feature descriptions.
+- **Stale-state.** Flip `[ ]` -> `[x]` (or `[N/A — <reason>]`). Sync § Feature Tasks summary table rows from `<feature>.tasks.md` `Status:` lines. Fix narrative tense (future -> past) on shipped-feature descriptions.
 
 - **Leak-scan.** Before promoting, grep the ADR dir (`SAID.docs-root:`-relative `docs/adr/*.md`) + `docs/ux/*.md` for clauses that **contradict** the rule being moved. If any surface, flag to operator and halt this finding pending decision. On approval: add rule to destination ADR/UX-spec; remove from spec/tasks; add `Refs: <ADR-ID> §<n>` (id per `SAID.adr-prefix:`) (or `Refs: ux/<area>.md §<n>`) pointer. Earn-its-place gate: pattern must have appeared in ≥2 features OR carry independent strong-spec justification — single-feature patterns stay in feature-spec.
 
@@ -128,8 +128,8 @@ For each approved finding, in order: stale → leak → bloat → lessons → ha
    ```
    ## Debrief close (YYYY-MM-DD)
    - Reconciliations: N (one-line summary)
-   - Migrations: M (rule → `<SAID.adr-prefix>` id / ux/yyy.md)
-   - Compactions: K (spec A → B lines)
+   - Migrations: M (rule -> `<SAID.adr-prefix>` id / ux/yyy.md)
+   - Compactions: K (spec A -> B lines)
    - Lessons: in this file § Lessons (or N/A)
    - Pending proposals: in debrief.md § Pending proposals (or N/A)
    - Successor: `docs/working/<next-feature>/idea.md` (or N/A — reason)
@@ -145,7 +145,7 @@ For each approved finding, in order: stale → leak → bloat → lessons → ha
 ## Anti-patterns
 
 - **Don't run on features with open tasks.** BLOCK + redirect to `/said:impl`.
-- **Don't autonomous-backport.** Phase A → operator review → Phase B is mandatory. No exceptions.
+- **Don't autonomous-backport.** Phase A -> operator review -> Phase B is mandatory. No exceptions.
 - **Don't create a new task ID for Debrief close.** It's a footer section, not a task. Multiple debriefs (rare; re-opened features) append additional dated footers.
 - **Don't cite `docs/working/<feature>/` paths in `Refs:` on backport edits.** Working folder is operator workspace per `template-tasks.md` discipline; durable refs point to spec / ADR / UX-spec / source-code.
 - **Don't promote a pattern to ADR from single-feature evidence** unless the pattern carries independent strong-spec justification. Default: ≥2-feature appearance per the earn-its-place-ADR.

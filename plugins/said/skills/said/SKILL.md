@@ -1,7 +1,7 @@
 ---
 name: said
 description: >
-  Single-feature SAID orchestrator. Drives ONE feature through the full SAID phase chain — Scope → Architect → Implement → Deliver — in one session, invoking the real said:* skill at each phase and self-publishing a `goal: done|continue|stop` control line every turn so a plain `/goal implement <id> as said!` runs it to closure with no hand-written condition.
+  Single-feature SAID orchestrator. Drives ONE feature through the full SAID phase chain — Scope -> Architect -> Implement -> Deliver — in one session, invoking the real said:* skill at each phase and self-publishing a `goal: done|continue|stop` control line every turn so a plain `/goal implement <id> as said!` runs it to closure with no hand-written condition.
   Triggered ONLY by the explicit command "/said:said <feature-id>", or by the `said!` operator macro (which calls Skill(said:said)). Do NOT trigger on general implementation, planning, or orchestration requests. For a feature spanning ≥2 SAID lanes use said:flow, not this.
 ---
 
@@ -11,16 +11,16 @@ Drives one feature through its whole SAID cycle in a single session, each phase 
 
 ## Contract — holds every run
 
-- **Never emulate a `said:*` skill.** Scope, architect, implement, gate, debrief through the real commands. Caught writing a spec or task by hand → stop and invoke.
+- **Never emulate a `said:*` skill.** Scope, architect, implement, gate, debrief through the real commands. Caught writing a spec or task by hand -> stop and invoke.
 - **Reconstruct the phase by inspection, every invocation** (Step 1). Never read a stored phase/state file back as truth — re-derive from the feature's artifacts. This is what makes the skill re-entrant across compaction: a compaction is not a stop; re-enter and continue.
 - **Main-context; never spawn to decide.** The governed cycle runs in the main context; verify inline. A depth-1 invocation (e.g. `said!` under `/goal` + an autonomy macro) is **tolerated, not an error**: it verifies inline, and the `said:*` skills it invokes do their own read-only spawning **one level down**. The real per-subagent limits are *no operator* (a subagent can't hold a decision) and no ability to orchestrate a background build — not "no nested spawning"; every owed decision returns as data.
-- **Single-lane only.** ≥2 lanes carry the feature's SAID artifacts → **BLOCK + redirect to `flow!` / `/said:flow`** (Step-1 route guard). A mount is not a lane.
-- **Classify the request first (Step 0).** A bug / tweak / follow-up that fits an existing feature takes the SHORT path (`triage → add-task → impl → deliver`), never a from-scratch Scope→Architect walk. A Closed feature + a new ask is never `goal: done` — and where that change lands (reopen vs new feature) is the **operator's** decision: propose both, never pick silently.
-- **Closure = footer AND gates, published as the `goal:` line every turn.** `said closed: yes` (⇔ `goal: done`) ONLY when the tasks log has a `## Debrief close` footer AND every gate passed (or a recorded, operator-confirmed skip). Emit the Output contract — the `goal:` line especially — on every invocation, including `status` mode and a no-action turn.
+- **Single-lane only.** ≥2 lanes carry the feature's SAID artifacts -> **BLOCK + redirect to `flow!` / `/said:flow`** (Step-1 route guard). A mount is not a lane.
+- **Classify the request first (Step 0).** A bug / tweak / follow-up that fits an existing feature takes the SHORT path (`triage -> add-task -> impl -> deliver`), never a from-scratch Scope->Architect walk. A Closed feature + a new ask is never `goal: done` — and where that change lands (reopen vs new feature) is the **operator's** decision: propose both, never pick silently.
+- **Closure = footer AND gates, published as the `goal:` line every turn.** `said closed: yes` (<=> `goal: done`) ONLY when the tasks log has a `## Debrief close` footer AND every gate passed (or a recorded, operator-confirmed skip). Emit the Output contract — the `goal:` line especially — on every invocation, including `status` mode and a no-action turn.
 - **Contradict a premature "done".** Never write "done"/"closed"/"nothing left" while the block says `no`; if an outer orchestrator declared the work finished and the block says `no`, say so and contradict it.
 - **Loop, not one-shot.** While the `goal:` line reads `continue`, the only correct next action is to re-invoke `/said:said <feature-id>` — never tick a step done or move on.
 - **`stop` is surfaced, not enforced — announce once, then hold.** `/goal`'s evaluator is binary (only *met* ends the loop); it **re-fires after a `goal: stop`** because the feature is not `done`. So an owed operator decision the agent must not fake — a UAT/aesthetic sign-off, an ambiguous reopen-vs-new, any human judgment — is announced **exactly once**: the owed verdict, the options, and how to unblock (reply the verdict, or `/goal clear` to release the loop). On every re-fire after that, **hold** — no new work, no manufactured verdict, no repeated "still waiting". Faking the judgment, or re-emitting until the Stop-hook block-cap force-kills the turn, is the failure this rule prevents (the HITL livelock).
-- **The SAID map is authoritative, not this file.** Phase→skill selection, gate order, and branch points come from the plugin README + each skill's description (Step 2). Project conventions (task-id shape, tasks-file location, QA-artifact names) come from the project's `CLAUDE.md` / stencils — read them at Step 1; never assume shapes.
+- **The SAID map is authoritative, not this file.** Phase->skill selection, gate order, and branch points come from the plugin README + each skill's description (Step 2). Project conventions (task-id shape, tasks-file location, QA-artifact names) come from the project's `CLAUDE.md` / stencils — read them at Step 1; never assume shapes.
 
 ## Invocation
 
@@ -29,7 +29,7 @@ Drives one feature through its whole SAID cycle in a single session, each phase 
 
 Preconditions — any failure BLOCKS with a named redirect:
 
-- **Single-lane only.** Feature carries SAID artifacts (`scope.md`, spec, or task log) in ≥2 lanes — declaration-first per each tree's `CLAUDE.md` `## Lane` block, glob fallback → **BLOCK + redirect to `flow!` / `/said:flow`**. (A mount where code lands is not a lane; one feature may touch several mounts and stay single-lane.)
+- **Single-lane only.** Feature carries SAID artifacts (`scope.md`, spec, or task log) in ≥2 lanes — declaration-first per each tree's `CLAUDE.md` `## Lane` block, glob fallback -> **BLOCK + redirect to `flow!` / `/said:flow`**. (A mount where code lands is not a lane; one feature may touch several mounts and stay single-lane.)
 - **Pick the entry (Step 0).** Classify the directive first — a bare feature-id resumes where it sits; a change/bug/follow-up on an existing feature takes the short path; a novel capability starts at Scope.
 
 ## Output contract
@@ -39,7 +39,7 @@ Every invocation ends with this block. No exceptions — including `status` mode
 ```
 feature: <id>
 phase: <Scope|Architect|Implement|Deliver|Closed> — <n> Todo
-gates: review-qa <pass|fail|—> · review-ux <pass|fail|—> · accept <pass|fail|—> · Eval <passed|pending|n/a>
+gates: review-qa <pass|fail|—>, review-ux <pass|fail|—>, accept <pass|fail|—>, Eval <passed|pending|n/a>
 said closed: yes|no
 goal: done | continue | stop — <reason>   # /goal reads this line: done|stop end the run, continue = re-invoke
 ```
@@ -54,24 +54,24 @@ The `goal:` line is the loop oracle — a plain directive (`/goal implement <id>
 
 ---
 
-## Step 0 — Classify the request → pick the path
+## Step 0 — Classify the request -> pick the path
 
 Before reconstructing anything, decide which entry the directive needs (first match wins). The test that splits SHORT from NEW: **does this work need its own scope + spec, or does it fit as a task on an existing feature?**
 
-| The directive is… | Path | Entry |
+| The directive is... | Path | Entry |
 |---|---|---|
-| a bare feature-id; feature **in-flight** (Todo>0 / phase < Closed) | **RESUME** | Step 1 → drive the chain from its phase |
-| a bare feature-id; feature **Closed**, no new ask | **DONE** | report Closed → `goal: done`; take no action |
-| a change / bug / follow-up that **fits an existing feature's scope** (feature **open**) | **SHORT** | `triage` → `add-task` → Implement (Step 3 front door); Scope + Architect skipped |
+| a bare feature-id; feature **in-flight** (Todo>0 / phase < Closed) | **RESUME** | Step 1 -> drive the chain from its phase |
+| a bare feature-id; feature **Closed**, no new ask | **DONE** | report Closed -> `goal: done`; take no action |
+| a change / bug / follow-up that **fits an existing feature's scope** (feature **open**) | **SHORT** | `triage` -> `add-task` -> Implement (Step 3 front door); Scope + Architect skipped |
 | a change / follow-up that fits an existing feature but the feature is **Closed** | **SHORT (ask)** | **operator decides where it lands** — see the note below; do not auto-pick |
-| a **novel capability** needing its own scope + spec (a new frozen decision) | **NEW** | Scope → the full chain (Step 1 enters at Scope) |
+| a **novel capability** needing its own scope + spec (a new frozen decision) | **NEW** | Scope -> the full chain (Step 1 enters at Scope) |
 | **trivial** — one-liner, obvious named location | **TINY** | `add-task` + `impl` directly (or `impl` a known task) |
 
 **Change to a *Closed* feature — the operator decides where it lands.** Do not pick reopen-vs-new-feature yourself. Propose both, with a recommendation:
 - **(a) Reopen** — `add-task <feat>` appends the task (`Todo>0`); `debrief` re-appends a fresh `## Debrief close`. Keeps locality; append-only-safe.
-- **(b) New small feature** — `scope-grill` → light `architect`; the closed feature stays sealed.
+- **(b) New small feature** — `scope-grill` -> light `architect`; the closed feature stays sealed.
 
-Do as the operator decides. Under `/goal` / an autonomy macro this is a decision the skill can't self-approve → `goal: stop — closed-feature change: (a) reopen add-task <feat> | (b) new feature; rec: <…>`, **unless the directive already names the choice**.
+Do as the operator decides. Under `/goal` / an autonomy macro this is a decision the skill can't self-approve -> `goal: stop — closed-feature change: (a) reopen add-task <feat> | (b) new feature; rec: <...>`, **unless the directive already names the choice**.
 
 Interactive default: state the chosen path (SHORT vs NEW: say why) before proceeding; under `/goal` / an autonomy macro, classify-and-proceed and report the choice.
 
@@ -81,13 +81,13 @@ Derive the phase, every time, from the feature's own artifacts (rooted at the fe
 
 | Fact | Probe |
 |---|---|
-| **Lane count** (route guard) | Declaration-first: count trees whose `CLAUDE.md` declares a `## Lane` carrying this feature's SAID artifacts; glob fallback `*/docs/features/<feature>*.tasks.md` + `*/docs/working/<feature>/`. **≥ 2 → BLOCK, redirect to `flow!`.** |
+| **Lane count** (route guard) | Declaration-first: count trees whose `CLAUDE.md` declares a `## Lane` carrying this feature's SAID artifacts; glob fallback `*/docs/features/<feature>*.tasks.md` + `*/docs/working/<feature>/`. **≥ 2 -> BLOCK, redirect to `flow!`.** |
 | **Feature-id** | the arg, normalized UPPERCASE; the tasks-file stem minus `.tasks` once one exists |
-| **Phase** | no `scope.md` → **Scope** · `scope.md`, no spec → **Architect** · spec + `Status: Todo` > 0 → **Implement** · spec, `Todo == 0`, **no** `## Debrief close` footer → **Deliver** · footer present → **Closed** |
+| **Phase** | no `scope.md` -> **Scope**, `scope.md`, no spec -> **Architect**, spec + `Status: Todo` > 0 -> **Implement**, spec, `Todo == 0`, **no** `## Debrief close` footer -> **Deliver**, footer present -> **Closed** |
 | **Work remaining** | count `Status: Todo` in `docs/features/<id>.tasks.md` (bare or slug-suffixed) |
 | **Gate results** | `review-qa` / `review-ux` / `accept` verdicts recorded in the tasks log / QA checklist for this feature; `—` if that gate hasn't run |
-| **Eval** | `passed` when the feature's Eval result artifact (`*QA-UAT*.md` / `*QA-eval*.md` / `*evaluation*.md`) carries a pass verdict · `n/a` when scope declares no user-visible surface (Developer-Story) · else `pending` |
-| **Closure** | the `## Debrief close` footer in the tasks log — the single Deliver→Closed transition |
+| **Eval** | `passed` when the feature's Eval result artifact (`*QA-UAT*.md` / `*QA-eval*.md` / `*evaluation*.md`) carries a pass verdict, `n/a` when scope declares no user-visible surface (Developer-Story), else `pending` |
+| **Closure** | the `## Debrief close` footer in the tasks log — the single Deliver->Closed transition |
 
 > **`Todo == 0` is ambiguous — never key an action on it alone.** A feature never architected looks identical to one that finished. Always pair the count with the phase: **Scope** and **Architect** have work; **Deliver** does not.
 
@@ -99,10 +99,10 @@ On the first substantive turn, resolve the ordered stage sequence **from the SAI
 
 ```
 SAID cycle for <id> — resolved from the map:
-  [ ] Scope      → /said:scope-refine (handoff) | /said:scope-grill (thin idea)
-  [ ] Architect  → /said:architect  (optional design-seed/inspect: /said:uxtoc)
-  [ ] Implement  → /said:impl (+ /said:review-ux per task on a lane with an agent-form Checker)
-  [ ] Deliver    → /said:review-qa → /said:review-ux → /said:accept → /said:debrief
+  [ ] Scope      -> /said:scope-refine (handoff) | /said:scope-grill (thin idea)
+  [ ] Architect  -> /said:architect  (optional design-seed/inspect: /said:uxtoc)
+  [ ] Implement  -> /said:impl (+ /said:review-ux per task on a lane with an agent-form Checker)
+  [ ] Deliver    -> /said:review-qa -> /said:review-ux -> /said:accept -> /said:debrief
 ```
 
 **Interactive default: confirm the checklist before proceeding.** Under `/goal` / an autonomy macro this relaxes to report-and-proceed (no wait) — but every stage and gate still runs.
@@ -113,27 +113,27 @@ Deterministic: the same reconstructed phase always yields the same entry. **Neve
 
 | Phase | Entry (invoke; never emulate) |
 |---|---|
-| **Scope** | `/said:scope-refine <handoff>` — a discovery handoff/branch state is the input. `/said:scope-grill` only for a genuinely thin idea. → produces `scope.md` (§D resolved). |
-| **Architect** | `/said:architect <scope-path>` → produces the spec + `*.tasks.md`. |
+| **Scope** | `/said:scope-refine <handoff>` — a discovery handoff/branch state is the input. `/said:scope-grill` only for a genuinely thin idea. -> produces `scope.md` (§D resolved). |
+| **Architect** | `/said:architect <scope-path>` -> produces the spec + `*.tasks.md`. |
 | **Implement** | `/said:impl <feature-id>` (whole-feature mode, serial) — **or task-level fan-out** when ≥2 `Todo` tasks are write-disjoint and the directive carries the `fan-out` opt-in word (see **Task-level fan-out** below). Compose `/said:review-ux` at task close; it resolves `SAID.reviewers:` and runs each declared Checker — Playwright walk for the `web-ux` Checker, schema/contract/invocation checks for a `cli`/`api`/`mcp` Checker. A genuine no-surface-contract skip is recorded, never silent. |
-| **Deliver** | `/said:review-qa <id>` → (FAIL → `goal: stop`) → `/said:review-ux <id>` (if present) → (FAIL → `goal: stop`) → `/said:accept <id>` → (FAIL → `goal: stop`) → **Eval** (below) → `/said:debrief <id>` through Phase C. The `## Debrief close` footer is the Deliver→Closed transition. |
-| **Closed** | no in-flight work → `said closed: yes` → `goal: done`. **A new ask on a Closed feature is a Step-0 SHORT/NEW, not `done`.** |
+| **Deliver** | `/said:review-qa <id>` -> (FAIL -> `goal: stop`) -> `/said:review-ux <id>` (if present) -> (FAIL -> `goal: stop`) -> `/said:accept <id>` -> (FAIL -> `goal: stop`) -> **Eval** (below) -> `/said:debrief <id>` through Phase C. The `## Debrief close` footer is the Deliver->Closed transition. |
+| **Closed** | no in-flight work -> `said closed: yes` -> `goal: done`. **A new ask on a Closed feature is a Step-0 SHORT/NEW, not `done`.** |
 
 **Task-level fan-out (opt-in) — arms build, main decides (`ADR-SAID-S09`).** When the feature at Implement has **≥2 `Status: Todo` tasks whose write-sets are disjoint** AND the operator's directive carries the opt-in word **`fan-out`** (e.g. `/goal implement <id> fan-out as said!`), drive the Implement row as a fan-out instead of serial whole-feature:
 1. **Partition in main.** Compute each `Todo` task's **write-set** = its `Refs:` ∪ the code-mount files its Approach names ∪ the spec's implementation pointers — in main, at fan-out time, never declared in the task body. Disjoint tasks fan out; any task that intersects another, or that edits the feature's own log/spec, is the **serial set** (a shared root — `said:flow`'s rule 4 applied to tasks).
 2. **Spawn arms via the Workflow tool.** One `/said:impl <task> arm` **per disjoint task**, concurrent under a barrier — the Workflow tool exists only here in the main context, so this is the only place fan-out can happen. Each arm builds under forced autonomy and returns a close block (owed items included); it never writes the log and never decides.
-3. **Close serially in main.** After the barrier, `/said:impl <task> close` **per task, serially in main** — apply each returned block, run Phase C, write the append-only log. Meanwhile main works the **serial set** (the intersecting + own-log tasks) itself. Compose, never emulate — every stage invokes the real `/said:impl … arm|close` by name.
+3. **Close serially in main.** After the barrier, `/said:impl <task> close` **per task, serially in main** — apply each returned block, run Phase C, write the append-only log. Meanwhile main works the **serial set** (the intersecting + own-log tasks) itself. Compose, never emulate — every stage invokes the real `/said:impl ... arm|close` by name.
 4. **The fan-out spawn turn emits `goal: continue`; the closes land on the completion turn.** The turn does **not** finish its work at the Workflow call — the tool returns a task id and completion arrives as a notification that re-invokes main. On the spawn turn, emit `goal: continue — fan-out: <N> arms building <tasks>` (spawning the workflow **is** this turn's progress, so the Step-5 no-progress HALT does **not** apply — see Step 5); the per-task closes and their own `goal:` line land on the completion turn. Then re-enter Step 1. Decisions — gate verdicts, closes, reopen-vs-new, UAT skips — stay in main.
 
 **Without the opt-in word, or with <2 disjoint tasks, the Implement row is unchanged** (`/said:impl <feature-id>` whole-feature, serial). **Inside a subagent** (depth-1) the Workflow tool is unavailable, so a `fan-out` request is **recorded as a skip** (per the Contract's depth clause) and the feature is driven serially — never a nested-spawn attempt.
 
-**Change front door (Step-0 SHORT / TINY).** `said:triage <what>` (skip if the location is named) → `said:add-task <owning-feat> [bug]`. `add-task` creates the `Todo`, so Step 1 then reconstructs **Implement** and the table above drives it — **Scope + Architect skipped**. If the owning feature is **Closed**, do not take this door on your own: **ask first (Step 0)** — the operator picks reopen (`add-task`, reopens `Todo>0`; `debrief` re-appends a close) vs a new small feature.
+**Change front door (Step-0 SHORT / TINY).** `said:triage <what>` (skip if the location is named) -> `said:add-task <owning-feat> [bug]`. `add-task` creates the `Todo`, so Step 1 then reconstructs **Implement** and the table above drives it — **Scope + Architect skipped**. If the owning feature is **Closed**, do not take this door on your own: **ask first (Step 0)** — the operator picks reopen (`add-task`, reopens `Todo>0`; `debrief` re-appends a close) vs a new small feature.
 
-**Eval at Deliver.** For a feature with an evaluable surface, run the surface-appropriate eval before `debrief` (a UAT/e2e via Playwright MCP where available for a `web` surface; contract/e2e checks for an `api` / `mcp` / `cli` surface; for a `doc` surface the **doc Eval** below) and record a real verdict into the eval artifact — failures as failures, never "not run". `n/a` only for a Developer-Story with no evaluable surface. An operator-confirmed **skip** is allowed only on explicit word, written as `skipped(recorded)`; under an autonomy macro that skip is a **hard blocker** (`goal: stop`) — the one wait autonomy cannot self-approve. Tooling unavailable → do not fabricate a pass; emit `UAT pending` → `goal: stop` naming the exact run owed.
+**Eval at Deliver.** For a feature with an evaluable surface, run the surface-appropriate eval before `debrief` (a UAT/e2e via Playwright MCP where available for a `web` surface; contract/e2e checks for an `api` / `mcp` / `cli` surface; for a `doc` surface the **doc Eval** below) and record a real verdict into the eval artifact — failures as failures, never "not run". `n/a` only for a Developer-Story with no evaluable surface. An operator-confirmed **skip** is allowed only on explicit word, written as `skipped(recorded)`; under an autonomy macro that skip is a **hard blocker** (`goal: stop`) — the one wait autonomy cannot self-approve. Tooling unavailable -> do not fabricate a pass; emit `UAT pending` -> `goal: stop` naming the exact run owed.
 
 **The doc Eval (a `doc` surface).** Spawning nothing (this skill never spawns to decide), after `accept` and at HEAD: (a) re-run the lane's umbrella inline — `SAID.commands: doc-gate`, expanded by the resolution chain's doc terminal — over the WHOLE code-mount and every task log of the feature, teeing to `docs/working/<id>/doc-gate-eval-<id>.log` (its own name; `debrief`'s later re-run does not tee); (b) read `docs/working/<id>/review-doc-editorial-<id>.md` — the feature-scope verdict `/said:review-ux <id>` wrote at this Deliver row — as recorded evidence. FAIL if the umbrella is non-zero, or that verdict reads FAIL, or it is missing although review-ux ran; record both results into `docs/working/<id>/QA-eval-<id>.md` (the Eval artifact the Step-1 probe reads). Like a `cli` lane's contract re-run, this is a Deliver-time re-execution plus a read of the recorded judgment — the cross-artifact read itself is review-ux's.
 
-**Omission is never silent.** A mandatory stage skipped or deferred without an explicit, recorded operator confirmation → **withhold `said closed: yes` and emit `goal: stop — unconfirmed omission: <stage>`**. Never present a mandatory stage as an optional offer ("if you want…"). Under autonomy this is the one wait that cannot be dropped — it forces the confirmation.
+**Omission is never silent.** A mandatory stage skipped or deferred without an explicit, recorded operator confirmation -> **withhold `said closed: yes` and emit `goal: stop — unconfirmed omission: <stage>`**. Never present a mandatory stage as an optional offer ("if you want..."). Under autonomy this is the one wait that cannot be dropped — it forces the confirmation.
 
 ## Step 4 — Gate before end of turn
 
@@ -144,7 +144,7 @@ Both hold (neither skippable under an autonomy macro — autonomy removes waits,
 
 ## Step 5 — Progress check, then re-enter
 
-Snapshot before/after every invocation: `Status: Todo` count, artifact file list, gate verdicts, footer presence. If an invocation changes **none** of them → **HALT** with `goal: stop — no progress: <what was attempted>`; do not re-enter. **Exception — a fan-out spawn turn:** spawning the arms via the Workflow tool is progress (the arms are building; their closes land on the async completion turn, not this one), so that turn emits `goal: continue`, never the no-progress HALT.
+Snapshot before/after every invocation: `Status: Todo` count, artifact file list, gate verdicts, footer presence. If an invocation changes **none** of them -> **HALT** with `goal: stop — no progress: <what was attempted>`; do not re-enter. **Exception — a fan-out spawn turn:** spawning the arms via the Workflow tool is progress (the arms are building; their closes land on the async completion turn, not this one), so that turn emits `goal: continue`, never the no-progress HALT.
 
 Otherwise return to Step 1 and continue. Stop only on: `goal: done` (footer + gates), or `goal: stop` (failing gate / unconfirmed omission / owed operator decision / no-progress). Emit the Output contract whether or not it was asked for — if an outer orchestrator invoked this once and moved on, that block is the only thing telling it the feature is not finished.
 
@@ -156,7 +156,7 @@ Otherwise return to Step 1 and continue. Stop only on: `goal: done` (footer + ga
 - Skip a mandatory stage silently — an unconfirmed omission is `goal: stop`, not a quiet pass.
 - Carry the phase, or any decision, only in conversation across a compaction.
 - Read a stored phase/state file back as truth in place of re-deriving from artifacts.
-- Re-run Scope+Architect for a change that fits an existing feature — that is the short path (`triage → add-task`).
+- Re-run Scope+Architect for a change that fits an existing feature — that is the short path (`triage -> add-task`).
 - Answer a new ask on a Closed feature with `goal: done` — classify it (Step 0), never dismiss it.
 - Silently pick reopen vs new-feature for a change to a Closed feature — propose both and let the operator decide (under autonomy: `goal: stop`, unless the directive named the choice).
 - Re-do work, fake the verdict, or re-emit "still waiting" when `/goal` re-fires after you already declared `goal: stop` on an owed operator decision — announce once, then hold; only the operator's reply or `/goal clear` releases it (the HITL livelock).

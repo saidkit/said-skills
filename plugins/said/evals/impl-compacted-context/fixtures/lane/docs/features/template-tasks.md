@@ -10,7 +10,7 @@
 ## Authoring discipline
 
 - **Working folder vs body** — `docs/working/<feature-id>/` is operator workspace; the task body cites only durable artifacts.
-- **Not here** — forward-looking rules (→ ADR + `Refs:` pointer) · file enumerations (→ `git log --name-only`) · historical narration · paraphrase of a referenced ADR/spec.
+- **Not here** — forward-looking rules (-> ADR + `Refs:` pointer), file enumerations (-> `git log --name-only`), historical narration, paraphrase of a referenced ADR/spec.
 - **Depth varies** — planned tasks fill Problem / Approach / Reading list / Acceptance / Fix; ad-hoc tasks may carry only Problem + Fix + Gotchas.
 - **`Refs:`** — mandatory when the task creates or edits an ADR / feature-spec.
 

@@ -2,6 +2,15 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.11.0] — 2026-09-14
+
+SAID-17 — the SAID-16 follow-ups (completeness executed-capture + built-floor, engine-word purge, plain-ASCII glyph gate).
+
+- **Changed:** `said_completeness.py` now realizes the cli **oracle tier** — where a capture manifest declares a per-unit `cmd:`, it executes that command's own `--help` **read-only** (command-path + `--help` only; every invocation flag stripped; option-line scoping, not prose) and verifies the designed `Flags` against it; a manifest `built:` line cannot bluff an oracle element. The completeness recipe row moves `said-capture: manifest` -> **`process-spawn`**. A non-cli (web) capture runs a front-declared probe as given (the front owns its read-only-ness; hermetic fixture shipped).
+- **Added:** a **built-floor** — an all-dropped (zero-built) manifest FAILs (`BUILT intersect DESIGNED` must be non-empty); a legitimate partial-drop still PASSes. Closes the vacuous-completeness hole.
+- **Changed:** the medium-agnostic engine (`uxtoc` / `architect` / `said_completeness.py`) carries **no incidental medium vocabulary** — `uxtoc` emits purely from the loaded grammar (the emit template lives in the grammar, discharging the SAID-05 §10.2 residual).
+- **Added:** an enforcing **plain-ASCII gate** (`docs/evaluation/plain-ascii/`) over `plugins/said/**` (R-SAID-08 realized; em-dash `U+2014` carved out); the shipped surface is purged of banned watermark glyphs.
+
 ## [0.10.0] — 2026-09-13
 
 Medium-agnostic uxtoc unit contract + no-seal completeness model. The design-outline engine (`uxtoc`, `element-projection.md`, `said_completeness.py`, `architect`) is now medium-agnostic: the engine owns the projection rule; each lane owns its vocabulary in a per-surface `docs/ux/feature-ux-grammar.md` grammar (one SC-HEADER section per surface, selected by `SAID.surface:`).

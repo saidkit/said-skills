@@ -48,7 +48,7 @@ timestamp: <ISO-8601>
 | **PASS** (all gates exit 0) | the sentinel `recomputed` — no log kept | verdict header + the exit-code table below |
 | **FAIL** (any gate non-zero) | a written+cited `cli-gate-capture-<task>.log` **under `SAID.working:`** | the table; the log holds the failing gate's output |
 
-- **Lane-path rule:** a FAIL capture lands under the feature's own working dir, cited lane-relative — **never a temp path** (`/tmp/…`, a scratchpad).
+- **Lane-path rule:** a FAIL capture lands under the feature's own working dir, cited lane-relative — **never a temp path** (`/tmp/...`, a scratchpad).
 - The `recomputed` sentinel is accepted **only** for a `said-capture: process-spawn` + deterministic (`oracle`/`metric`) + `said-recompute:` Checker on `verdict: PASS`.
 
 Exit-code table (the green-gate evidence — one row per command the lane's `SAID.commands:` names):

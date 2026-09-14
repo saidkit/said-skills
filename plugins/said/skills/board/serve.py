@@ -70,7 +70,7 @@ MARK = ('<svg class="mark" viewBox="0 0 16 16" width="%d" height="%d" fill="none
 FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">'
            '<path d="M8 2 L14 8 L8 8 Z" fill="#435AF6"/><path d="M2 8 L8 14 L8 8 Z" fill="#435AF6"/></svg>')
 
-# Phase colour comes from the brand ramp in board.css (neutral → cobalt → green),
+# Phase colour comes from the brand ramp in board.css (neutral -> cobalt -> green),
 # never from daisyUI's semantic palette — the brand allows one accent, no new hues.
 
 
@@ -91,12 +91,12 @@ BOARD_DIR = "docs/.board"            # ONE machine-local root: config + cache. G
 CONFIG_JSON = "config.json"          # {"app": "http://localhost:<port>", "todo": "docs/todo.md"}
 CACHE_INDEX = ("cache", "index.json")  # badge counts, written by whatever syncs with the app
 TODO_DEFAULT = "docs/todo.md"        # the local backlog file (--todo-file overrides)
-CACHE_MAX_AGE_DAYS = 30              # older than this: the cache is stale → render nothing
+CACHE_MAX_AGE_DAYS = 30              # older than this: the cache is stale -> render nothing
 MAX_BODY = 8192                      # a local write is one line of text, never a payload
 MAX_TODO_LEN = 200
 LOOPBACK = ("localhost", "127.0.0.1", "::1")
-CSRF_META = "said-board-csrf"        # the token is minted into the page…
-CSRF_HEADER = "X-Said-Board-Csrf"    # …and required back on every write
+CSRF_META = "said-board-csrf"        # the token is minted into the page...
+CSRF_HEADER = "X-Said-Board-Csrf"    # ...and required back on every write
 WIDGET_HEADER = "X-Said-Board"       # a custom header no cross-site form post can set
 
 
@@ -141,7 +141,7 @@ _cidx = {"key": None, "data": {}}
 
 def _cache_fresh(stamp):
     if not stamp:
-        return True                     # no claim of freshness → the file is taken at face value
+        return True                     # no claim of freshness -> the file is taken at face value
     try:
         t = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
     except (TypeError, ValueError):
@@ -213,7 +213,7 @@ def chip(fid, tid=None):
         return ""
     lbl = "%d comment%s" % (n, "" if n == 1 else "s")
     if unread:
-        lbl += " · %d unread" % unread
+        lbl += ", %d unread" % unread
     return '<span class="cchip%s" title="%s">\U0001F4AC %d</span>' % (
         " unread" if unread else "", esc(lbl), n)
 
@@ -329,7 +329,7 @@ def _flag_html(f):
     bits = []
     if f["sub"]:
         idle = "" if (f["stale"] or f["idle_days"] is None) else \
-            (" · active" if f["idle_days"] == 0 else " · %dd" % f["idle_days"])
+            (", active" if f["idle_days"] == 0 else ", %dd" % f["idle_days"])
         lbl = f["sub"] + idle
         bits.append('<span class="muted">%s</span>' % esc(lbl))
     if f["stale"]:
@@ -405,7 +405,7 @@ def render_roster(data, stale_only=False, lane=None):
         if multi and stale_only and not rows:
             continue
         if multi and lane is None:  # the select names the lane; no lanehead when one is chosen
-            out.append('<div class="lanehead">%s <span class="muted">· %s</span></div>' % (esc(lr["name"]), esc(lr["root"])))
+            out.append('<div class="lanehead">%s <span class="muted">, %s</span></div>' % (esc(lr["name"]), esc(lr["root"])))
         for f in rows:
             out.append(render_row(f))
             shown = True
@@ -435,7 +435,7 @@ def render_tasks(tasks, fid=None):
         for name in order:
             txt = secs[name]
             if len(txt) > 700:
-                txt = txt[:700].rstrip() + " …"
+                txt = txt[:700].rstrip() + " ..."
             body.append('<div class="sec"><span class="sec-h">%s</span><div class="sec-b">%s</div></div>'
                         % (esc(name), _md_inline(esc(txt))))
         detail = "".join(body) or '<div class="sec-b muted">No recorded detail.</div>'
@@ -458,7 +458,7 @@ def render_tasks(tasks, fid=None):
         return ('<button class="btn btn-xs join-item%s" data-mode="%s" onclick="setTaskFilter(this)">%s</button>'
                 % (active, mode, label))
     head = ('<div class="d-tasks-h"><div class="th-left">'
-            '<h4>Tasks · <span class="tcount">%d</span></h4>'
+            '<h4>Tasks, <span class="tcount">%d</span></h4>'
             '<div class="join tfilter">%s%s</div></div>'
             '<button class="btn btn-xs" onclick="toggleAll(this)">expand all</button></div>'
             % (todo_n if default == "todo" else total, fbtn("todo", "Todo"), fbtn("all", "All")))
@@ -476,12 +476,12 @@ def render_feature(data, fid):
     steps = "".join('<li class="step %s">%s</li>' % ("step-primary" if i <= ci else "", esc(p))
                     for i, p in enumerate(PHASE_SEQ))
     g = f["gates"]
-    gate_line = " · ".join([
+    gate_line = ", ".join([
         "Evals: ",
         "review-qa %s" % ("✓" if g["qa"] else "○"), "review-ux %s" % ("✓" if g["ux"] else "○"),
         "accept %s" % ("✓" if g["accept"] else "○"), "debrief %s" % ("✓" if f["debrief_closed"] else "○"),
     ])
-    dates = " · ".join(x for x in [
+    dates = ", ".join(x for x in [
         "started %s" % esc(f["started"]) if f["started"] else "",
         "last %s" % esc(f["last_activity"]) if f["last_activity"] else "",
         "age %dd" % f["age_days"] if f["age_days"] is not None else "",
@@ -492,9 +492,9 @@ def render_feature(data, fid):
         nxt = ('<div class="d-next"><span class="lbl">Next</span><code class="nextcmd">%s</code>'
                '<button class="btn btn-xs copybtn" onclick="copyNext(this)">copy</button></div>') % esc(f["next"])
     prog = ('<div class="d-prog"><progress class="progress progress-success" value="%d" max="100"></progress>'
-            '<span class="nm">%d / %d · %d%%</span></div>' % (_pct(f), f["done"], f["denominator"], _pct(f))) if f["denominator"] else ""
+            '<span class="nm">%d / %d, %d%%</span></div>' % (_pct(f), f["done"], f["denominator"], _pct(f))) if f["denominator"] else ""
     fp = f.get("paths_rel") or f["paths"]  # display relative to the project root
-    files = " · ".join(esc(p) for p in (fp["spec"], fp["tasks"], fp["scope"]) if p)
+    files = ", ".join(esc(p) for p in (fp["spec"], fp["tasks"], fp["scope"]) if p)
     lane_tag = '<span class="badge badge-outline badge-sm">%s</span>' % esc(f["lane"]) if data["lane_count"] > 1 else ""
     # the feature name sits below the id in the detail header — full text, wraps freely here
     nm = f.get("display_name")
@@ -519,7 +519,7 @@ TODO_DATE = re.compile(r"\s*\((\d{4}-\d{2}-\d{2})\)\s*$")
 
 
 def parse_todo(text):
-    """Markdown checklist → rows. Headings become section labels; anything else is skipped."""
+    """Markdown checklist -> rows. Headings become section labels; anything else is skipped."""
     out = []
     for raw in text.splitlines():
         line = raw.rstrip()
@@ -565,7 +565,7 @@ def render_backlog():
     open_n = sum(1 for r in items if r["status"] != "Done")
     done_n = len(items) - open_n
     out = [stamp, '<div class="bl-note"><span class="lbl">local</span>'
-                  '<span class="nm">%d open · %d done</span><code>%s</code></div>' % (open_n, done_n, rel)]
+                  '<span class="nm">%d open, %d done</span><code>%s</code></div>' % (open_n, done_n, rel)]
     for r in rows:
         if "head" in r:
             out.append('<div class="lanehead">%s</div>' % esc(r["head"]))
@@ -593,7 +593,7 @@ def read_asset(filename):
 
 
 def page():
-    # The header needs only cheap config (project · lane names · today) — NOT the full analyze() — so the
+    # The header needs only cheap config (project, lane names, today) — NOT the full analyze() — so the
     # shell returns instantly and the fragments stream the feature data in (with the loading logo ticking),
     # instead of the browser sitting blank while a git-per-feature derive runs server-side on a big repo.
     lanes, project = CFG["lanes"], CFG["project"]
@@ -625,18 +625,18 @@ def page():
             '<div id="backlogwrap"><section class="backlog">'
             '<form class="bl-add" onsubmit="return addTodo(this)">'
             '<input class="input input-sm bl-input" name="text" maxlength="%d" autocomplete="off" '
-            'placeholder="add a local backlog item…" aria-label="New backlog item">'
+            'placeholder="add a local backlog item..." aria-label="New backlog item">'
             '<button class="btn btn-xs" type="submit">add</button>'
             '<span class="bl-msg" role="status"></span></form>'
             '<section id="backlog-list" hx-get="/fragment/backlog" hx-trigger="load, refresh" '
-            'hx-indicator="#refreshBtn"><div class="empty-state">loading…</div></section>'
+            'hx-indicator="#refreshBtn"><div class="empty-state">loading...</div></section>'
             '%s'
             '<form class="bl-conn" onsubmit="return saveConnect(this)"><span class="lbl">app</span>'
             '<input class="input input-xs bl-input" name="app" value="%s" aria-label="Local app URL">'
             '<button class="btn btn-xs" type="submit">save</button>'
             '<span class="bl-msg" role="status"></span></form>'
             "</section></div>" % (MAX_TODO_LEN, mount("backlog"), esc(app)))
-    # 3-zone header: LEFT (logo·SAID·project·lane·Update·updated-time) | CENTER (List|Kanban) | RIGHT (rest)
+    # 3-zone header: LEFT (logo,SAID,project,lane,Update,updated-time) | CENTER (List|Kanban) | RIGHT (rest)
     head = (
         '<div class="hz-left">'
         '<div class="brand"><a class="lockup" href="%s" target="_blank" rel="noopener noreferrer" '
@@ -644,7 +644,7 @@ def page():
         '<span class="proj">%s</span></div>'
         '<span class="lane-wrap">%s%s</span>'
         '<button id="refreshBtn" class="btn btn-xs update-pill" onclick="refreshNow()" title="Update from git">Update</button>'
-        '<span id="updated" class="stamp">loading…</span>'
+        '<span id="updated" class="stamp">loading...</span>'
         "</div>"
         '<div class="hz-center"><div class="join vtoggle">'
         '<button class="btn btn-xs join-item btn-active" data-view="list" onclick="setView(this)">List</button>'
@@ -661,22 +661,22 @@ def page():
             "lane: (document.getElementById(\"laneSelect\")||{}).value||\"\"}'")
     return (
         '<!doctype html><html data-theme="light"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1"><title>SAID board · %s</title>'
+        '<meta name="viewport" content="width=device-width,initial-scale=1"><title>SAID board, %s</title>'
         '<link rel="icon" href="/favicon.svg" type="image/svg+xml">'
         '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link rel="stylesheet" href="%s">'
         '<script src="%s" defer onerror="var b=document.getElementById(\'cdnwarn\');if(b)b.style.display=\'block\'"></script>'
         '<link rel="stylesheet" href="%s" onerror="var b=document.getElementById(\'cdnwarn\');if(b)b.style.display=\'block\'">'
         '<link rel="stylesheet" href="/board.css">%s</head><body data-view="list" class="sb-loading"%s>'
-        # a full page load is an explicit refresh → the initial fragment loads derive fresh (async, while
+        # a full page load is an explicit refresh -> the initial fragment loads derive fresh (async, while
         # the logo ticks); board.js clears __fresh after they settle so later navigation reuses the cache.
         '<script>window.__fresh=true</script>'
         '<div id="cdnwarn">A CDN asset (htmx/daisyUI) failed to load — data is live, but styling/refresh may be limited.</div>'
         "<header>%s</header><main id=\"main\" aria-keyshortcuts=\"ArrowUp ArrowDown ArrowLeft ArrowRight Enter Escape\">"
         '<div id="listwrap" class="cols">'
         '<section class="roster" id="roster" hx-get="/fragment/roster" hx-trigger="load, refresh" hx-indicator="#refreshBtn" %s>'
-        '<div class="empty-state">loading…</div></section>'
-        '<section class="detail" id="detail" tabindex="-1"><div class="empty-state">Select a feature — or press <kbd class="k">↑</kbd> <kbd class="k">↓</kbd> — to see its position in the SAID cycle.</div></section>'
+        '<div class="empty-state">loading...</div></section>'
+        '<section class="detail" id="detail" tabindex="-1"><div class="empty-state">Select a feature — or press <kbd class="k">Up</kbd> <kbd class="k">Down</kbd> — to see its position in the SAID cycle.</div></section>'
         "</div>"
         '<div id="kanbanwrap"><section id="kanban" class="kanban" hx-get="/fragment/kanban" hx-trigger="load, refresh" hx-indicator="#refreshBtn" %s></section></div>'
         "%s</main>"
@@ -686,8 +686,8 @@ def page():
         '<div id="backdrop" onclick="closeDrawer()"></div>'
         '<div id="help" role="dialog" aria-modal="false" aria-label="keyboard shortcuts">'
         '<h5>Keyboard</h5>'
-        '<div class="krow"><span>Move</span><span class="keys"><kbd class="k">↑</kbd><kbd class="k">↓</kbd><kbd class="k">←</kbd><kbd class="k">→</kbd></span></div>'
-        '<div class="krow"><span>Open detail</span><span class="keys"><kbd class="k">↵</kbd></span></div>'
+        '<div class="krow"><span>Move</span><span class="keys"><kbd class="k">Up</kbd><kbd class="k">Down</kbd><kbd class="k">Left</kbd><kbd class="k">Right</kbd></span></div>'
+        '<div class="krow"><span>Open detail</span><span class="keys"><kbd class="k">Enter</kbd></span></div>'
         '<div class="krow"><span>Back / close</span><span class="keys"><kbd class="k">esc</kbd></span></div>'
         '<div class="krow"><span>First / last</span><span class="keys"><kbd class="k">Home</kbd><kbd class="k">End</kbd></span></div>'
         '<div class="krow"><span>Vim keys</span><span class="keys"><kbd class="k">h</kbd><kbd class="k">j</kbd><kbd class="k">k</kbd><kbd class="k">l</kbd></span></div>'
@@ -695,11 +695,11 @@ def page():
         "</div>"
         '<footer><span class="tagline">as said, so done</span>'
         "<span>%s</span>"
-        '<span class="khint"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>↵</kbd> open · <kbd>esc</kbd> back · <kbd>?</kbd> keys</span>'
+        '<span class="khint"><kbd>Up</kbd><kbd>Down</kbd> move, <kbd>Enter</kbd> open, <kbd>esc</kbd> back, <kbd>?</kbd> keys</span>'
         '<a href="/api/status.json" target="_blank">/api/status.json</a></footer>'
         '<script src="/board.js" defer></script></body></html>'
     ) % (esc(project), FONTS, HTMX, DAISY, embed, body_extra, head, vals, vals, bl_view,
-         ("local files · %s" % esc(app)) if connected() else "read-only · 127.0.0.1")
+         ("local files, %s" % esc(app)) if connected() else "read-only, 127.0.0.1")
 
 
 # --- HTTP handler ------------------------------------------------------------
@@ -916,7 +916,7 @@ def stop_server(port):
             sys.stderr.write("said:board: could not kill pid %d (%s)\n" % (pid, exc))
     _clear_pidfile()
     if killed:
-        sys.stderr.write("said:board stopped · pid %s · port %d\n" % (", ".join(map(str, killed)), port))
+        sys.stderr.write("said:board stopped, pid %s, port %d\n" % (", ".join(map(str, killed)), port))
         return 0
     sys.stderr.write("said:board: no running server found (port %d)\n" % port)
     return 1
@@ -992,10 +992,10 @@ def main():
     # not sent from the other — which presents as broken sign-in, not as a config error.
     url = "http://%s:%d/" % ("localhost" if connected() else "127.0.0.1", port)
     _write_pidfile(port, url)
-    sys.stderr.write("said:board · %s · pid %d\n%s · loopback · htmx + daisyUI via CDN\n"
-                     "stop: `python3 serve.py stop`  (or Ctrl-C) · state: %s\n"
+    sys.stderr.write("said:board, %s, pid %d\n%s, loopback, htmx + daisyUI via CDN\n"
+                     "stop: `python3 serve.py stop`  (or Ctrl-C), state: %s\n"
                      % (url, os.getpid(),
-                        ("connected · %s · local writes: /connect /todo (%s)" % (CFG["app"], CFG["todo_rel"]))
+                        ("connected, %s, local writes: /connect /todo (%s)" % (CFG["app"], CFG["todo_rel"]))
                         if connected() else "read-only", PIDFILE))
     if not a.no_open:
         try:
@@ -1005,7 +1005,7 @@ def main():
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        sys.stderr.write("\nstopping…\n")
+        sys.stderr.write("\nstopping...\n")
     finally:
         _clear_pidfile()
         httpd.shutdown()

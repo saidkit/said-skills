@@ -3,7 +3,7 @@ name: architect
 description: >
   SAID/Phase 2 (Architect) — turns a refined `scope.md` (Phase 1 output)
   into a feature spec + append-only tasks log via three-pass authoring
-  (gather → author → plan). The spec is a recreation contract: a fresh
+  (gather -> author -> plan). The spec is a recreation contract: a fresh
   implementer reading the spec alone must be able to rebuild the feature
   within its scope. Triggered ONLY by the explicit command
   "/said:architect [<scope-path>] [output-name=<custom>]".
@@ -15,7 +15,7 @@ description: >
 
 This skill turns Phase 1's refined `scope.md` into the two artifacts Phase 3 (Implement) consumes: a feature spec at `docs/features/<feature>.md` and an append-only tasks log at `docs/features/<feature>.tasks.md`. Phase 1 is the input boundary (read `said:scope-grill` / `said:scope-refine` outputs); Phase 3 is the output boundary (`/said:impl` consumes what this skill writes).
 
-The skill itself is the orchestrator — there is NO separate agent. You — the main agent — drive three sequential passes (**gather** → **author** → **plan**) within ONE invocation.
+The skill itself is the orchestrator — there is NO separate agent. You — the main agent — drive three sequential passes (**gather** -> **author** -> **plan**) within ONE invocation.
 
 ## Core principle — the spec is a recreation contract
 
@@ -35,7 +35,7 @@ The user invokes:
 
 If the operator's request is to **add a new task** to an already-architected feature ("add a task for X", "amend the tasks log") — redirect to `/said:add-task` (the canonical entry point for backlog additions).
 
-If the operator's request is to **propagate new info** into an existing feature — BE handoff result, scope refinement, mid-implementation discovery, "process X and update spec + tasks", etc. — do NOT bounce. This is direct-edit work, not re-architecture. Proceed: read the source doc, list the deltas, apply surgical edits to spec + tasks per `docs/features/template-tasks.md` amendment carve-out (uncommitted task → amend in place + `### Deviations` note; committed task → append a new task ID). **After applying the spec edit, re-run the recreation-contract self-test** (Pass 2 § Recreation-contract self-test) against the updated spec — this branch owns the relocated spec-write + self-test (formerly `add-task` Step 4.5, moved here per the charter boundary). Report the diff. The 3-pass authoring flow below runs ONLY for INITIAL spec + tasks creation from a `scope.md`.
+If the operator's request is to **propagate new info** into an existing feature — BE handoff result, scope refinement, mid-implementation discovery, "process X and update spec + tasks", etc. — do NOT bounce. This is direct-edit work, not re-architecture. Proceed: read the source doc, list the deltas, apply surgical edits to spec + tasks per `docs/features/template-tasks.md` amendment carve-out (uncommitted task -> amend in place + `### Deviations` note; committed task -> append a new task ID). **After applying the spec edit, re-run the recreation-contract self-test** (Pass 2 § Recreation-contract self-test) against the updated spec — this branch owns the relocated spec-write + self-test (formerly `add-task` Step 4.5, moved here per the charter boundary). Report the diff. The 3-pass authoring flow below runs ONLY for INITIAL spec + tasks creation from a `scope.md`.
 
 If `scope.md` doesn't exist or §D is non-empty — BLOCK. Phase 1 is incomplete. Redirect: "scope.md §D non-empty (Phase 1 incomplete). Resolve §D items via `/said:scope-refine` regenerate or hand-edit, then re-run `/said:architect`."
 
@@ -44,14 +44,14 @@ If `scope.md` doesn't exist or §D is non-empty — BLOCK. Phase 1 is incomplete
 Resolve inputs and ground in calibration sources before the operator interaction starts:
 
 1. **Resolve scope-path.**
-   - Path given as arg → verify with `ls <path>`. If missing, BLOCK and ask operator.
-   - No path given → list `<SAID.working>/*/scope.md` (from `SAID.working:` on the `## Lane` block; no key → HALT); if exactly one, use it; if multiple or zero, ASK the operator which feature.
+   - Path given as arg -> verify with `ls <path>`. If missing, BLOCK and ask operator.
+   - No path given -> list `<SAID.working>/*/scope.md` (from `SAID.working:` on the `## Lane` block; no key -> HALT); if exactly one, use it; if multiple or zero, ASK the operator which feature.
 2. **Verify §D empty.** Read scope.md, locate `## §D`, confirm it's empty (or every item explicitly marked "defer to Phase 2 (Architect)" with reasoning). Otherwise BLOCK.
 3. **Resolve surface.** Read `SAID.surface:` from the `## Lane` block (the medium; required — an omitted key HALTs, never a last-resort default).
-4. **Derive feature name.** Take the leaf segment of the working dir (`docs/working/<feature>/scope.md` → `<feature>`). Confirm with operator only if ambiguous.
+4. **Derive feature name.** Take the leaf segment of the working dir (`docs/working/<feature>/scope.md` -> `<feature>`). Confirm with operator only if ambiguous.
 5. **Resolve output paths.**
-   - Output spec/tasks paths from `SAID.feature-spec:` + `SAID.task-log:` on the `## Lane` block; no key → HALT.
-   - For sub-phased features, operator may pass `output-name=<custom>` → `docs/features/<custom>.{md,tasks.md}`.
+   - Output spec/tasks paths from `SAID.feature-spec:` + `SAID.task-log:` on the `## Lane` block; no key -> HALT.
+   - For sub-phased features, operator may pass `output-name=<custom>` -> `docs/features/<custom>.{md,tasks.md}`.
    - If either exists already, BLOCK and ask: "Spec exists at `<path>`. Overwrite, suffix `-2`, or abort?"
 6. **Load calibration contracts** (parallel reads):
    - `docs/features/template.md` ★ — **the structural contract**. Its `^## ` headers are the spec section list, in order. Pass 2 iterates this list; the skill does NOT carry a parallel section recipe.
@@ -88,8 +88,8 @@ Procedure:
    - Related features: [docs/features/<FEAT-ID>.md, ...]
    - Target code dir: [src/features/<dir>/, ...]
 
-   Screens / surfaces touched: [from §B + §Visual contract]
-   - <ScreenName>: <what changes / what it shows>
+   Surfaces / units touched: [from §B + §Visual contract]
+   - <unit / surface name>: <what changes / what it shows>
 
    Endpoints consumed / produced: [from §A wire captures + §Cross-cutting]
    - <METHOD> <path> — <purpose>
@@ -107,7 +107,7 @@ Procedure:
    AC form: <Gherkin | bullets | mixed-per-piece>
    ```
 
-3. **Pause for operator review.** Brief: "Intent ledger extracted. Pieces: `<n>`. Artifacts: `<n>`. Screens: `<n>`. Endpoints: `<n>`. Governing rules: `<n>`. Ready to author? Reply OK or flag missing/wrong entries."
+3. **Pause for operator review.** Brief: "Intent ledger extracted. Pieces: `<n>`. Artifacts: `<n>`. Surfaces: `<n>`. Endpoints: `<n>`. Governing rules: `<n>`. Ready to author? Reply OK or flag missing/wrong entries."
 
 ## Pass 2 — Author
 
@@ -124,11 +124,11 @@ Procedure:
 
 #### Spec metadata — `**Surface:**` (author before `## Context to load`)
 
-Author the `**Surface:**` field immediately under the `# <FEAT>-<NN>: …` title (per `docs/features/template.md`). Default it to the lane `SAID.surface:` resolved at Step 0 #3 — the feature **inherits the lane** medium; write `**Surface:** none` only when the scope declares the feature screenless / no user-visible surface (a Developer-Story data / infra feature). This field drives the uxtoc basis→contract lifecycle's **feature-level bearing gate** (the feature-level variant of the lane's `feature-ux-rules.md` bearing contract): a surface-bearing feature's built surface is completeness-checked at `accept` against the persisted outline, while `none` opts out (the check SKIPs).
+Author the `**Surface:**` field immediately under the `# <FEAT>-<NN>: ...` title (per `docs/features/template.md`). Default it to the lane `SAID.surface:` resolved at Step 0 #3 — the feature **inherits the lane** medium; write `**Surface:** none` only when the scope declares the feature screenless / no user-visible surface (a Developer-Story data / infra feature). This field drives the uxtoc basis->contract lifecycle's **feature-level bearing gate** (the feature-level variant of the lane's `feature-ux-rules.md` bearing contract): a surface-bearing feature's built surface is completeness-checked at `accept` against the persisted outline, while `none` opts out (the check SKIPs).
 
 #### `## Context to load alongside this spec`
 
-Take `Artifacts cited` from the intent ledger. Dedupe. Order: ADRs → UX specs → upstream specs → related features → target code dir → tasks-file pointer (`docs/features/<feature>.tasks.md`).
+Take `Artifacts cited` from the intent ledger. Dedupe. Order: ADRs -> UX specs -> upstream specs -> related features -> target code dir -> tasks-file pointer (`docs/features/<feature>.tasks.md`).
 
 Output one bullet per artifact: `<path> — <≤8-word reason this artifact governs the feature>`. The single highest-leverage artifact (the one the implementer must read first) carries `★` after its path.
 
@@ -169,7 +169,7 @@ Natural size: 4–8 bullets, one line each.
 
 ##### `### UI/UX Requirements` (visual surfaces only — skip for non-visual)
 
-For each entry in `Screens / surfaces touched`, ONE bullet: `**<ScreenName>** — <what it shows> per <ux-spec>#<rule>`. Anchor only — never paraphrase the cited rule.
+For each entry in `Surfaces / units touched`, ONE bullet: `**<surface / unit name>** — <what it shows> per <ux-spec>#<rule>`. Anchor only — never paraphrase the cited rule.
 
 Natural size: 3–6 bullets.
 
@@ -196,7 +196,7 @@ For each entry in `Pieces of scope`, ≤ 3 acceptance statements. Each is observ
 - Integrator-visible API behavior (caller sends X, gets Y)
 - Measurable system property (response time, render count, bundle delta)
 
-**Conditional outline input — the `uxtoc` basis→contract lifecycle (surface-bearing features).** If the feature's `**Surface:**` is a medium (not `none`) AND `docs/working/<feature>/toc.md` exists, read that `uxtoc` outline — the single source of truth (`## <unit> <ID> — …` sections with keyed elements under container headers) — **as author-input**: you *consume* it exactly as you consume `scope.md`, and you never *cite* its `docs/working/` path (so the no-`docs/working/`-citation rule holds) — then add **one acceptance line per unit** (its `## <unit>` sections): the unit's designed elements are present or accounted-for, citing the durable UX spec the unit already cites, never the `toc.md` path. When architect folds a durable unit, it stamps `last-revised: <feature-id>` into that unit's front-matter (tool-written provenance, non-gating). Skip-if-absent (the `SC-STUB` discipline): a `Surface: none` feature, or a surface-bearing feature with no `toc.md`, adds no such line. These lines count toward the ≤ 15-line budget — one per unit.
+**Conditional outline input — the `uxtoc` basis->contract lifecycle (surface-bearing features).** If the feature's `**Surface:**` is a medium (not `none`) AND `docs/working/<feature>/toc.md` exists, read that `uxtoc` outline — the single source of truth (`## <unit> <ID> — ...` sections with keyed elements under container headers) — **as author-input**: you *consume* it exactly as you consume `scope.md`, and you never *cite* its `docs/working/` path (so the no-`docs/working/`-citation rule holds) — then add **one acceptance line per unit** (its `## <unit>` sections): the unit's designed elements are present or accounted-for, citing the durable UX spec the unit already cites, never the `toc.md` path. When architect folds a durable unit, it stamps `last-revised: <feature-id>` into that unit's front-matter (tool-written provenance, non-gating). Skip-if-absent (the `SC-STUB` discipline): a `Surface: none` feature, or a surface-bearing feature with no `toc.md`, adds no such line. These lines count toward the ≤ 15-line budget — one per unit.
 
 Form per intent ledger AC form:
 - **Gherkin scenarios** (`Given / When / Then`) when the feature parameterizes end-user behavior across multiple inputs. Cap: ≤ 3 scenarios per piece, ≤ 3 pieces gherkined.
@@ -233,8 +233,8 @@ Natural size: 4–6 bullets.
 
 After all sections are drafted, read the draft as a cold implementer. Answer **yes** or **no** for each of the 5 questions below. Each question anchors to a verifiable property of the spec text — not a vibe.
 
-1. **Screens / surfaces.** Can I list every screen / surface this feature creates or changes by name?
-   *Verifiable:* every entry in `Screens / surfaces touched` (ledger) has a `**<ScreenName>**` mention in UI/UX Requirements (web) or Functional Requirements (server).
+1. **Surfaces / units.** Can I list every surface / unit this feature creates or changes by name?
+   *Verifiable:* every entry in `Surfaces / units touched` (ledger) has a `**<surface / unit name>**` mention in UI/UX Requirements (web) or Functional Requirements (server).
 2. **Endpoints.** Can I list every endpoint consumed or produced?
    *Verifiable:* every entry in `Endpoints consumed / produced` (ledger) appears as `<METHOD> <path>` in API Integration.
 3. **Governing rules.** Can I list every ADR / UX-spec rule that governs the shape?
@@ -269,18 +269,18 @@ Procedure:
    - **Heuristic:** if `Pieces of scope` cleanly split by lane (e.g., "Schema migration", "API endpoints", "Web screens"), multi-lane. If they cross lanes per entry ("Entity X — full stack rewrite"), surface the ambiguity to the operator before deciding.
 3. **Generate file header.** Use a CONDENSED preamble: the four "CRITICAL: append-only" bullets (Never overwrite / When updating status / When adding tasks / Keep all detail) + a one-line pointer to `docs/features/template-tasks.md` for full authoring discipline + close-of-task review + a one-line pointer to the companion spec. Do NOT verbatim-copy the full template-tasks.md preamble — it's ~70 lines and would bloat every tasks file.
 4. **Generate summary table.** One row per task: ID / Title / Status. All Status = `Todo` initially. **IDs follow `SAID.id-shape:`** (`<PREFIX><NN>-<NN>` single-lane, `<PREFIX><NN>-<LANE>-<NN>` multi-lane — feature segment collapses the dash; task counter 2-digit zero-padded). Numbering: **per-lane monotonic counter** — each `(feature, lane)` pair starts at `01` independently (two lanes' initial tasks both numbered `01`, not `01 + 02`).
-5. **For a surface-governed task, run Step 0.SC, then classify + resolve from the LOADED registry — never inline** (a structural / non-surface task skips it). Classify each task's screen shape; resolve its rule bundle + stencils by filtering the loaded registry (cite rule ids). Ambiguous `applies-to` → ask the operator.
+5. **For a surface-governed task, run Step 0.SC, then classify + resolve from the LOADED registry — never inline** (a structural / non-surface task skips it). Classify each task's screen shape; resolve its rule bundle + stencils by filtering the loaded registry (cite rule ids). Ambiguous `applies-to` -> ask the operator.
 
 ## Step 0.SC — Load the surface contract (SC-STUB v3)
 
 Run this ONLY when about to reason over a surface-shape rule — the shape vocabulary is the loaded registry's own `applies-to` values, never a list recalled without it. A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
-1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
-2. Registry absent → bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).
-3. Present → LOAD it WHOLE; echo its `SC-HEADER` `token · N rules`. Missing/malformed sentinel → HALT. Never grep a single row.
+1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key -> HALT.
+2. Registry absent -> bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).
+3. Present -> LOAD it WHOLE; echo its `SC-HEADER` `token, N rules`. Missing/malformed sentinel -> HALT. Never grep a single row.
 4. Reason over the LOADED registry only; cite rule ids. Never restate or re-derive a mapping from memory.
 
-6. **Rule-bundle routing comes from the loaded registry** — the registry carries the shape→bundle mapping; there is no inline map. Resolve each task's bundle from it.
+6. **Rule-bundle routing comes from the loaded registry** — the registry carries the shape->bundle mapping; there is no inline map. Resolve each task's bundle from it.
 
 7. **Read the routed rule bundles in full; extract applicable frozen rules.** For each bundle the loaded registry routes the task's shape to, read it in full and pull every anchored frozen-rule entry (rule id / verbatim one-line summary / source anchor). This list IS the per-task acceptance gate step 8 folds into Acceptance.
 
@@ -329,7 +329,7 @@ Suggested next step for the operator: "Phase 3 (Implement) starts here. Run `/sa
 These are positive boundaries of the skill's contract — not negative rules subsumed by the section procedures + recreation-contract test.
 
 - **Phase 2 stops at writing spec + tasks.** The operator triggers Phase 3 via `/said:impl`. Never auto-invoke implementation, never spawn coding agents, never begin code edits.
-- **Phase 2 is for INITIAL authoring only.** Adding a task to an existing feature → `/said:add-task` (direct append per `template-tasks.md`).
+- **Phase 2 is for INITIAL authoring only.** Adding a task to an existing feature -> `/said:add-task` (direct append per `template-tasks.md`).
 - **Spec and tasks are two files, never one.** Earned design decision (S01-1). Spec is the pre-implementation contract; tasks.md is the post-implementation history.
 - **§D-empty preflight is non-negotiable.** Phase 1 incomplete = Phase 2 starts on bad input. BLOCK and redirect.
 - **The recreation-contract test is the authoring gate.** Section procedures produce the right shape by construction; the test verifies. If a section grows large, re-run the procedure for that section — don't add caps or "no X" rules.

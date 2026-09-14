@@ -9,21 +9,21 @@ description: >
 
 Run the surface's agent-form Checker on a just-completed feature task, **before** the task is closed in the FEATURE.tasks.md log file. On a `web` lane that is the `said:review-ux-agent`: it reads `docs/ux/feature-ux-checklist.md`, filters rules by screen shape, runs each `verify:` action, and returns a structured report.
 
-**Reviewer resolution.** This gate reads `SAID.reviewers:` (from the `## Lane` block; see the engine README — a list read WHOLE) and **runs each declared Checker whose `said-governs` matches the feature's `Surface`** (a `said-governs`-less Checker governs any; the oracle applies the same filter) — a uniform applicability filter, **not** a per-medium engine branch. Each Checker owns its own capture + judge: the shipped `web-ux` Checker spawns the Playwright-driven `said:review-ux-agent` for screen-shape + comparative parity (Steps 1–2 below are its arm; Steps 3–4 are shared by every arm); a `cli-gate` / schema Checker runs its own `verify:` actions instead — invocation + output assertions for a CLI, schema conformance / contract-tests / curl for an API, handshake + schema probes for an MCP tool — with no browser walk, and the agent's screen-shape + Playwright steps below do not apply. The load-bearing rule: the gate resolves the declared reviewers, not a hardcoded browser assumption — so an `api` lane is gated by its schema Checker and never reported "env-blocked" for a dev server it never needed. A surface-bearing lane with omitted / empty `reviewers:` → FAIL (*declare `reviewers:`, or set `surface: none`*).
+**Reviewer resolution.** This gate reads `SAID.reviewers:` (from the `## Lane` block; see the engine README — a list read WHOLE) and **runs each declared Checker whose `said-governs` matches the feature's `Surface`** (a `said-governs`-less Checker governs any; the oracle applies the same filter) — a uniform applicability filter, **not** a per-medium engine branch. Each Checker owns its own capture + judge: the shipped `web-ux` Checker spawns the Playwright-driven `said:review-ux-agent` for screen-shape + comparative parity (Steps 1–2 below are its arm; Steps 3–4 are shared by every arm); a `cli-gate` / schema Checker runs its own `verify:` actions instead — invocation + output assertions for a CLI, schema conformance / contract-tests / curl for an API, handshake + schema probes for an MCP tool — with no browser walk, and the agent's screen-shape + Playwright steps below do not apply. The load-bearing rule: the gate resolves the declared reviewers, not a hardcoded browser assumption — so an `api` lane is gated by its schema Checker and never reported "env-blocked" for a dev server it never needed. A surface-bearing lane with omitted / empty `reviewers:` -> FAIL (*declare `reviewers:`, or set `surface: none`*).
 
 ## When this fires
 
 The user invokes one of:
 
 - `/said:review-ux <task-id>` — run QA on the named task.
-- `/said:review-ux` — run QA on the most recently touched task; resolve from the latest entry in `SAID.task-log:` (`## Lane` block; no key → HALT).
-- `/said:review-ux <feature-id>` — the **feature-scope** read, on a lane whose Checker supports it (today: the doc arm). Argument precedence is `accept`'s: an id matching the lane's `SAID.id-shape:` task form is a task id; else an id that resolves an existing `<feature-id>.tasks.md` is a feature id; anything else → BLOCK.
+- `/said:review-ux` — run QA on the most recently touched task; resolve from the latest entry in `SAID.task-log:` (`## Lane` block; no key -> HALT).
+- `/said:review-ux <feature-id>` — the **feature-scope** read, on a lane whose Checker supports it (today: the doc arm). Argument precedence is `accept`'s: an id matching the lane's `SAID.id-shape:` task form is a task id; else an id that resolves an existing `<feature-id>.tasks.md` is a feature id; anything else -> BLOCK.
 
-**Which arm.** Read `SAID.reviewers:` WHOLE. `web-ux` → the web arm (Steps 1, 1.5, 2). `doc-editorial` → the **doc arm** below (Steps 1, 1.5 and 2 do not apply: no entity, no screen shape, no feature-url, no JWT, no dev-server gates, no UX-checklist sha). Steps 3–4 apply to both.
+**Which arm.** Read `SAID.reviewers:` WHOLE. `web-ux` -> the web arm (Steps 1, 1.5, 2). `doc-editorial` -> the **doc arm** below (Steps 1, 1.5 and 2 do not apply: no entity, no screen shape, no feature-url, no JWT, no dev-server gates, no UX-checklist sha). Steps 3–4 apply to both.
 
 ## The doc arm — `doc-editorial`
 
-1. **Inputs.** The task id (or feature id); the task's shipped artifacts under `SAID.code-mount:` (or, at feature scope, ALL the feature's shipped artifacts together); the lane's `<docs-root>/qa/feature-qa-checklist.md` **loaded whole** — echo its `SC-HEADER` `token · N checks` (missing/malformed → HALT); its editorial context (the preamble) and its semantic rows are the reviewer's contract.
+1. **Inputs.** The task id (or feature id); the task's shipped artifacts under `SAID.code-mount:` (or, at feature scope, ALL the feature's shipped artifacts together); the lane's `<docs-root>/qa/feature-qa-checklist.md` **loaded whole** — echo its `SC-HEADER` `token, N checks` (missing/malformed -> HALT); its editorial context (the preamble) and its semantic rows are the reviewer's contract.
 2. **Spawn** the plugin's `said:doc-editorial-reviewer` with those inputs — never `review-ux-agent`. Per task it hunts the artifacts for what the mechanical gate cannot see (attack order in the agent); at feature scope it reads every artifact against every other — cross-artifact contradiction, source currency across tasks.
 3. **The verdict artifact.** The reviewer writes `docs/working/<feature-id>/review-doc-editorial-<task-id>.md` (per task) or `review-doc-editorial-<feature-id>.md` (feature scope) with the five-key header its agent file names. Confirm the file exists before the shared Step 3 (Present the report); a missing file is a FAIL of this gate, never a silent pass.
 4. **Spawn depth unavailable** (this skill running inside a depth-1 subagent, e.g. `said!` under `/goal`): do NOT fail on "cannot spawn". Perform the editorial read **inline** in this turn against the same inputs and attack order, write the same verdict artifact, and add a `method: inline — agent path unavailable (recorded skip)` line under its header. Reviewer ≠ builder degrades and is recorded — the precedent every arm follows.
@@ -38,10 +38,10 @@ Before spawning the agent, collect — by reading sources, NOT by asking the use
 3. **screen-shape** — the task's shape, drawn from the loaded checklist's shape vocabulary (the `applies-to` values at the top of the surface's `feature-ux-checklist.md`; do not enumerate shapes inline). Infer from the task's spec entry or ask user if unknown or vague. If the task has multiple shapes, run QA once per shape.
 4. **feature-url** — from the task's spec or, if missing, infer from the entity name (`/<entity>s`, `/app/<entity>`, etc.). Confirm by `curl -sI <url>` returning 200 from the running dev server. If the dev server is down, ask the user to start it before proceeding.
 5. **reference-url** — the named reference screen for visual parity. These are the <PROJECT> reference fixtures mounted under `/app/reference/*` in a repo:
-   - list-table → `/app/reference/tasks`
-   - form (create) → `/app/reference/projects/new`
-   - detail-with-tabs → `/app/reference/projects/<id>`
-   - dashboard / cards → `/app/reference/dashboard`
+   - list-table -> `/app/reference/tasks`
+   - form (create) -> `/app/reference/projects/new`
+   - detail-with-tabs -> `/app/reference/projects/<id>`
+   - dashboard / cards -> `/app/reference/dashboard`
   If the task spec names a different reference, use that instead.
 
 If any input cannot be resolved without guessing, ask the user **one focused question per missing input** (not five at once). Wait for the answer before spawning the agent.
@@ -88,13 +88,13 @@ Run all four sub-steps in parallel (one assistant message, four Bash tool calls)
    git -C $(git rev-parse --show-toplevel) log -1 --format=%h docs/ux/feature-ux-checklist.md > /tmp/qa-checklist-sha.txt
    ```
 
-4. **Build skip list from task evidence to `/tmp/qa-skip.txt`.** Read the task's entry in `docs/features/{FEATURE}.tasks.md` for the `### Fix` block. If the entry explicitly cites quality-gate exit codes ("tests N → M pass", "typecheck clean", "knip no new regressions"), append `R-GATE-TYPECHECK` / `R-GATE-TESTS` / `R-GATE-LINT` / `R-GATE-KNIP` to the skip list as appropriate. The agent will record these as PASS with evidence "pre-cleared by skill from task entry" without re-checking. This list is conservative — only skip rules whose evidence is unambiguous in the task entry.
+4. **Build skip list from task evidence to `/tmp/qa-skip.txt`.** Read the task's entry in `docs/features/{FEATURE}.tasks.md` for the `### Fix` block. If the entry explicitly cites quality-gate exit codes ("tests N -> M pass", "typecheck clean", "knip no new regressions"), append `R-GATE-TYPECHECK` / `R-GATE-TESTS` / `R-GATE-LINT` / `R-GATE-KNIP` to the skip list as appropriate. The agent will record these as PASS with evidence "pre-cleared by skill from task entry" without re-checking. This list is conservative — only skip rules whose evidence is unambiguous in the task entry.
 
    ```bash
    FIX_BLOCK=$(awk "/^## ${TASK_ID}:/,/^## /" docs/features/{FEATURE}.tasks.md | awk "/^### Fix/,/^### /")
    {
      echo "$FIX_BLOCK" | grep -qiE "typecheck.*(clean|green|pass)|tsc.*clean" && echo R-GATE-TYPECHECK
-     echo "$FIX_BLOCK" | grep -qiE "tests? [0-9]+ ?(→|->) [0-9]+|test:src.*pass" && echo R-GATE-TESTS
+     echo "$FIX_BLOCK" | grep -qiE "tests? [0-9]+ ?(->|->) [0-9]+|test:src.*pass" && echo R-GATE-TESTS
      echo "$FIX_BLOCK" | grep -qiE "lint.*(clean|green|pass)|biome.*clean" && echo R-GATE-LINT
      echo "$FIX_BLOCK" | grep -qiE "knip.*(no new|green|pass|clean)" && echo R-GATE-KNIP
    } > /tmp/qa-skip.txt
@@ -141,9 +141,9 @@ Output the agent's structured report verbatim, followed by:
 - a one-paragraph operator summary distilling the verdict (READY-TO-CLOSE / BLOCKED-ON-FIXES / NEEDS-OPERATOR-DECISION),
 - a numbered FAIL list with file:line pointers (so the operator can click straight to each finding),
 - the recommended next step:
-  - all PASS → "Task is ready to close. Update status in `docs/features/{FEATURE}.tasks.md` and add a `### Fix` line."
-  - any FAIL on a hard rule → "Fix the FAIL list, then re-run /said:review-ux <task-id>."
-  - SOFT-FLAGs only → "Soft flags do not block close. Decide whether to address now or defer."
+  - all PASS -> "Task is ready to close. Update status in `docs/features/{FEATURE}.tasks.md` and add a `### Fix` line."
+  - any FAIL on a hard rule -> "Fix the FAIL list, then re-run /said:review-ux <task-id>."
+  - SOFT-FLAGs only -> "Soft flags do not block close. Decide whether to address now or defer."
 
 ## Step 4: Do NOT auto-fix
 

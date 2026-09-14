@@ -34,7 +34,7 @@ IDDIR_RE = re.compile(r"^([A-Z]+)-(\d+)$")
 PHASE_RANK = {"Implement": 0, "Deliver": 1, "Architect": 2, "Scope": 3, "Closed": 4}
 STALE_DEFAULT = {"Implement": 7, "Deliver": 7, "Architect": 14, "Scope": 14}
 
-GLYPH = {"done": "█", "empty": "░", "none": "·",
+GLYPH = {"done": "█", "empty": "░", "none": ",",
          "ok": "✓", "pending": "○", "warn": "⚠", "block": "⛔"}
 
 
@@ -123,7 +123,7 @@ def parse_tasks(paths):
             s = STATUS_RE.match(ln)
             if s:
                 status = s.group(1).capitalize()
-                if status in ("Cancelled", "Superseded"):  # obsolete/replaced → counts as canceled
+                if status in ("Cancelled", "Superseded"):  # obsolete/replaced -> counts as canceled
                     status = "Canceled"
                 counts[status] = counts.get(status, 0) + 1
                 d = DATE_RE.search(ln)
@@ -265,7 +265,7 @@ def worktree_date(root, files, git_available):
     """
     if not files:
         return None
-    # Pathspecs must be absolute: with a relative --root, `git -C <root> … -- <root>/x`
+    # Pathspecs must be absolute: with a relative --root, `git -C <root> ... -- <root>/x`
     # resolves inside the repo again, matches nothing, and would read as a clean tree.
     if git_available and not sh(["git", "-C", root, "status", "--porcelain", "--"]
                                 + [os.path.abspath(p) for p in files]):
@@ -472,13 +472,13 @@ def flags(f):
     if f["phase"] == "Closed":
         extra = gate_str(f)
         if f["counts"]["Canceled"]:
-            extra += "  · %d canceled" % f["counts"]["Canceled"]
+            extra += " , %d canceled" % f["counts"]["Canceled"]
         return extra
     bits = []
     if f["sub"]:
         label = f["sub"]
         if not f["stale"] and f["idle_days"] is not None:
-            label += " · %s" % ("active" if f["idle_days"] == 0 else "%dd" % f["idle_days"])
+            label += ", %s" % ("active" if f["idle_days"] == 0 else "%dd" % f["idle_days"])
         bits.append(label)
     if f["stale"]:
         bits.append("%s %dd idle" % (GLYPH["warn"], f["idle_days"]))
@@ -499,7 +499,7 @@ def _lane_tail(next_from, legacy_prefixes, prefix, max_next):
     tail = []
     nexts = [f["next"] for f in next_from if f["next"]][:max_next]
     if nexts:
-        tail.append(prefix + "Next: " + " · ".join(nexts))
+        tail.append(prefix + "Next: " + ", ".join(nexts))
     if legacy_prefixes:
         tail.append(prefix + "legacy: %s — not issued here (docs/working history)" % ", ".join(legacy_prefixes))
     return tail
@@ -517,7 +517,7 @@ def render_roster(data, stale_only=False):
     idw = max([len(f["id"]) for f in allf] + [4])
     phw = max([len(f["phase"]) for f in allf] + [5])
     n = data["lane_count"]
-    lines = ["SAID status · %s · %d lane%s · %s" % (
+    lines = ["SAID status, %s, %d lane%s, %s" % (
         data["project"], n, "" if n == 1 else "s", data["today"]), ""]
     if n == 1:
         lr = data["lanes"][0]
@@ -561,9 +561,9 @@ def _feature_block(f, lane_label=None):
     pipe = []
     for i, p in enumerate(seq):
         pipe.append("%s %s" % (p, GLYPH["ok"] if i < ci else ("●" if i == ci else GLYPH["pending"])))
-    out = (["lane: %s" % lane_label] if lane_label else []) + ["%s — %s" % (f["id"], cur), "", "  " + " → ".join(pipe)]
+    out = (["lane: %s" % lane_label] if lane_label else []) + ["%s — %s" % (f["id"], cur), "", "  " + " -> ".join(pipe)]
     g = f["gates"]
-    gline = " · ".join([
+    gline = ", ".join([
         "review-qa " + (GLYPH["ok"] if g["qa"] else GLYPH["pending"]),
         "review-ux " + (GLYPH["ok"] if g["ux"] else GLYPH["pending"]),
         "accept " + (GLYPH["ok"] if g["accept"] else GLYPH["pending"]),
@@ -571,12 +571,12 @@ def _feature_block(f, lane_label=None):
     ])
     out += ["  gates: " + gline, ""]
     c = f["counts"]
-    out.append("Tasks   Done %d · Todo %d · Canceled %d      %s  %s" % (
+    out.append("Tasks   Done %d, Todo %d, Canceled %d      %s  %s" % (
         c["Done"], c["Todo"], c["Canceled"], bar(f["done"], f["denominator"]),
         ("%d%%" % round(100 * f["done"] / f["denominator"])) if f["denominator"] else "—"))
     for it in f["todo_items"]:
-        out.append("  %s · %s" % (it["id"], it["title"] or ""))
-    dl = "Dates   started %s · last activity %s · age %s · %s" % (
+        out.append("  %s, %s" % (it["id"], it["title"] or ""))
+    dl = "Dates   started %s, last activity %s, age %s, %s" % (
         f["started"] or "—", f["last_activity"] or "—",
         ("%dd" % f["age_days"]) if f["age_days"] is not None else "—",
         idle_phrase(f["idle_days"]) or "idle —")
@@ -588,7 +588,7 @@ def _feature_block(f, lane_label=None):
     if f["next"]:
         out.append("Next    %s" % f["next"])
     p = f.get("paths_rel") or f["paths"]
-    out.append("Files   " + " · ".join([x for x in (p["spec"], p["tasks"], p["scope"]) if x]))
+    out.append("Files   " + ", ".join([x for x in (p["spec"], p["tasks"], p["scope"]) if x]))
     return "\n".join(out)
 
 
@@ -651,7 +651,9 @@ def index_checkers(*paths):
             for key in ("said-checker", "said-governs", "said-capture", "said-judge", "said-recompute"):
                 m = re.search(r"^[ \t>*-]*%s:\s*(.+?)\s*$" % re.escape(key), block, re.M)
                 if m:
-                    meta[key] = m.group(1).strip()
+                    # strip an inline ` # comment` (recipe-form rows document the field after the value);
+                    # a `#` glued to a token (no leading space) is kept, so a value never loses content.
+                    meta[key] = re.sub(r"\s+#.*$", "", m.group(1)).strip()
             cid = meta.get("said-checker")
             if cid:
                 if cid in idx:  # duplicate said-checker id: deterministic first-wins (files sorted), surfaced not silent
@@ -690,7 +692,7 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
     if head_sha and tgt != head_sha:  # absent tgt fails too — never skip the staleness check
         return False, "stale/missing target-sha (%s != HEAD %s)" % (tgt[:8] if tgt else "absent", head_sha[:8])
     judge = (meta or {}).get("said-judge")
-    if judge in ("oracle", "metric"):  # deterministic → must recompute, never trust the file
+    if judge in ("oracle", "metric"):  # deterministic -> must recompute, never trust the file
         cmd = (meta or {}).get("said-recompute")
         if not cmd:
             return False, "%s Checker declares no said-recompute (unverifiable)" % judge
@@ -832,8 +834,8 @@ def main():
     ap.add_argument("--workdir", help="reviewer-gate: feature working dir holding verdict artifacts")
     ap.add_argument("--surface", help="reviewer-gate: the lane's SAID.surface medium")
     ap.add_argument("--reviewers", help="reviewer-gate: comma-sep declared reviewer ids")
-    ap.add_argument("--checkers-dir", default=None,  # None → resolve via lane SAID.checkers-dir → the plugin's own agents/ (no lane-root/agents fallback)
-                    help="reviewer-gate: dir of agent-form Checker files (default: lane SAID.checkers-dir: → the plugin's own plugins/said/agents)")
+    ap.add_argument("--checkers-dir", default=None,  # None -> resolve via lane SAID.checkers-dir -> the plugin's own agents/ (no lane-root/agents fallback)
+                    help="reviewer-gate: dir of agent-form Checker files (default: lane SAID.checkers-dir: -> the plugin's own plugins/said/agents)")
     ap.add_argument("--recipe-rules", help="reviewer-gate: a docs/ux rules file to also scan for recipe-form Checkers")
     a = ap.parse_args()
 

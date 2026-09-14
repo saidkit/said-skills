@@ -10,14 +10,14 @@ Read from the spine (`SKILL.md` Contract rule 1) at the moment it names; every r
 
 Run this ONLY when about to reason over a surface-shape rule — the shape vocabulary is the loaded registry's own `applies-to` values, never a list recalled without it. A structural, data-layer, or non-surface task skips it entirely. Then, only if this lane ships a rule registry:
 
-1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key → HALT.
-2. Registry absent → bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).
-3. Present → LOAD it WHOLE; echo its `SC-HEADER` `token · N rules`. Missing/malformed sentinel → HALT. Never grep a single row.
+1. Registry path = key-grep `SAID.docs-root:` (scalar) on the `## Lane` block + `/ux/feature-ux-rules.md`. No `SAID.docs-root:` key -> HALT.
+2. Registry absent -> bearing-gated: a **surface-bearing** lane (`SAID.surface: <medium>`) FAILs with a named redirect (ship the surface contract) — it cannot proceed with a hollow gate; a `SAID.surface: none` lane SKIPs (proceed without one, never HALT, never invent a rule).
+3. Present -> LOAD it WHOLE; echo its `SC-HEADER` `token, N rules`. Missing/malformed sentinel -> HALT. Never grep a single row.
 4. Reason over the LOADED registry only; cite rule ids. Never restate or re-derive a mapping from memory.
 
 Procedure:
 
-1. **For a surface-governed task, order rules by blast radius per the loaded registry** (Step 0.SC) — cheapest first (a non-surface task skips it). The bundle + ordering come from the loaded registry (cross-cutting rules first → entity-shape deepest → wire-contract reshape → visual-parity last), not hardcoded `docs/ux/*.md` filenames.
+1. **For a surface-governed task, order rules by blast radius per the loaded registry** (Step 0.SC) — cheapest first (a non-surface task skips it). The bundle + ordering come from the loaded registry (cross-cutting rules first -> entity-shape deepest -> wire-contract reshape -> visual-parity last), not hardcoded `docs/ux/*.md` filenames.
    - Wire-contract reshape — response-schema rewrite per Phase A captured bytes.
    - Parity gaps — DEFERRED to the Phase C check `per profile.parity`; don't pre-tune.
 
@@ -39,12 +39,12 @@ Phase B continues until all Acceptance `[ ]` bullets except the parity bullet ar
 - **Don't subsume `/said:review-ux`.** The UX gate is deliberately separate; this skill INVOKES it at Phase C, doesn't replace it. The split exists because "implementation agent declares done, QA agent rubber-stamps" is the regression-shipping pattern the separation guards against.
 - **Don't batch rules in Phase B.** "I'll satisfy three rules at once in one commit" = discipline collapse. One rule, one confirmation, one chat message. The agent's tendency to bulk-edit is the failure mode this discipline exists to prevent.
 - **Reference comments, where the profile tags at all: `// <task-id>` only.** NOT `// <task-id>: <anything>` — the suffix is what produced the prose problem.
-- **Don't auto-progress phase boundaries.** Operator pauses at Phase A → Phase B and Phase B → Phase C are mandatory in the interactive forms. If the operator reply is silent or ambiguous, ASK rather than proceed. (The `arm` fan-out form has no operator to pause for — it runs A→B under forced autonomy and returns owed items; **Fan-out forms**.)
+- **Don't auto-progress phase boundaries.** Operator pauses at Phase A -> Phase B and Phase B -> Phase C are mandatory in the interactive forms. If the operator reply is silent or ambiguous, ASK rather than proceed. (The `arm` fan-out form has no operator to pause for — it runs A->B under forced autonomy and returns owed items; **Fan-out forms**.)
 - **Don't run on `Status: Done` tasks.** BLOCK; for follow-ups on COMMITTED Done tasks (`git log --all --grep <task-id>` non-empty), redirect to `/said:add-task`. Pre-commit Done tasks MAY be amended in place per template-tasks.md pre-commit carve-out — operator gate via mid-flight rule below.
 - **Don't silently fold mid-flight scope additions.** When operator's message during any phase introduces a requirement not in the task's Approach, STOP and classify before proceeding:
-   - **Within scope** (Approach implicitly covers it) → proceed.
-   - **Scope-creep, task uncommitted** (`git log --all --grep <task-id>` empty) → propose in-place amendment to Approach + Acceptance + `### Deviations` note documenting the late fold-in; re-run `/said:add-task` Step 3 spec coverage gate for the new requirement; operator confirms before write.
-   - **Scope-creep, task committed** → redirect operator to `/said:add-task <feature-id>` for the new requirement. Current task stays as shipped.
+   - **Within scope** (Approach implicitly covers it) -> proceed.
+   - **Scope-creep, task uncommitted** (`git log --all --grep <task-id>` empty) -> propose in-place amendment to Approach + Acceptance + `### Deviations` note documenting the late fold-in; re-run `/said:add-task` Step 3 spec coverage gate for the new requirement; operator confirms before write.
+   - **Scope-creep, task committed** -> redirect operator to `/said:add-task <feature-id>` for the new requirement. Current task stays as shipped.
   Never silently fold; never silently split. The classification IS the discipline.
 - **Don't invent new `###` headers when closing tasks.** The section list in template-tasks.md is exhaustive. Any new header is a regression to the multi-pass drift the conformance-fold settlement retired.
 - **Don't extend or wrap a generic multi-pass feature-development skill.** Those produce the multi-pass churn this driver escapes. `/said:impl` supersedes them for SAID-architected features (any feature with `docs/features/<feature>.tasks.md`); a generic feature skill stays available for non-SAID one-off feature work.

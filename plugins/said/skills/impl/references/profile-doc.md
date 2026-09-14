@@ -1,9 +1,9 @@
 # impl profile: doc
-PROFILE-HEADER · doc · 6 slots
+PROFILE-HEADER, doc, 6 slots
 
 ## gate
 `SAID.commands:` carries a plugin verb: `doc-gate` expands, run from the lane root as ONE Bash line, to `set -o pipefail; python3 ${CLAUDE_SKILL_DIR}/../review-qa/doc-gate.py --repo-root . --tasks '<SAID.task-log glob for this feature>' --artifacts <SAID.code-mount> --banned <SAID.docs-root>/qa/banned-lexicon.txt <the lane's arguments after the verb> 2>&1 | tee <SAID.working>/doc-gate-<id>.log` (`<id>` = this task's id) — the engine is the sibling `review-qa` skill's bundled script.
-Exit 0 = clean (WARNs allowed) · exit 1 = at least one FAIL · **exit 2 is a HALT, never a verdict**.
+Exit 0 = clean (WARNs allowed), exit 1 = at least one FAIL, **exit 2 is a HALT, never a verdict**.
 `<typecheck>`, `<tests>`, `<lint>` and `<quality-gates-umbrella>` ALL bind to this one umbrella — it is fast and idempotent, so per-rule and close-time runs are the same command.
 No `Makefile` / `package.json` / operator-prompt step applies here.
 

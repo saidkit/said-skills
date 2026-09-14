@@ -18,6 +18,6 @@
 - **Before each implementation step, re-read `## Earned rules` and name the ids you apply.**
 
 ## Earned rules (full context in linked ADR)
-- **R-PROJ-01** — Every parser accepts a `strict` flag; unknown keys raise when strict → docs/adr/ADR-PROJ-S01.md
-- **R-PROJ-02** — Tests live next to their source file → docs/adr/ADR-PROJ-S02.md
-- **R-PROJ-03** — No network calls in unit tests; use the recorded fixture → docs/adr/ADR-PROJ-S03.md
+- **R-PROJ-01** — Every parser accepts a `strict` flag; unknown keys raise when strict -> docs/adr/ADR-PROJ-S01.md
+- **R-PROJ-02** — Tests live next to their source file -> docs/adr/ADR-PROJ-S02.md
+- **R-PROJ-03** — No network calls in unit tests; use the recorded fixture -> docs/adr/ADR-PROJ-S03.md

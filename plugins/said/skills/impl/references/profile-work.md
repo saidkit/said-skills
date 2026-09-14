@@ -1,5 +1,5 @@
 # impl profile: work
-PROFILE-HEADER · work · 6 slots
+PROFILE-HEADER, work, 6 slots
 
 ## gate
 None. This family binds no runner: `<typecheck>`, `<tests>`, `<lint>` and `<quality-gates-umbrella>` stay unbound.

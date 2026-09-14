@@ -7,7 +7,7 @@ description: >
   counts, grep results, file presence/absence), (c) `Refs:` ADR/UX mechanical
   conformance against `docs/qa/feature-qa-checklist.md`. Project-agnostic in command
   invocation — resolves commands at runtime, primary from the `## Lane`
-  `SAID.commands:` key (in `CLAUDE.md`), then `Makefile` → `package.json` →
+  `SAID.commands:` key (in `CLAUDE.md`), then `Makefile` -> `package.json` ->
   operator-prompt as fallback (same chain as `/said:impl` Step 0 #8).
   Read-only by contract; never edits code, specs, or tasks.
   Sibling skill `/said:accept` covers behavioral contract (AC items) —
@@ -33,9 +33,9 @@ This skill verifies implementation hygiene at task or feature close: quality gat
 
 BLOCK + redirect if:
 
-- Targeted task is `Status: Todo` / `Status: In progress` → redirect to `/said:impl`.
-- Operator intent is AC verification → wrong skill, redirect to `/said:accept`.
-- Operator intent is spec authoring → redirect to `/said:architect`.
+- Targeted task is `Status: Todo` / `Status: In progress` -> redirect to `/said:impl`.
+- Operator intent is AC verification -> wrong skill, redirect to `/said:accept`.
+- Operator intent is spec authoring -> redirect to `/said:architect`.
 
 ## Common compositions
 
@@ -45,19 +45,19 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 /said:impl <task-id|feature-id>      # task / batch closes
 /said:review-qa <task-id|feature-id> # implementation hygiene cleared ┐
 /said:accept <task-id|feature-id>    # behavioral contract verified   ┘ siblings, parallel
-                                        # ↓ both green
+                                        # both green
 /said:debrief <feature-id>           # Phase 4 entry allowed (preflight reads review-qa report)
 ```
 
 ## Step 0 — Preflight
 
 1. **Resolve mode + inputs:**
-   - **Paths:** resolve `SAID.task-log:` + `SAID.feature-spec:` + `SAID.working:` from the `## Lane` block; no block/key → HALT (operator declares it), never glob-guess.
-   - Single arg matching project's task-id regex → task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
-   - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) → feature-mode (bare or suffixed per-lane feature-id, e.g. `PROJ-01-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `PROJ-01-FE-07` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
+   - **Paths:** resolve `SAID.task-log:` + `SAID.feature-spec:` + `SAID.working:` from the `## Lane` block; no block/key -> HALT (operator declares it), never glob-guess.
+   - Single arg matching project's task-id regex -> task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
+   - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) -> feature-mode (bare or suffixed per-lane feature-id, e.g. `PROJ-01-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `PROJ-01-FE-07` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
 2. **Status check:**
    - Task-mode: the named task must be `Status: Done (YYYY-MM-DD)`. Otherwise BLOCK + redirect to `/said:impl`.
-   - Feature-mode: any task with `Status: Todo` / `Status: In progress` → BLOCK with list; operator confirms in-scope-vs-out-of-scope or closes first. (Backlog passes — intentional non-gating per SAID convention; matches `/said:debrief` preflight.)
+   - Feature-mode: any task with `Status: Todo` / `Status: In progress` -> BLOCK with list; operator confirms in-scope-vs-out-of-scope or closes first. (Backlog passes — intentional non-gating per SAID convention; matches `/said:debrief` preflight.)
 3. **Resolve project quality-gate commands.** Same chain as `/said:impl` Step 0 #8 (first-match wins):
    - **Primary** — the `## Lane` `SAID.commands:` key (in `CLAUDE.md`): the umbrella target (`pre-commit`, `qa`, `check`, `all`).
    - **Secondary** — if `Makefile` present: prefer `make pre-commit`; fall back to `make qa` / `check` / `all`.
@@ -78,18 +78,18 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 Procedure:
 
 1. **Parse `### Fix` blocks** for mechanical claims (regex on canonical shapes):
-   - **Fix-presence (assert first, mechanical):** before parsing claims, assert the `### Fix` body is present and non-placeholder — the block between `### Fix` and the next `###` has a non-blank, non-`<!-- … -->` line. An empty or scaffold-only body (`<!-- Filled at close … -->`) is a **FAIL** (impl's close rule makes the fill a mandatory close-mutation), never a silent zero-claim pass. (This is `R-QA-07`.)
-   - **Test count delta** — match `Tests (\d+) → (\d+)` or `(\d+) pass` or `(\d+) tests` patterns. Extract claimed end-count.
-   - **Quality-gate clean** — match `tsc + lint clean`, `tests pass`, `knip clean`, etc. Each → re-run the resolved per-gate command at Phase B.
-   - **Grep result** — match `` `grep -rn <pattern> <path>` returns (\d+) results `` or `... shows (\d+) matches` shapes. Extract pattern + path + expected count. On parse failure → mark for operator-prompt fallback (Q2=c).
-   - **File deletion** — match `` `<path>` deleted `` or `N files deleted` claims. Each → `! [ -e <path> ]` check.
-   - **File presence** — match `` `<path>` written `` claims. Each → `[ -e <path> ]` check.
-   - **Rules applied** — run for **every Done task in scope, line or no line** (the checker handles absence; this is the second look at what `impl` verified at its own close). Shape `Rules applied: <R-ids | none> (block: N)`. Two re-checks at Phase B, computed by the bundled `<skill-dir>/earned-rules.py` (`check --claude-md <lane-root>/CLAUDE.md --task-file <tasks log> --task-id <id> --adr-date 2026-09-08`) over the lane's `## Earned rules` section (the anchored heading to the next `## ` heading or EOF; `N` = its `^- ` lines, indented sub-bullets excluded; an id = the first whole `R-*` token on a line): (1) every cited id exists on a rule line; (2) `N` against the section's count — an absent id or `N` above the count → **FAIL**; `N` below the count → **WARN** (the block grew since the close; ids still verified); `none` with the right `N` → PASS. Accepted grammar: ids comma- or space-separated, bare or backticked; a leading bullet/backtick; `(block:N)` with or without the space. **Absent line:** FAIL when the task's `Status: Done (YYYY-MM-DD)` date is on or after 2026-09-08 (the contract's date), **WARN** (operator-verify) before it — so feature-mode sweeps over legacy tasks do not false-fail. A lane whose `CLAUDE.md` has no `## Earned rules` heading → **WARN naming the roll, never FAIL** (only the rollout can change that state; the HALT on an un-rolled lane is `impl`'s at close). The heading is the lane's adoption marker; the calendar date is the fallback for a rolled lane's pre-contract closes.
+   - **Fix-presence (assert first, mechanical):** before parsing claims, assert the `### Fix` body is present and non-placeholder — the block between `### Fix` and the next `###` has a non-blank, non-`<!-- ... -->` line. An empty or scaffold-only body (`<!-- Filled at close ... -->`) is a **FAIL** (impl's close rule makes the fill a mandatory close-mutation), never a silent zero-claim pass. (This is `R-QA-07`.)
+   - **Test count delta** — match `Tests (\d+) -> (\d+)` or `(\d+) pass` or `(\d+) tests` patterns. Extract claimed end-count.
+   - **Quality-gate clean** — match `tsc + lint clean`, `tests pass`, `knip clean`, etc. Each -> re-run the resolved per-gate command at Phase B.
+   - **Grep result** — match `` `grep -rn <pattern> <path>` returns (\d+) results `` or `... shows (\d+) matches` shapes. Extract pattern + path + expected count. On parse failure -> mark for operator-prompt fallback (Q2=c).
+   - **File deletion** — match `` `<path>` deleted `` or `N files deleted` claims. Each -> `! [ -e <path> ]` check.
+   - **File presence** — match `` `<path>` written `` claims. Each -> `[ -e <path> ]` check.
+   - **Rules applied** — run for **every Done task in scope, line or no line** (the checker handles absence; this is the second look at what `impl` verified at its own close). Shape `Rules applied: <R-ids | none> (block: N)`. Two re-checks at Phase B, computed by the bundled `<skill-dir>/earned-rules.py` (`check --claude-md <lane-root>/CLAUDE.md --task-file <tasks log> --task-id <id> --adr-date 2026-09-08`) over the lane's `## Earned rules` section (the anchored heading to the next `## ` heading or EOF; `N` = its `^- ` lines, indented sub-bullets excluded; an id = the first whole `R-*` token on a line): (1) every cited id exists on a rule line; (2) `N` against the section's count — an absent id or `N` above the count -> **FAIL**; `N` below the count -> **WARN** (the block grew since the close; ids still verified); `none` with the right `N` -> PASS. Accepted grammar: ids comma- or space-separated, bare or backticked; a leading bullet/backtick; `(block:N)` with or without the space. **Absent line:** FAIL when the task's `Status: Done (YYYY-MM-DD)` date is on or after 2026-09-08 (the contract's date), **WARN** (operator-verify) before it — so feature-mode sweeps over legacy tasks do not false-fail. A lane whose `CLAUDE.md` has no `## Earned rules` heading -> **WARN naming the roll, never FAIL** (only the rollout can change that state; the HALT on an un-rolled lane is `impl`'s at close). The heading is the lane's adoption marker; the calendar date is the fallback for a rolled lane's pre-contract closes.
 
 2. **Compose rule set from `feature-qa-checklist.md`** — three triggers (union; a rule fires if any matches):
    - **`applies-to: any` sweep:** always include every `any` rule. Universal defense — `<RULE-LABEL>` structural rules, `R-GATE-*`, etc.
    - **Screen-shape filter:** if the task / feature has a declared screen-shape (read from spec § Per-feature scope or task entry), include rules whose `applies-to` matches that shape — shape vocabulary = the `applies-to` values in the LOADED checklist; do not enumerate shapes inline.
-   - **Refs-cite-driven match:** for each entry in the task's `Refs:` line, find rules whose `source` matches the cite — by ADR file path (`docs/adr/<adr-file>.md`), ADR short name (`<ADR-shortname>`), or rule ID (`R-<XXX>-N`). Cite without matching rule → WARN (operator-verify).
+   - **Refs-cite-driven match:** for each entry in the task's `Refs:` line, find rules whose `source` matches the cite — by ADR file path (`docs/adr/<adr-file>.md`), ADR short name (`<ADR-shortname>`), or rule ID (`R-<XXX>-N`). Cite without matching rule -> WARN (operator-verify).
 
 3. **Parse `Refs:` line** for additional cites beyond the checklist mappings — purely spec/doc edits (e.g., spec edits, project-doc edits) surface as WARN since they have no mechanical assertion.
 
@@ -106,7 +106,7 @@ Procedure:
    ### Fix presence + claim re-checks
    | source | claim | re-verify command |
    |---|---|---|
-   | <feat-id>.tasks.md:<line> (<task-id>) | <claim — e.g., Tests N → M> | <re-verify command> |
+   | <feat-id>.tasks.md:<line> (<task-id>) | <claim — e.g., Tests N -> M> | <re-verify command> |
    | <feat-id>.tasks.md:<line> (<task-id>) | <claim — e.g., grep returns 0> | <re-verify command> |
    | <feat-id>.tasks.md:<line> (<task-id>) | <claim — e.g., file deleted> | <re-verify command> |
 
@@ -134,9 +134,9 @@ Procedure:
    - **Quality gate sub-claim** (e.g., "tsc clean"): already covered by umbrella above; mark per-claim verdict from umbrella result.
    - **Rules applied — once per Done task in scope, regardless of whether a line parsed** (it is not a claim re-check; an absent line is exactly the case it grades): run `<skill-dir>/earned-rules.py check --claude-md <lane-root>/CLAUDE.md --task-file <tasks log> --task-id <id> --adr-date 2026-09-08`; the verdict is its first word (PASS / WARN / FAIL) with its reason as evidence.
 
-3. **Rule-set assertions.** For each rule in the composed rule set (per Phase A § 2), run its `verify:` action. A **semantic** row on a lane whose declared reviewer (`SAID.reviewers:`) covers it is **discharged by that reviewer's recorded verdict for the task** (`docs/working/<feature-id>/review-<checker-id>-<task>.md`, `verdict: PASS`) — never left MANUAL-PENDING to the operator on such a lane; the row that proves the verdict exists is mechanical, the rows that read as its content are discharged together. PASS / FAIL based on assertion's exit code or expected condition. Some `verify:` actions are mechanical bash; some are semantic (read-and-assert) and require operator review on output → MANUAL-PENDING; some carry default-SOFT-PASS semantics (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`) and fire only when conditions warrant.
+3. **Rule-set assertions.** For each rule in the composed rule set (per Phase A § 2), run its `verify:` action. A **semantic** row on a lane whose declared reviewer (`SAID.reviewers:`) covers it is **discharged by that reviewer's recorded verdict for the task** (`docs/working/<feature-id>/review-<checker-id>-<task>.md`, `verdict: PASS`) — never left MANUAL-PENDING to the operator on such a lane; the row that proves the verdict exists is mechanical, the rows that read as its content are discharged together. PASS / FAIL based on assertion's exit code or expected condition. Some `verify:` actions are mechanical bash; some are semantic (read-and-assert) and require operator review on output -> MANUAL-PENDING; some carry default-SOFT-PASS semantics (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`) and fire only when conditions warrant.
 
-4. **Refs without mapping:** spec / project-doc cites with no rule match → WARN. Operator manually verifies. Never auto-PASS.
+4. **Refs without mapping:** spec / project-doc cites with no rule match -> WARN. Operator manually verifies. Never auto-PASS.
 
 5. **Per-check output (Q4=c-style — one-line + embedded command + verbose redirect):**
 
@@ -144,10 +144,10 @@ Procedure:
    | section | check | verdict | evidence |
    |---|---|---|---|
    | quality-gates | <umbrella command> | PASS | exit 0; <test count + lint/typecheck/knip status> |
-   | fix-claim/<task-id> | <claim — e.g., Tests N → M> | PASS | actual: M (≥ claim); `<tests>` |
-   | fix-claim/<task-id> | <claim — e.g., grep returns 0> | PASS | `<re-verify command>` → 0 matches |
-   | fix-claim/<task-id> | <claim — e.g., file deleted> | PASS | `! [ -e <path> ]` → true |
-   | refs/<ADR-shortname> | <check description> | PASS | `<tests> <test-file>` → N tests pass |
+   | fix-claim/<task-id> | <claim — e.g., Tests N -> M> | PASS | actual: M (≥ claim); `<tests>` |
+   | fix-claim/<task-id> | <claim — e.g., grep returns 0> | PASS | `<re-verify command>` -> 0 matches |
+   | fix-claim/<task-id> | <claim — e.g., file deleted> | PASS | `! [ -e <path> ]` -> true |
+   | refs/<ADR-shortname> | <check description> | PASS | `<tests> <test-file>` -> N tests pass |
    | refs/<ADR-shortname> | <check description> | WARN | no mapping in docs/qa/feature-qa-checklist.md; operator-verify |
    ```
 
@@ -175,14 +175,14 @@ Aggregate verdict rules:
 Gate effect for `/said:debrief`:
 
 - `/said:debrief` Step 0 preflight reads the most recent `review-qa-<feature-id>.md`.
-- If verdict is FAIL → halt `/said:debrief` with redirect: "Resolve `/said:review-qa` failures first."
+- If verdict is FAIL -> halt `/said:debrief` with redirect: "Resolve `/said:review-qa` failures first."
 - WARNs listed in debrief preflight summary; not blocking.
 
 ## Anti-patterns
 
 - **NEVER hardcode language-specific commands in this SKILL.md.** No literal `bunx tsc`, `go test`, `cargo run`, `npm run` actions inside skill steps. Always resolve via Step 0 #3. (Examples in the resolution chain are illustrative for the resolver, not action prescriptions.)
 - **Don't run on `Status: Todo` / `Status: In progress` tasks.** BLOCK; redirect to `/said:impl`.
-- **Don't auto-promote WARN → PASS.** Operator must verify each WARN. Auto-promotion defeats the gate.
+- **Don't auto-promote WARN -> PASS.** Operator must verify each WARN. Auto-promotion defeats the gate.
 - **Don't edit code, specs, or tasks.** Read-only by contract. Even when finding obvious typos.
 - **Don't re-implement what `/said:accept` does.** Strict scope separation: hygiene (this skill) vs behavioral contract (sibling). Don't read `### Acceptance` sections; don't classify AC items.
 - **Don't synthesize grep commands from ambiguous prose.** Q2=c — try canonical-shape extraction first; on parse failure, operator-prompt. Don't fabricate complex grep commands from prose hints.
@@ -194,7 +194,7 @@ Gate effect for `/said:debrief`:
 
 ## Anchors
 
-- `docs/qa/feature-qa-checklist.md` — project-side lookup table (cited rule → mechanical assertion); operator-maintained.
+- `docs/qa/feature-qa-checklist.md` — project-side lookup table (cited rule -> mechanical assertion); operator-maintained.
 - `said:impl` Step 0 #8 — command-resolution chain reference.
 - `said:accept` — sibling skill (behavioral contract verification).
 - `said:debrief` — Phase 4 driver this skill gates.

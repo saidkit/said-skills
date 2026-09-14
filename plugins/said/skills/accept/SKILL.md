@@ -21,7 +21,7 @@ This skill verifies that AC promises a feature/task made — bullet conditions O
 
 **Read-only contract.** Never edits code, specs, or tasks. Surfaces verdicts; operator decides remediation path (re-open via `/said:impl`, or follow-up via `/said:add-task`).
 
-**Single-pass goal.** Multiple `/said:accept` runs on the same task with shifting outcomes = drift. Phase A → operator-review → Phase B is the discipline that lands one PASS or one operator-decided fix-and-re-run.
+**Single-pass goal.** Multiple `/said:accept` runs on the same task with shifting outcomes = drift. Phase A -> operator-review -> Phase B is the discipline that lands one PASS or one operator-decided fix-and-re-run.
 
 ## When this fires
 
@@ -33,9 +33,9 @@ The operator invokes:
 
 BLOCK + redirect if:
 
-- Targeted task is `Status: Todo` / `Status: In progress` → redirect to `/said:impl`.
-- Operator intent is hygiene verification (quality gates / `### Fix` integrity / `Refs:` conformance) → wrong skill, redirect to `/said:review-qa`.
-- Operator intent is to author a new spec → redirect to `/said:architect`.
+- Targeted task is `Status: Todo` / `Status: In progress` -> redirect to `/said:impl`.
+- Operator intent is hygiene verification (quality gates / `### Fix` integrity / `Refs:` conformance) -> wrong skill, redirect to `/said:review-qa`.
+- Operator intent is to author a new spec -> redirect to `/said:architect`.
 
 ## Common compositions
 
@@ -45,21 +45,21 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 /said:impl <task-id|feature-id>     # task / batch closes
 /said:accept <task-id|feature-id>   # behavioral contract verified   ┐
 /said:review-qa <task-id|feature-id># implementation hygiene cleared ┘ siblings, parallel
-                                       # ↓ both green
+                                       # both green
 /said:debrief <feature-id>          # Phase 4 entry allowed (preflight reads accept report)
 ```
 
 ## Step 0 — Preflight
 
 1. **Resolve mode + inputs:**
-   - **Paths:** resolve `SAID.task-log:` + `SAID.feature-spec:` + `SAID.working:` from the `## Lane` block; no block/key → HALT (operator declares it), never glob-guess.
-   - Single arg matching the project's task-id regex — from `SAID.id-shape:` on the `## Lane` block (no key → HALT) → task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
-   - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) → feature-mode (e.g., `<FEAT>-NN`, or a suffixed per-lane feature-id like `PROJ-01-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `PROJ-01-FE-07` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
-   - `--feature-only` flag → feature-mode without task sweep.
+   - **Paths:** resolve `SAID.task-log:` + `SAID.feature-spec:` + `SAID.working:` from the `## Lane` block; no block/key -> HALT (operator declares it), never glob-guess.
+   - Single arg matching the project's task-id regex — from `SAID.id-shape:` on the `## Lane` block (no key -> HALT) -> task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
+   - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) -> feature-mode (e.g., `<FEAT>-NN`, or a suffixed per-lane feature-id like `PROJ-01-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `PROJ-01-FE-07` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
+   - `--feature-only` flag -> feature-mode without task sweep.
 2. **Status check:**
    - Task-mode: the named task must be `Status: Done (YYYY-MM-DD)`. Otherwise BLOCK + redirect to `/said:impl`.
-   - Feature-mode (default): every task with `Status: Todo` / `Status: In progress` listed; if any → BLOCK with the list; operator confirms in-scope vs out-of-scope or closes them first. (Backlog and N/A statuses pass — they're intentional non-gating per SAID convention.)
-3. **Read spec + tasks file.** Spec read in full only in feature-mode (need § Acceptance Criteria + § Feature Tasks summary table). Tasks file read by-section (`## <task-id>:` anchors → `### Acceptance` blocks).
+   - Feature-mode (default): every task with `Status: Todo` / `Status: In progress` listed; if any -> BLOCK with the list; operator confirms in-scope vs out-of-scope or closes them first. (Backlog and N/A statuses pass — they're intentional non-gating per SAID convention.)
+3. **Read spec + tasks file.** Spec read in full only in feature-mode (need § Acceptance Criteria + § Feature Tasks summary table). Tasks file read by-section (`## <task-id>:` anchors -> `### Acceptance` blocks).
 4. **Index probe artifacts.** Glob `docs/working/<feature-id>/` for recorded probes: `*-wire-*.json`, `*.png` screenshots (Playwright snapshots for a `web` surface; wire captures for `api`/`mcp`/`cli`), and `review-<checker-id>-*.md` (an agent-form Checker's L1 verdict — an editorial verdict for a `doc` surface; never bare `review-*.md`, which would sweep in review-qa's own verdicts). Build a `<task-id> -> [artifact paths]` map for Phase A classification.
 5. **Run the reviewer-gate probe (the skill-invoked half of close enforcement).** Resolve the **effective surface** = the feature's `**Surface:**` field if set, else the lane `SAID.surface:` (Step 0 #3 read the spec). An effective surface of `none` records SKIP, never FAIL, and does not run. Otherwise `accept` **runs the reviewer gate as a recorded probe** -- unconditionally, whatever the declared reviewer set -- before it honors any verdict: `python3 ${CLAUDE_SKILL_DIR}/../status/said_status.py --reviewer-gate --root <lane-root> --surface <effective surface> --reviewers <the lane SAID.reviewers: list, read WHOLE> --workdir <the feature SAID.working: dir>` (reviewer set resolved declaration-first from the lane block) and record its exit code and per-reviewer lines in the Phase C report. This is a **recorded probe, not a gate**: a failing set is surfaced (the named reviewer, its reason) but **never blocks the accept** -- the auto-blocking pre-close hook stays deferred, no artifact claims the close is machine-blocked. Phase B then honors the recorded verdict; `accept` never hand-recomputes a Checker itself, and stays read-only w.r.t. code, spec, and tasks.
 
@@ -74,13 +74,13 @@ Procedure:
    - Each bullet (or each Given/When/Then group in Gherkin) is one AC item.
 
 2. **Classify each item:**
-   - **Mechanical** — code/data assertion: file presence (`exists path/x`, `deleted`), grep result (`returns 0 results`, `N matches`), endpoint contract (`responds with shape Y`), schema validation, test count delta (`Tests 575 → 578`), ADR rule conformance (when the rule has a mechanical assertion).
+   - **Mechanical** — code/data assertion: file presence (`exists path/x`, `deleted`), grep result (`returns 0 results`, `N matches`), endpoint contract (`responds with shape Y`), schema validation, test count delta (`Tests 575 -> 578`), ADR rule conformance (when the rule has a mechanical assertion).
    - **Recorded-probe** — verified against a recorded probe artifact under `docs/working/<feature-id>/` (a Playwright snapshot for a `web` surface; a wire-capture JSON for `api`/`mcp`/`cli`; an editorial verdict `review-doc-editorial-*.md` for a `doc` surface). Evidence read, NOT re-executed (default; see Anti-patterns).
    - **Manual** — operator must eyeball; no mechanical assertion + no recorded probe. Subjective operator eyeball — e.g. a visual surface's side-by-side "looks-identical" check, "operator confirms theme matches mock", production-build visual checks.
 
 3. **Special cases:**
-   - `[N/A — <reason>]` → classify as mechanical, auto-PASS with reason recorded verbatim. No re-litigation (task closure already approved the N/A).
-   - `[x]` items → DO NOT auto-trust the check; still classify + verify the assertion. The `[x]` is a task-claim, not the verdict.
+   - `[N/A — <reason>]` -> classify as mechanical, auto-PASS with reason recorded verbatim. No re-litigation (task closure already approved the N/A).
+   - `[x]` items -> DO NOT auto-trust the check; still classify + verify the assertion. The `[x]` is a task-claim, not the verdict.
 
 4. **Spec § Feature Tasks table-status alignment** (feature-mode + task-mode for that task's row): mechanical item per row — row's Status column equals task entry's `Status:` line.
 
@@ -102,21 +102,21 @@ Procedure:
 
 > **Stance: execute mechanicals; read recorded probes; surface manuals. One verdict per item. AC text IS the contract — don't interpret operator intent.**
 
-For each approved item, in classification order (mechanical → recorded-probe → manual):
+For each approved item, in classification order (mechanical -> recorded-probe -> manual):
 
 1. **Mechanical.** Infer the assertion from AC text and execute via Bash / Read / grep. Examples:
-   - "tsc + lint clean" → run `<typecheck>` + `<lint>` (resolved per project, same chain as `/said:impl` Step 0 #8).
-   - "Tests 575 → 578" → run `<tests>`; parse count; verify ≥ 578.
-   - "grep -rn `<forbidden-token>` src/ returns 0" → re-run grep; verify count matches.
-   - "File `<path>` deleted" → check `! [ -e <path> ]`.
-   - "Spec §14 names `<path>`" → check file presence + structural match against spec.
-   - ADR-rule conformance (when assertion is well-defined) → run the assertion.
+   - "tsc + lint clean" -> run `<typecheck>` + `<lint>` (resolved per project, same chain as `/said:impl` Step 0 #8).
+   - "Tests 575 -> 578" -> run `<tests>`; parse count; verify ≥ 578.
+   - "grep -rn `<forbidden-token>` src/ returns 0" -> re-run grep; verify count matches.
+   - "File `<path>` deleted" -> check `! [ -e <path> ]`.
+   - "Spec §14 names `<path>`" -> check file presence + structural match against spec.
+   - ADR-rule conformance (when assertion is well-defined) -> run the assertion.
 
 2. **Recorded-probe (recorded-evidence mode).** Read the probe artifact:
-   - JSON wire probe → parse + compare assertion against captured bytes.
-   - Screenshot / Playwright snapshot (a `web`-surface probe) → PASS if AC bullet says "captured" / "probe confirms X" and the artifact exists. The probe IS the evidence.
+   - JSON wire probe -> parse + compare assertion against captured bytes.
+   - Screenshot / Playwright snapshot (a `web`-surface probe) -> PASS if AC bullet says "captured" / "probe confirms X" and the artifact exists. The probe IS the evidence.
    - **NEVER re-execute a recorded UI / wire probe** -- a screenshot, a Playwright snapshot, a wire-JSON capture (settled default; risks flakiness, BE drift, dev-server unavailability). This is distinct from the **reviewer-gate recorded probe** (Step 0 #5): that is a fresh skill-invoked run of `said_status.py --reviewer-gate`, not a re-execution of a stored artifact. Operator override via `--re-execute=<task-id>` is deferred to v1.1; not implemented.
-   - **Completeness Checker (the `uxtoc` basis→contract lifecycle).** Read the feature's `**Surface:**` field; an **absent** field inherits the lane's `SAID.surface:` (never silently `none` — the lane key's own rule). When the field is a medium (not `none`), the reviewer set honored is the subset of `SAID.reviewers:` whose `said-governs` matches the feature's `Surface` (the same subset the oracle and `review-ux` apply; a `said-governs`-less Checker governs any), and that subset includes a recipe-form `completeness` Checker whose L2-oracle verdict (`said_status.py --reviewer-gate`) Step 0 #5 already produced as the recorded probe; here Phase B **honors** that recorded verdict (a failing set was surfaced by the probe, never blocking). `accept` never hand-recomputes a Checker itself (the gate recomputes deterministic Checkers, so a fabricated verdict is caught), and stays read-only w.r.t. code, spec, and tasks. **Bearing gate:** `Surface: none` -> the Checker self-selects out (Step 0 #5 records SKIP); a surface-bearing feature whose outline is missing -> the probe records a FAIL (absence is never a silent skip, surfaced not blocking). This is a recorded-probe item, **not** a new classification bucket.
+   - **Completeness Checker (the `uxtoc` basis->contract lifecycle).** Read the feature's `**Surface:**` field; an **absent** field inherits the lane's `SAID.surface:` (never silently `none` — the lane key's own rule). When the field is a medium (not `none`), the reviewer set honored is the subset of `SAID.reviewers:` whose `said-governs` matches the feature's `Surface` (the same subset the oracle and `review-ux` apply; a `said-governs`-less Checker governs any), and that subset includes a recipe-form `completeness` Checker whose L2-oracle verdict (`said_status.py --reviewer-gate`) Step 0 #5 already produced as the recorded probe; here Phase B **honors** that recorded verdict (a failing set was surfaced by the probe, never blocking). `accept` never hand-recomputes a Checker itself (the gate recomputes deterministic Checkers, so a fabricated verdict is caught), and stays read-only w.r.t. code, spec, and tasks. **Bearing gate:** `Surface: none` -> the Checker self-selects out (Step 0 #5 records SKIP); a surface-bearing feature whose outline is missing -> the probe records a FAIL (absence is never a silent skip, surfaced not blocking). This is a recorded-probe item, **not** a new classification bucket.
 
    **For `Surface: doc`:** the declared `doc-editorial` reviewer (a `doc` lane's `SAID.reviewers:`; the plugin's doc-editorial reviewer) plays the completeness Checker's role for the doc surface. Step 0 #5 runs the reviewer-gate probe for a `doc` lane too (all surfaces run the same probe); Phase B then **honors** the recorded editorial-review verdict. Bearing gate identical: `Surface: none` -> SKIP; a `doc` feature whose editorial-review verdict is missing -> the probe records a FAIL (absence is never a silent skip, surfaced not blocking). `web`/`cli`/`api`/`mcp` honor the same Step 0 #5 probe.
 
@@ -127,7 +127,7 @@ For each approved item, in classification order (mechanical → recorded-probe �
    ```
    | source | verdict | evidence |
    |---|---|---|
-   | <feat-id>.tasks.md:<line> | PASS | `grep -nE "#N\|#N\|#N" <ux-spec path>` → N matches |
+   | <feat-id>.tasks.md:<line> | PASS | `grep -nE "#N\|#N\|#N" <ux-spec path>` -> N matches |
    | <feat-id>.tasks.md:<line> | MANUAL-PENDING | operator: walk <route-under-test> vs <reference-route> |
    | <feat-id>.tasks.md:<line> | PASS | recorded probe: `docs/working/<feat-id>/<task-id>-wire-<topic>.json` (`<observed shape>` present) |
    ```
@@ -158,13 +158,13 @@ Aggregate verdict rules:
 Gate effect for `/said:debrief`:
 
 - `/said:debrief` Step 0 preflight reads the most recent `accept-<feature-id>.md` (or per-task reports for tasks closed since the last feature-mode run).
-- If verdict is FAIL → halt `/said:debrief` with redirect: "Resolve `/said:accept` failures first."
-- If verdict is MANUAL-PENDING → surface to operator at debrief preflight; operator confirms inline before debrief proceeds.
+- If verdict is FAIL -> halt `/said:debrief` with redirect: "Resolve `/said:accept` failures first."
+- If verdict is MANUAL-PENDING -> surface to operator at debrief preflight; operator confirms inline before debrief proceeds.
 
 ## Anti-patterns
 
 - **Don't run on `Status: Todo` / `Status: In progress` tasks.** BLOCK; redirect to `/said:impl`.
-- **Don't auto-promote MANUAL-PENDING → PASS.** Operator marks inline. Auto-promotion defeats the gate.
+- **Don't auto-promote MANUAL-PENDING -> PASS.** Operator marks inline. Auto-promotion defeats the gate.
 - **Don't edit code, specs, or tasks.** Read-only by contract. Even when finding obvious typos. Fixes route through `/said:impl` (re-open task pre-commit) or `/said:add-task` (post-commit follow-up).
 - **Don't re-execute recorded UI / wire probes.** Recorded probes (screenshots, Playwright snapshots, wire-JSON) are evidence-at-task-close (settled default). Re-execution risks flakiness, BE migration drift, dev-server unavailability — failures here would be unrelated to AC drift. `--re-execute=<task-id>` override deferred to v1.1. (Distinct: the reviewer-gate recorded probe of Step 0 #5 is a fresh skill-invoked run, re-run each accept -- not a stored artifact.)
 - **Don't synthesize probe scripts from AC text.** If an AC item could theoretically be automated (e.g., "kebab shows Disable / Enable / Remove") but no recorded probe exists, classify as manual. Auto-generating probe code (e.g. Playwright, for a `web` surface) from prose is error-prone and out of scope.

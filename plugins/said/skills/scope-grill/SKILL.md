@@ -6,7 +6,7 @@ description: >
   with §A purpose / §B target shape / §C constraints / §D open questions.
   Trigger phrases: user says "Grill idea ...", "Let's ideate ...", or runs
   the explicit command "/said:scope-grill <topic>". Stops when §D empties
-  → writes `scope.md` to `docs/working/<feature>/` for Phase 2 (Architect)
+  -> writes `scope.md` to `docs/working/<feature>/` for Phase 2 (Architect)
   to consume. Do NOT trigger on substantive handoffs (multi-paragraph
   technical docs, paths to wip.md / context.md) — redirect the operator 
   to /said:scope-refine.
@@ -71,13 +71,13 @@ Suggested order:
 3. **§C — Constraints** — "What must this respect — performance, RBAC, existing conventions? Anything explicitly out-of-scope? Sequencing — does this block other work or wait on something? Any ADR / UX rule that pins a specific shape?"
 4. **§D — Open questions** — Surface as you go. Anything you'd otherwise have to GUESS at to write spec.md goes here, with phrasing + forcing function + your default-with-reasoning.
 
-For a `web` surface: Cite `R-*` rules from the loaded `feature-ux-checklist.md` whenever §B / §C touches a contract-governed area (each governed shape → its `R-*` rules, per the checklist's own map — do not hardcode shape→rule pairs inline). Phase 2 (Architect) needs these citations to ground the spec.
+For a `web` surface: Cite `R-*` rules from the loaded `feature-ux-checklist.md` whenever §B / §C touches a contract-governed area (each governed shape -> its `R-*` rules, per the checklist's own map — do not hardcode shape->rule pairs inline). Phase 2 (Architect) needs these citations to ground the spec.
 
 Whenever you find yourself about to silently resolve a question — STOP. That's a §D item. Surface it; do not pick a side.
 
 ## Stop condition
 
-§D empties → scope.md is complete → write the file to `docs/working/<feature>/scope.md` and tell the operator Phase 1 is done. Suggested next step: "Phase 2 (Architect) starts here. Run /said:architect when ready (or build the spec interactively per `docs/features/template.md`)."
+§D empties -> scope.md is complete -> write the file to `docs/working/<feature>/scope.md` and tell the operator Phase 1 is done. Suggested next step: "Phase 2 (Architect) starts here. Run /said:architect when ready (or build the spec interactively per `docs/features/template.md`)."
 
 If the operator wants to defer some §D items to Phase 2 — that's allowed. Mark those items as "defer to Phase 2 (Architect)" with explicit reasoning, treat them as resolved for Phase 1 purposes, and write scope.md. Phase 2 will surface them again if they're real blockers.
 

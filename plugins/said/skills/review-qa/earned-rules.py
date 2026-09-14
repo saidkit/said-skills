@@ -10,10 +10,10 @@ Usage:
       `Rules applied: <ids | none> (block: N)` line, and prints PASS / WARN / FAIL with a reason.
       Grammar accepted: ids separated by commas or spaces, bare or backticked; an optional
       leading bullet/backtick; `(block:N)` with or without a space; an optional trailing period.
-      Verdicts: cited id not in the section → FAIL · claimed N > actual → FAIL · claimed N < actual
-      → WARN "block grew since close" (a later rule is not a false close) · absent line, heading present
-      → FAIL on/after --adr-date, WARN before (the heading is the lane's adoption marker; the date is the
-      fallback for a rolled lane's pre-contract closes) · no heading in CLAUDE.md → WARN, never FAIL
+      Verdicts: cited id not in the section -> FAIL, claimed N > actual -> FAIL, claimed N < actual
+      -> WARN "block grew since close" (a later rule is not a false close), absent line, heading present
+      -> FAIL on/after --adr-date, WARN before (the heading is the lane's adoption marker; the date is the
+      fallback for a rolled lane's pre-contract closes), no heading in CLAUDE.md -> WARN, never FAIL
       (roll the lane; the HALT on an un-rolled lane is the implement skill's, at close time).
       Exit 0 = PASS or WARN, 1 = FAIL, 2 = config error.
 
@@ -32,7 +32,7 @@ import sys
 HEADING = re.compile(r"^## Earned rules")
 NEXT_HEADING = re.compile(r"^## ")
 RULE_LINE = re.compile(r"^- ")
-ID_TOKEN = re.compile(r"(?<![A-Za-z])R-[A-Z]+-[A-Z0-9-]+")  # a whole token: `ADR-…` never yields an id
+ID_TOKEN = re.compile(r"(?<![A-Za-z])R-[A-Z]+-[A-Z0-9-]+")  # a whole token: `ADR-...` never yields an id
 APPLIED_LINE = re.compile(r"^Rules applied:\s*(?P<ids>.*?)\s*\(block:\s*(?P<n>\d+)\)\s*\.?\s*$")
 LINE_PREFIX = re.compile(r"^\s*(?:[-*]\s+)?`?\s*")  # a bullet marker and/or a backtick before the line is tolerated
 DONE_DATE = re.compile(r"\*\*Status:\*\*\s*Done\s*\((\d{4}-\d{2}-\d{2})\)|^Status:\s*Done\s*\((\d{4}-\d{2}-\d{2})\)", re.M)

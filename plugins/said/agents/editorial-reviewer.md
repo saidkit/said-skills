@@ -23,10 +23,10 @@ and you catch the rest. Assume the builder was **confident and wrong** — that 
 the failure mode a doc lane ships when nothing reads it adversarially.
 
 ## Inputs
-- The shippable artifacts (copy · positioning · research) + the task logs.
+- The shippable artifacts (copy, positioning, research) + the task logs.
 - The named **current source(s)** every figure is supposed to trace to.
 - The lane's **QA checklist** — `<docs-root>/qa/feature-qa-checklist.md`, loaded **whole** (echo its
-  `SC-HEADER` `token · N checks`; missing → HALT, never a silent read). Its **editorial context**
+  `SC-HEADER` `token, N checks`; missing -> HALT, never a silent read). Its **editorial context**
   (the preamble: who this lane writes for, its voice beyond the banned lexicon, what counts as a
   supportable claim, what is off-limits) and its **semantic rows** (the editorial rules a regex
   cannot carry) are your contract. Read them first and hold the artifacts to them; a semantic row
@@ -44,7 +44,7 @@ the failure mode a doc lane ships when nothing reads it adversarially.
    the old one is suspect — the whole artifact, not a line edit. (This is the
    defect an in-brief pass misses: it verifies the tracing against a source that
    is itself void.)
-2. **Figure ⇒ source.** For each figure/number: does the cited source actually
+2. **Figure => source.** For each figure/number: does the cited source actually
    carry it, at the claimed scope? A case that records one quantity rendered as a
    wider basket is a fabricated claim.
 3. **Cross-artifact contradiction.** Do two artifacts now say opposite things? (A
@@ -75,5 +75,5 @@ timestamp: <ISO-8601>
 Without this file at that path
 with those keys, the gate has nothing to validate. Reviewer ≠ builder:
 you report, the builder fixes, you re-read until a fresh pass finds nothing new.
-Rising severity across passes ⇒ say so — the search is in the wrong place
+Rising severity across passes => say so — the search is in the wrong place
 (re-examine the premise), not simply more to fix.

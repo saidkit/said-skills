@@ -16,8 +16,8 @@
     });
     document.addEventListener('htmx:afterRequest',function(){
       if((inflight=inflight>0?inflight-1:0)===0){
-        window.__fresh=false;                                      // initial full-load fresh flag is spent → later nav reuses the cache
-        if(showT){clearTimeout(showT);showT=null;}                 // finished before DELAY → never shown → no flash
+        window.__fresh=false;                                      // initial full-load fresh flag is spent -> later nav reuses the cache
+        if(showT){clearTimeout(showT);showT=null;}                 // finished before DELAY -> never shown -> no flash
         if(shown){var left=MIN-(Date.now()-shownAt); hideT=setTimeout(off, left>0?left:0);}
       }
     });
@@ -126,7 +126,7 @@
     var down=(k==='ArrowDown'||k==='j'),up=(k==='ArrowUp'||k==='k'),
         left=(k==='ArrowLeft'||k==='h'),right=(k==='ArrowRight'||k==='l');
     if(vw()==='kanban'){
-      if(inDrawer()){if(left){e.preventDefault();closeDrawer();}return;}  // drawer caught the keyboard: ↑↓ scroll its content, ←/Esc return to the board
+      if(inDrawer()){if(left){e.preventDefault();closeDrawer();}return;}  // drawer caught the keyboard: Up/Down scroll its content, Left/Esc return to the board
       if(up||down){e.preventDefault();moveKanban(0,down?1:-1);return;}  // moveKanban self-lands on first card when no cursor (no double-jump)
       if(left||right){e.preventDefault();moveKanban(right?1:-1,0);return;}
       if(k==='Home'||k==='End'){e.preventDefault();if(!ensureCursor())return;homeEnd(k==='End');return;}
@@ -164,7 +164,7 @@
   function restoreLane(){var ls=$('laneSelect');if(!ls)return;var want=localStorage.getItem('sb-lane'),ok=false;
     for(var i=0;i<ls.options.length;i++){if(ls.options[i].value===want){ok=true;break;}}
     if(ok){if(ls.value!==want){ls.value=want;refreshVisible();}}  // htmx already fired load with the default; re-load the stored lane
-    else{localStorage.setItem('sb-lane',ls.value);}}              // no/stale stored lane → keep the first-declared default
+    else{localStorage.setItem('sb-lane',ls.value);}}              // no/stale stored lane -> keep the first-declared default
   window.setView=function(btn){var m=btn.getAttribute('data-view');document.body.setAttribute('data-view',m);localStorage.setItem('sb-view',m);
     document.querySelectorAll('.vtoggle .btn').forEach(function(b){b.classList.toggle('btn-active',b.getAttribute('data-view')===m);});
     document.body.classList.remove('drawer-open');refreshVisible();
@@ -199,7 +199,7 @@
     return false;};
   window.saveConnect=function(form){var v=(form.elements.app.value||'').trim();
     post('/connect',{app:v}).then(function(r){
-      say(form,r.ok?'saved · reload to apply':(r.error||'could not save'),!r.ok);
+      say(form,r.ok?'saved, reload to apply':(r.error||'could not save'),!r.ok);
     }).catch(function(){say(form,'could not save',true);});
     return false;};
 

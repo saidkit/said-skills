@@ -28,7 +28,7 @@ smell, without ever gating the close.
    STOP — do not guess.
 2. **Read the diff / task body** for the order rules were satisfied in.
 3. **Compare** against the registry's routed bundle ordering (cross-cutting
-   error/shell-level rules first → entity-shape rules → wire-contract reshape →
+   error/shell-level rules first -> entity-shape rules -> wire-contract reshape ->
    visual-parity last).
 
 ## What it reports (never blocks)

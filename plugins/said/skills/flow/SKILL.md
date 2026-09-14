@@ -34,9 +34,9 @@ Skills compose freely: a skill is instructions loaded into the one agent that ha
 
 Preconditions. Any failure BLOCKS with a named redirect:
 
-- A `scope.md` exists for the feature in at least one lane, §D resolved. Else →
+- A `scope.md` exists for the feature in at least one lane, §D resolved. Else ->
   `/said:scope-refine` or `/said:scope-grill`.
-- The feature spans **≥ 2 lanes carrying their own SAID artifacts (a `scope.md`, spec, or task log) — not ≥ 2 repos, and NOT counted by task-log presence**. Count lanes by the Step-1 declaration-first enumeration: a lane still at Scope or Architect has no task log yet but is a full lane. A lane owns a full SAID cycle (its own feature specs, task log, working dir, ADRs); a mount is where code lands. One feature may change code in several mounts and remain single-lane. Single-lane → `/said:impl`.
+- The feature spans **≥ 2 lanes carrying their own SAID artifacts (a `scope.md`, spec, or task log) — not ≥ 2 repos, and NOT counted by task-log presence**. Count lanes by the Step-1 declaration-first enumeration: a lane still at Scope or Architect has no task log yet but is a full lane. A lane owns a full SAID cycle (its own feature specs, task log, working dir, ADRs); a mount is where code lands. One feature may change code in several mounts and remain single-lane. Single-lane -> `/said:impl`.
 
 ## Output contract
 
@@ -69,14 +69,14 @@ Never read a state file. Derive everything, every time.
 
 | Fact | Probe |
 |---|---|
-| Lanes involved | **Declaration first:** read each candidate tree's `CLAUDE.md` `## Lane` block and take its `SAID.docs-root:` / `SAID.task-log:` / `SAID.working:` / `SAID.id-shape:` / `SAID.adr-prefix:` keys verbatim. **No block → HALT:** where a candidate tree declares no `## Lane` block, halt and tell the operator to declare the lane's `SAID.<axis>:` keys — do not glob-guess. A repo root's `CLAUDE.md` may carry a `SAID.lanes:` registry naming where each lane starts — enumerate from it when present |
+| Lanes involved | **Declaration first:** read each candidate tree's `CLAUDE.md` `## Lane` block and take its `SAID.docs-root:` / `SAID.task-log:` / `SAID.working:` / `SAID.id-shape:` / `SAID.adr-prefix:` keys verbatim. **No block -> HALT:** where a candidate tree declares no `## Lane` block, halt and tell the operator to declare the lane's `SAID.<axis>:` keys — do not glob-guess. A repo root's `CLAUDE.md` may carry a `SAID.lanes:` registry naming where each lane starts — enumerate from it when present |
 | **Feature-id per lane** | the matched `*.tasks.md` filename stem minus `.tasks` — e.g. `PROJ-01` (front), `PROJ-01-BE` (server), `PROJ-02-BE-widgets`. **Record it. Every later invocation targeting that lane uses the lane's own id, never the umbrella id.** A lane's suffix is what makes its id globally unique; assuming the umbrella id silently addresses the wrong lane's log |
-| Lane phase | no `scope.md` → **Scope** · scope, no spec → **Architect** · spec+tasks, `Status: Todo` > 0 → **Implement** · spec+tasks, Todo == 0, no `## Debrief close` footer in the tasks log → **Deliver** (a `debrief.md` may already exist mid-debrief — it is written at debrief Phase A, before the footer; `debrief.md` presence alone is NOT `Closed`) · `## Debrief close` footer present **and no open inbound crossing addressed to the lane** → **Closed** |
+| Lane phase | no `scope.md` -> **Scope**, scope, no spec -> **Architect**, spec+tasks, `Status: Todo` > 0 -> **Implement**, spec+tasks, Todo == 0, no `## Debrief close` footer in the tasks log -> **Deliver** (a `debrief.md` may already exist mid-debrief — it is written at debrief Phase A, before the footer; `debrief.md` presence alone is NOT `Closed`), `## Debrief close` footer present **and no open inbound crossing addressed to the lane** -> **Closed** |
 | Work remaining | count `Status: Todo` in that lane's `*.tasks.md` |
 | Crossings | `BE-handover-*.md` (or lane equivalent) — **open** iff no sibling `*-reply.md` and no `## Reply` section appended (match the heading **case-insensitively** — canonical form is `## Reply`) |
 | Blocked tasks | task entries whose Approach or Out-of-scope names an open crossing |
 | Shared root | does scope name an upstream both lanes clone (e.g. an engine étalon)? is it complete? |
-| **Feature e2e/UAT** | the integrated cross-lane run (only meaningful once **all** lanes `Closed`). **Declaration first:** honor a feature-UAT artifact location declared in the repo-root `CLAUDE.md`. **Fallback:** glob the feature working dir(s) for a UAT result artifact (`*QA-UAT*.md` / `*uat*.md`) carrying a filled result matrix. `passed` = pass verdict present · `skipped(recorded)` = an operator skip recorded in it · `n/a` = scope declares no UI behavior (Developer-Story) · else `pending` |
+| **Feature e2e/UAT** | the integrated cross-lane run (only meaningful once **all** lanes `Closed`). **Declaration first:** honor a feature-UAT artifact location declared in the repo-root `CLAUDE.md`. **Fallback:** glob the feature working dir(s) for a UAT result artifact (`*QA-UAT*.md` / `*uat*.md`) carrying a filled result matrix. `passed` = pass verdict present, `skipped(recorded)` = an operator skip recorded in it, `n/a` = scope declares no UI behavior (Developer-Story), else `pending` |
 
 > **`Todo == 0` is ambiguous — never key an action on it alone.** A lane with zero tasks
 > because it was never architected looks identical to one that finished. Always pair the count
@@ -95,8 +95,8 @@ Tag every piece `[lane: FE | BE | shared-root]`, **written into scope §5 itself
 > **Classification test.** *Could the other lane legitimately answer "no, and here is why",
 > citing a contract, schema reality or physical constraint I do not hold?*
 >
-> **Yes → NEGOTIATION.** Needs a crossing.
-> **No → MECHANICAL.** Belongs in the owning lane's own task log. No crossing.
+> **Yes -> NEGOTIATION.** Needs a crossing.
+> **No -> MECHANICAL.** Belongs in the owning lane's own task log. No crossing.
 
 **Where a MECHANICAL item lives before the receiving lane has a task log.** It does not become a task by being classified. The receiving lane authors its own tasks at its Architect phase (§4.1) — this skill never writes into another lane's log, because that is the lane's authority, not the orchestrator's.
 
@@ -158,7 +158,7 @@ Entering a lane — by fork, rotation, or because it is already loaded — the p
 | **Scope** | `/said:scope-refine <handoff-path>` — the handover plus audit findings are the handoff. `/said:scope-grill` only for a genuinely thin idea |
 | **Architect** | `/said:architect <scope-path>` |
 | **Implement** | `/said:impl <feature-id>` — whole-feature mode |
-| **Deliver** | `/said:review-qa <feature-id>` → (halt on FAIL) → `/said:review-ux <feature-id>` → (if present, halt on FAIL) → `/said:accept <feature-id>` → (halt on FAIL) → `/said:debrief <feature-id>` through Phase C — the `## Debrief close` footer is the Deliver→Closed transition. **This is the single source for the per-lane gate chain; Rule 7 invokes it per lane** |
+| **Deliver** | `/said:review-qa <feature-id>` -> (halt on FAIL) -> `/said:review-ux <feature-id>` -> (if present, halt on FAIL) -> `/said:accept <feature-id>` -> (halt on FAIL) -> `/said:debrief <feature-id>` through Phase C — the `## Debrief close` footer is the Deliver->Closed transition. **This is the single source for the per-lane gate chain; Rule 7 invokes it per lane** |
 | **Closed** | nothing — do not re-enter |
 
 ### 4.2 Fork vs rotate
@@ -198,11 +198,11 @@ Runs **once, after every lane reads `Closed`** — never before: the integrated 
 
 Drive it in main context where the environment provides the tooling (Playwright MCP where there is UI): exercise the feature end-to-end across all lanes and record **real** results — failures recorded as failures, never as "not run" — into the feature's UAT result artifact (the one Step 1 probes).
 
-- **Pass** → the probe reads `passed`; the feature may close.
-- **Fail** → record it; re-open the owning lane via `/said:add-task` + `/said:impl`, which drops that lane out of `Closed` — the loop reconverges.
-- **No UI behavior** (scope declares a Developer-Story / no user-visible surface) → `n/a`.
-- **Operator-confirmed skip** → allowed only on explicit operator word, written into the UAT artifact as `skipped(recorded)`, never silent. Under an autonomy macro this skip is a **hard blocker** — the one wait autonomy cannot self-approve.
-- **Tooling unavailable** (environment-gated, like peer-session forking) → do not fabricate a pass; REPORT the owed UAT (`feature e2e/UAT: pending` → `feature closed: no`) and name the exact run to perform, as Rule 8 reports an external wait.
+- **Pass** -> the probe reads `passed`; the feature may close.
+- **Fail** -> record it; re-open the owning lane via `/said:add-task` + `/said:impl`, which drops that lane out of `Closed` — the loop reconverges.
+- **No UI behavior** (scope declares a Developer-Story / no user-visible surface) -> `n/a`.
+- **Operator-confirmed skip** -> allowed only on explicit operator word, written into the UAT artifact as `skipped(recorded)`, never silent. Under an autonomy macro this skip is a **hard blocker** — the one wait autonomy cannot self-approve.
+- **Tooling unavailable** (environment-gated, like peer-session forking) -> do not fabricate a pass; REPORT the owed UAT (`feature e2e/UAT: pending` -> `feature closed: no`) and name the exact run to perform, as Rule 8 reports an external wait.
 
 Never emit `feature closed: yes` while this reads `pending`.
 
@@ -216,16 +216,16 @@ Both hard. Neither skippable under an autonomy macro — autonomy removes waits,
 ```markdown
 # <feature> — resume pointer
 Reconstructed: <date>
-Lanes:     FE <phase, n Todo> · BE <phase, n Todo>
+Lanes:     FE <phase, n Todo>, BE <phase, n Todo>
 Crossings: <name> — open|replied|consumed
 Next:      <the exact command to run>
-Blocked:   <task → crossing it waits on, or none>
+Blocked:   <task -> crossing it waits on, or none>
 decisions not yet in a file: none
 ```
 
 ## Step 6 — Progress check, then re-enter
 
-Snapshot before and after every invocation: per-lane `Status` counts, artifact file list, crossing states. If an invocation changes **none** of them → **HALT**, report what was attempted and what the reconstruction says, do not re-enter. A loop that churns quietly is worse than one that stops loudly.
+Snapshot before and after every invocation: per-lane `Status` counts, artifact file list, crossing states. If an invocation changes **none** of them -> **HALT**, report what was attempted and what the reconstruction says, do not re-enter. A loop that churns quietly is worse than one that stops loudly.
 
 Otherwise return to Step 1 and continue. Do not report a phase boundary as a stopping point — boundaries are where work flows, not where it waits.
 

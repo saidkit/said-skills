@@ -4,7 +4,7 @@ description: >
   SAID status board — LOCAL WEB dashboard (browser sibling of /said:status):
   List + Kanban views, manual refresh, per-lane view, click-through deep-dive. Self-contained
   stdlib server; htmx + daisyUI from a CDN; read-only and loopback by default. Triggered ONLY
-  by "/said:board [stop] [--port N] [--stale] [--lane …] [--connect URL]" — `stop` kills the
+  by "/said:board [stop] [--port N] [--stale] [--lane ...] [--connect URL]" — `stop` kills the
   running server, `--connect` opts in to a local companion app (embed + Backlog view + two
   local-file writes). DEPENDS on the said:status skill (imports its said_status.py).
   NOT the terminal board ("/said:status"); NOT for driving a phase.
@@ -42,7 +42,7 @@ surfaces; the web numbers match the terminal board exactly because it imports th
 
 - `/said:board` — launch the dashboard and open the browser.
 - `/said:board stop` — stop the running server (by its pidfile / port).
-- `/said:board --port N` · `--stale` · `--lane …` — loopback port + analyzer flags (same vocabulary
+- `/said:board --port N`, `--stale`, `--lane ...` — loopback port + analyzer flags (same vocabulary
   as `/said:status`), forwarded to `analyze()`.
 - `/said:board --connect http://localhost:3000` — opt in to the companion app at that URL (loopback
   URLs only). Persisted by the board's own connect form; a later launch with no flag reuses it.
@@ -59,7 +59,7 @@ Identical to `/said:status` Step 0: resolve docs/working roots, issued id-prefix
 ```bash
 # launch
 python3 <skill-dir>/serve.py --root <repo-root> [--prefixes PROJ,LEGACY] \
-  [--legacy-prefixes LEGACY] [--lane NAME:…]... [--port <n>] [--no-open] \
+  [--legacy-prefixes LEGACY] [--lane NAME:...]... [--port <n>] [--no-open] \
   [--connect http://localhost:3000] [--todo-file docs/todo.md]
 # stop
 python3 <skill-dir>/serve.py stop [--port <n>]
@@ -95,7 +95,7 @@ over it) and writes it from the connect form.
 When connected, the page emits — and nothing else changes:
 
 ```html
-<meta name="said-board-csrf" content="…">
+<meta name="said-board-csrf" content="...">
 <link rel="stylesheet" href="<app>/embed/said-widgets.css">
 <script src="<app>/embed/said-widgets.js" defer data-said-origin="<app>"></script>
 

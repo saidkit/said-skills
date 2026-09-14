@@ -12,7 +12,7 @@ description: >
 
 # Triage — SAID Root-Cause Investigator
 
-Thin wrapper around a read-only code-exploration subagent for the specific case of bug or behavior tracing. The skill exists to FORCE a deterministic deep-trace pattern (entry → call chain → root cause file:line → fix shape) instead of leaving Claude to lazy-shortcut with a few `Read` calls and a guess.
+Thin wrapper around a read-only code-exploration subagent for the specific case of bug or behavior tracing. The skill exists to FORCE a deterministic deep-trace pattern (entry -> call chain -> root cause file:line -> fix shape) instead of leaving Claude to lazy-shortcut with a few `Read` calls and a guess.
 
 Read-only by contract. The skill investigates; it does not edit, fix, or test. After the report lands, the operator decides what to do (typically `/said:add-task <feature-id> bug` to append a task, then `/said:impl` to drive it).
 

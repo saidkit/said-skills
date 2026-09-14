@@ -2,11 +2,11 @@
 
 Read from the spine (`SKILL.md` Contract rule 1) at the moment it names; every rule here is standing for the whole phase.
 
-## Common compositions (upstream → this skill)
+## Common compositions (upstream -> this skill)
 
 Two canonical operator flows feed tasks into `/said:impl`:
 
-**A — Planned feature** (Phase 1 → 2 → 3):
+**A — Planned feature** (Phase 1 -> 2 -> 3):
 
 ```
 /said:scope-refine docs/working/<feature>/handoff.md
@@ -16,7 +16,7 @@ Two canonical operator flows feed tasks into `/said:impl`:
 
 (Use `/said:scope-grill` instead of `/said:scope-refine` for thin-idea ideation without a handoff doc.)
 
-**B — Ad-hoc bug fix** (Triage → Append → Drive):
+**B — Ad-hoc bug fix** (Triage -> Append -> Drive):
 
 ```
 /said:triage <bug>
@@ -47,7 +47,7 @@ Procedure:
 
 4. **Read in parallel** — every Reading-list UX spec flagged `(full read)`, AND every current-implementation file under the entity's feature dir cited in Reading list (or implied by Approach — e.g., `features/<entity>/` if the task migrates that entity). UX specs ground the rule anchors; current-impl files ground the "Evidence" column in step 6. Cite each in the inventory output with one-line anchor (e.g., "Read the routed rule spec — its rules in scope per task Approach"; "Read `<screen file>:1-120` — current shape baseline").
 
-5. **Run the lane's wire-capture rule, if it declares one.** A lane whose tasks cite endpoints states its capture procedure as an `R-*` line in its `## Earned rules` (Step 0 #9) — the command, the auth, where the captured payload lands (`docs/working/<feature-id>/<task-id>-wire-<endpoint-slug>.json` is the conventional path). Run that rule for every endpoint cited in the task's Acceptance; note drift between captured bytes and the client schema in the task body's Approach. **Drift = blocker; surface in inventory.** No such rule → no probe; the wire bullet is judged at Phase C by the lane's declared Checker.
+5. **Run the lane's wire-capture rule, if it declares one.** A lane whose tasks cite endpoints states its capture procedure as an `R-*` line in its `## Earned rules` (Step 0 #9) — the command, the auth, where the captured payload lands (`docs/working/<feature-id>/<task-id>-wire-<endpoint-slug>.json` is the conventional path). Run that rule for every endpoint cited in the task's Acceptance; note drift between captured bytes and the client schema in the task body's Approach. **Drift = blocker; surface in inventory.** No such rule -> no probe; the wire bullet is judged at Phase C by the lane's declared Checker.
 
 6. **Inventory table.** One row per `[ ]` Acceptance bullet, **plus one row per file named in the companion spec's §Implementation pointers (or equivalent file list)**. If a spec-named file doesn't exist on disk, the row's `Work` column reads `CREATE`. Phase A cannot complete with a spec-named file unaccounted-for — silently skipping a mandated component is the slip vector this rule closes. Columns: Bullet / Currently satisfied? (yes / no / partial) / file:line evidence / Work to satisfy.
 

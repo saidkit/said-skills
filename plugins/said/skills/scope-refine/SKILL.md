@@ -46,13 +46,13 @@ Resolve five inputs — by reading sources, not by asking — except where expli
      - Concatenate into a markdown handoff doc with sections `## Branch state`, `## Recent commits`, `## Uncommitted changes`, `## Wip notes`.
      - Write to `docs/working/<feature>/_branch-state.md` (you'll need feature name first — see input 4). This file lives alongside `scope.md` as audit-trail; the agent's boundary rule treats only the named handoff path as authoritative, so co-located peer files don't pollute the audit.
 
-2. **output-path** — `SAID.working:` root (`## Lane` block; no key → HALT) + `scope.md`. The agent writes here. If `scope.md` already exists at that path, append `-N` (`scope-1.md`, `scope-2.md`, …) so prior versions stay as history.
+2. **output-path** — `SAID.working:` root (`## Lane` block; no key -> HALT) + `scope.md`. The agent writes here. If `scope.md` already exists at that path, append `-N` (`scope-1.md`, `scope-2.md`, ...) so prior versions stay as history.
 
 3. **probe-mode** — explicit flag value, or default `curl`. Validate: must be `skip | curl | full`. The default is curl-first because typical case shrinks 2–3 min playwright to <10s curl. Reach for `full` only when the dev backend is known auth-gated end-to-end (curl can't reach the endpoints) or — for a `web` surface — when the visual walk is mandatory. **For a non-visual surface, `full` forces playwright on wire probes ONLY**; Stage 3b (visual walk) auto-skips regardless of mode because there's no UI surface. Reach for `skip` only when the handoff already cites every needed wire capture and (for a `web` surface) screenshot.
 
 4. **feature name** — needed to construct paths in inputs 1 and 2. Derive from:
    - The operator's path argument: if it's under `docs/working/<feature>/...`, take the leaf segment.
-   - The current branch name: convention varies (`feature/foo` → `foo`; canonical task IDs matching `^([A-Z]+)(\d+)-.+$` derive to feature `${1}-${2}`; bare slugs like `said-01` pass through).
+   - The current branch name: convention varies (`feature/foo` -> `foo`; canonical task IDs matching `^([A-Z]+)(\d+)-.+$` derive to feature `${1}-${2}`; bare slugs like `said-01` pass through).
    - If still ambiguous (e.g., on `main`), ASK the operator: "What feature name should I use for the scope.md output? Suggest: `<best-guess>`."
 
 5. **scope-hint** (optional) — comma-separated list of feature dirs to audit, overriding the dir list extracted from the handoff. Pass through if the operator gave it; otherwise omit and let the agent derive from Stage 1.
@@ -61,7 +61,7 @@ If any required resolution would force a guess, ASK the operator one focused que
 
 ## Step 1b: Consult the decision record first (retrieval-at-scope)
 
-Before spawning the agent, run **`said:retrieval`** on the feature question — a read-only precedent sweep so the scope starts from what the project already decided, not a blank slate. Pass its findings into the agent's spawn prompt (a `Precedent (said:retrieval): …` block) so the agent's §A framing and §D open-questions weigh precedent first, and surface precedent-vs-handoff conflicts in §D rather than resolving them silently. **Surface-agnostic** (every medium) and **additive** — an empty decision record is a no-op ("no precedent found — proposing without"), so this never blocks a greenfield refine. **Compose** `said:retrieval` (read-only, terminal); never re-implement the sweep here.
+Before spawning the agent, run **`said:retrieval`** on the feature question — a read-only precedent sweep so the scope starts from what the project already decided, not a blank slate. Pass its findings into the agent's spawn prompt (a `Precedent (said:retrieval): ...` block) so the agent's §A framing and §D open-questions weigh precedent first, and surface precedent-vs-handoff conflicts in §D rather than resolving them silently. **Surface-agnostic** (every medium) and **additive** — an empty decision record is a no-op ("no precedent found — proposing without"), so this never blocks a greenfield refine. **Compose** `said:retrieval` (read-only, terminal); never re-implement the sweep here.
 
 ## Step 2: Spawn the agent
 
@@ -91,8 +91,8 @@ After the agent returns:
 - **scope.md path** — confirm where the file landed.
 - **§D — Conflicts and open questions** — print the section verbatim. Each entry names a conflict (handoff vs contract divergence) or an open question (handoff residual or checklist gap).
 - **Recommended next step** — depends on §D state:
-  - **§D empty** → "Phase 1 (Scope) is done. Phase 2 (Architect) starts. Run `/said:architect` when ready, or build the spec interactively per `docs/features/template.md`."
-  - **§D non-empty** → "Phase 1 (Scope) is BLOCKED on §D. Resolve each item, then either re-run `/said:scope-refine` to regenerate, or hand-edit `scope.md` so §D is empty before proceeding to `/said:architect`."
+  - **§D empty** -> "Phase 1 (Scope) is done. Phase 2 (Architect) starts. Run `/said:architect` when ready, or build the spec interactively per `docs/features/template.md`."
+  - **§D non-empty** -> "Phase 1 (Scope) is BLOCKED on §D. Resolve each item, then either re-run `/said:scope-refine` to regenerate, or hand-edit `scope.md` so §D is empty before proceeding to `/said:architect`."
 
 DO NOT silently resolve §D items. The agent surfaces conflicts in §D deliberately; this skill carries them through to the operator unchanged.
 

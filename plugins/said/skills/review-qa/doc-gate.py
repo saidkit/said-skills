@@ -24,7 +24,7 @@ THE EFFECTIVE RULE SET — arguments, never a file. The lane's umbrella line
 the skills' resolution chain expands the verb to this script with the lane's paths.
 A softened rule prints `[WARN] <rule>` and never fails the run; an off rule prints
 nothing. A gate is never neutered silently: the EFFECTIVE RULE SET prints on every
-run; every rule off, or an unknown rule name → exit 2. A lane's own checks are rows
+run; every rule off, or an unknown rule name -> exit 2. A lane's own checks are rows
 in its `docs/qa/feature-qa-checklist.md`, never engine config.
 
 Exit 0 = clean (WARNs allowed). Exit 1 = ≥1 FAIL. Exit 2 = usage/config error.
@@ -177,7 +177,7 @@ def check_closure(task_globs, sev):
                     _label(sev), "closure", path,
                     _lineno(text, base + m.start()),
                     f"task `{h.group(1)}` is Status: Done with an unchecked "
-                    f"acceptance box — closure ⟺ acceptance broken",
+                    f"acceptance box — closure <=> acceptance broken",
                 ))
     return out
 
@@ -213,13 +213,13 @@ def check_void_source(artifact_roots, rules, sev):
                 out.append(Finding(
                     _label(sev), "void-source", path, _lineno(text, offset + m.start()),
                     f"shippable artifact carries a fabrication/do-not-ship/voided-source "
-                    f"marker: “{m.group(0)}” — a figure's source may be stale or invented",
+                    f"marker: '{m.group(0)}' — a figure's source may be stale or invented",
                 ))
     return out
 
 
 def check_voice(artifact_roots, rules, sev_exclaim, sev_lexicon):
-    """voice-exclaim (C3) — exclamation in prose · voice-lexicon (C3) — the banned lexicon."""
+    """voice-exclaim (C3) — exclamation in prose, voice-lexicon (C3) — the banned lexicon."""
     out = []
     banned = []
     if sev_lexicon != "off" and rules.lexicon:
@@ -240,7 +240,7 @@ def check_voice(artifact_roots, rules, sev_exclaim, sev_lexicon):
                 if m:
                     out.append(Finding(
                         _label(sev_lexicon), "voice-lexicon", path, _lineno(text, offset + m.start()),
-                        f"banned lexicon: “{m.group(0)}”",
+                        f"banned lexicon: '{m.group(0)}'",
                     ))
     return out
 
@@ -298,7 +298,7 @@ def main(argv=None):
     ap.add_argument("--tasks", nargs="*", default=[],
                     help="task-log files/globs (closure)")
     ap.add_argument("--artifacts", nargs="*", default=[],
-                    help="shippable artifact files/dirs (void-source · voice · dangling-ref)")
+                    help="shippable artifact files/dirs (void-source, voice, dangling-ref)")
     ap.add_argument("--banned", default=None, help="default banned-lexicon file (one term/line)")
     ap.add_argument("--soft", action="append", default=[], metavar="RULE",
                     help="relax a rule to WARN (repeatable); one of: " + ", ".join(RULES))
@@ -316,7 +316,7 @@ def main(argv=None):
         for r in unknown:
             print(f"  [CONFIG] unknown rule: {r} (rules: {', '.join(RULES)})")
         print("-" * 44)
-        print("CONFIG-ERROR · an unknown rule was named — nothing was checked.")
+        print("CONFIG-ERROR, an unknown rule was named — nothing was checked.")
         return 2
     rules = RuleSet(default_lexicon, soft=args.soft, off=args.off)
     try:
@@ -325,7 +325,7 @@ def main(argv=None):
         print(BANNER)
         print(f"  [CONFIG] {e}")
         print("-" * 44)
-        print("CONFIG-ERROR · the effective rule set has every rule off — refused.")
+        print("CONFIG-ERROR, the effective rule set has every rule off — refused.")
         return 2
 
     # Non-vacuity: a --tasks/--artifacts root that matches zero files means the gate would check
@@ -338,7 +338,7 @@ def main(argv=None):
         for r in task_empty + art_empty:
             print(f"  [CONFIG] root matched zero files: {r}")
         print("-" * 44)
-        print(f"CONFIG-ERROR · a --tasks/--artifacts root matched zero files "
+        print(f"CONFIG-ERROR, a --tasks/--artifacts root matched zero files "
               f"(scanned {len(task_files)} task + {len(art_files)} artifact files) — a gate that "
               f"scans nothing must not PASS. Fix the path/glob or the cwd.")
         return 2
@@ -358,12 +358,12 @@ def main(argv=None):
     print(BANNER)
     print_rules(rules, len(task_files), len(art_files))
     if not findings:
-        print("PASS · no findings")
+        print("PASS, no findings")
     for f in fails + warns:
         print(f)
     print("-" * 44)
     print(f"scanned {len(task_files)} task file(s) + {len(art_files)} artifact file(s)")
-    print(f"{'FAIL' if fails else 'PASS'} · {len(fails)} FAIL · {len(warns)} WARN")
+    print(f"{'FAIL' if fails else 'PASS'}, {len(fails)} FAIL, {len(warns)} WARN")
     print("(the editorial reviewer agent — reviewer ≠ builder — covers the "
           "semantic half: contradictions, figure-source currency, invented prose)")
     return 1 if fails else 0

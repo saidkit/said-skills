@@ -14,7 +14,7 @@ Before proposing a default, accepting a spawned-agent's framing, or answering "w
 - **Fresh sweep, no carry.** Each run re-searches for the current question; it never makes later answers "automatically precedent-checked".
 - **Single-pass; never self-loop.** Run once, emit the status signal, stop. The status is for a driver to read (a future `--exhaustive` sweep) — this skill does not loop itself.
 - **Emit the retrieval-status stop signal** (below) at the end of every run.
-- **Agnostic.** Adapt to whatever decision-record layout the project uses (`docs/adr/` vs `decision-log/` vs RFCs; `docs/working/` vs `notes/` vs `planning/`). No decision record at all → that is the first finding ("no decision record found — proposing without precedent").
+- **Agnostic.** Adapt to whatever decision-record layout the project uses (`docs/adr/` vs `decision-log/` vs RFCs; `docs/working/` vs `notes/` vs `planning/`). No decision record at all -> that is the first finding ("no decision record found — proposing without precedent").
 
 ## Invocation
 
@@ -31,13 +31,13 @@ Before proposing a default, accepting a spawned-agent's framing, or answering "w
 ## Output
 
 List what was found per source, with citations. Then:
-- If precedent EXISTS → default to it; cite the source; surface conflicts between precedent and the current proposal (especially agent-produced ones) as the FIRST thing in your output.
-- If precedent DOES NOT exist → name the gap explicitly; propose a default grounded in adjacent precedents (similar features, related ADRs) AND surface the gap as something the project may want to codify (e.g., as a new ADR or memory entry).
+- If precedent EXISTS -> default to it; cite the source; surface conflicts between precedent and the current proposal (especially agent-produced ones) as the FIRST thing in your output.
+- If precedent DOES NOT exist -> name the gap explicitly; propose a default grounded in adjacent precedents (similar features, related ADRs) AND surface the gap as something the project may want to codify (e.g., as a new ADR or memory entry).
 
 ## Retrieval status — the loop-ready stop signal
 
 Close every run with an explicit status block, so a driver (or a future `--exhaustive` sweep) can decide whether another pass is worth it:
 
-- **coverage:** `complete` — all five sources swept and the last pass surfaced no new precedent (dry) · `partial` — sources left unswept, or fresh leads still point outward.
-- **goal:** `achieved` — the decision/precedent question is answered · `open` — not yet answered · `none` — search exhausted, no precedent exists (recorded as a gap to codify).
+- **coverage:** `complete` — all five sources swept and the last pass surfaced no new precedent (dry), `partial` — sources left unswept, or fresh leads still point outward.
+- **goal:** `achieved` — the decision/precedent question is answered, `open` — not yet answered, `none` — search exhausted, no precedent exists (recorded as a gap to codify).
 - **retrieval complete: yes | no** — the stop signal. `yes` when `goal: achieved` OR `coverage: complete`; `no` only when coverage is partial AND the goal is still open (another sweep can still surface precedent).

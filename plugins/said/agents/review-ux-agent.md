@@ -60,7 +60,7 @@ You run this in **as few assistant turns as possible**. The procedure below is s
 
 5. **Visual parity (<RULE-LABEL>) in ONE parallel-playwright turn.** In a single assistant message, issue `browser_navigate(feature-url)` + `browser_take_screenshot('feature.png')` + `browser_navigate(reference-url)` + `browser_take_screenshot('reference.png')` as parallel tool calls. Compare for visible regressions; record findings.
 
-6. **Per-rule Read assertions for non-bash rules.** For rules whose `verify:` says "Read X and confirm …" (<RULE-LABEL>, <RULE-LABEL> field-counting, <RULE-LABEL> RBAC structure, <RULE-LABEL>, <RULE-LABEL>, <RULE-LABEL>), issue ALL Reads in ONE assistant turn in parallel. ONE turn = all judgment-bearing Reads done.
+6. **Per-rule Read assertions for non-bash rules.** For rules whose `verify:` says "Read X and confirm ..." (<RULE-LABEL>, <RULE-LABEL> field-counting, <RULE-LABEL> RBAC structure, <RULE-LABEL>, <RULE-LABEL>, <RULE-LABEL>), issue ALL Reads in ONE assistant turn in parallel. ONE turn = all judgment-bearing Reads done.
 
 7. **Classify + emit report.** ONE turn = final text output, no tool calls. Use the report shape below verbatim.
 
