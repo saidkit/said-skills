@@ -504,7 +504,7 @@ def main():
                     % (len(oracle_built), oracle_intended, len(oracle_units)))
     else:
         cap_note = ("capture: manifest/declared-evidence; %d in oracle-intended containers "
-                    "(no two-witness-parseable capture)" % oracle_intended)
+                    "(no author-independent capture available)" % oracle_intended)
     print("completeness PASS: %d designed <= %d built + %d dropped (%s)"
           % (len(designed), len(built), len(dropped), cap_note))
     sys.exit(0)

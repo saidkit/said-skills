@@ -35,10 +35,10 @@ The operator invokes:
 
 `<path>` resolves to one of (the `docs/...` roots below come from `SAID.docs-root:` / `SAID.working:` on the `## Lane` block; no key -> HALT):
 
-- a **unit spec** - one unit, at the grammar's `unit-home` (an inline `## <unit> <ID>` section, or a file under the declared `dir:` unit-home).
-- `docs/features/<FEAT-ID>.md` - feature spec; outline scope + every unit the spec references (inline `## <unit>` sections AND, where `unit-home` is a `dir:`, the linked unit files).
+- a **unit spec** - one unit, at the grammar's `unit-home` (an inline `### <unit> <ID>` sub-section, or a file under the declared `dir:` unit-home).
+- `docs/features/<FEAT-ID>.md` - feature spec; outline scope + every unit the spec references (inline `### <unit>` sub-sections AND, where `unit-home` is a `dir:`, the linked unit files).
 - `docs/working/<feature>/scope.md` - scope only.
-- `docs/working/<feature>/` - directory; glob `scope.md` + any linked unit files + any inline `## <unit>` sections in sibling spec files.
+- `docs/working/<feature>/` - directory; glob `scope.md` + any linked unit files + any inline `### <unit>` sub-sections in sibling spec files.
 
 ## Out of scope
 
