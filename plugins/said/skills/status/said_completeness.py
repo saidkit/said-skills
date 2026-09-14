@@ -39,7 +39,8 @@ Honesty rests on the comparison + recompute + capture:
 Trust tiers are declaration-bound (grammar `oracle-containers:`): a container is oracle-verified where an
 executed capture runs AND the tool's `--help` is two-witness parseable (its unit declares a `cmd:`), else
 declared-evidence (manifest). The verdict reports the oracle-verified count and how many units were
-two-witness oracle-verified.
+two-witness oracle-verified, and WARNs when a designed oracle flag falls to declared-evidence because its
+tool's `--help` is not two-witness parseable (the coverage ceiling, surfaced per-run, not silent).
 
 Grammar resolution: `--grammar <path>` argv, else $SAID_GRAMMAR; the section is selected by
 $SAID_SURFACE. A missing grammar die(2)s with a named redirect; two matching surface-sections exit 2.
@@ -481,6 +482,21 @@ def main():
     if not ((built & designed) | oracle_built):
         die("FAIL: no designed element is built (every designed element dropped) - vacuous completeness; "
             "a delivered feature builds at least one designed element", 1)
+
+    # Own the coverage ceiling: a designed oracle-container flag can fall to declared-evidence when its unit
+    # DECLARED a capture cmd: but the tool's --help is not two-witness parseable (hand-formatted / truncated
+    # synopsis). That is a legitimate honest fallback (it PASSes, manifest-built) but must not be SILENT -
+    # WARN so a reader knows those flags are author-trusted (manifest), not author-independently verified.
+    for u in sorted(help_cache):
+        if help_cache[u][0]:
+            continue                      # two-witness parseable -> genuinely oracle-verified, no ceiling
+        fell = sorted(k for (uu, k) in designed
+                      if uu == u and container_of.get((uu, k)) in g["oracle_containers"] and (uu, k) not in dropped)
+        if fell:
+            sys.stderr.write(
+                "completeness WARN: unit %r declares a capture cmd but its --help is not two-witness "
+                "parseable; %d designed oracle flag(s) verified by declared-evidence (manifest), NOT "
+                "author-independently -- coverage ceiling: %s\n" % (u, len(fell), ", ".join(fell)))
 
     oracle_intended = sum(1 for k in designed if container_of.get(k) in g["oracle_containers"])
     if oracle_units:
