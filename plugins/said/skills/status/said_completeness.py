@@ -28,14 +28,18 @@ Honesty rests on the comparison + recompute + capture:
   - the L2 oracle verdict-recompute (said_status.py --reviewer-gate re-derives, never trusts a PASS);
   - BUILT capture: for a **cli** unit whose manifest declares a `cmd:`, the grammar's oracle-containers
     are verified author-independently by executing that command's own `--help` read-only (command-path +
-    `--help` only - every invocation flag stripped; flags read from the option-definition lines, not
-    prose); a **non-cli (web)** unit runs its front-declared probe as-given (the front owns its
-    read-only-ness; no `--help`, no flag-strip); the rest is read from the capture manifest
-    (declared-evidence).
+    `--help` only - every invocation flag stripped). A flag is oracle-verified by TWO machine witnesses
+    (two-witness): the first usage-synopsis block AND an options-section+column cluster corroborated by it -
+    a flag in prose, an epilog, a description column, or only one witness is not verified. A tool whose
+    `--help` is not two-witness parseable (hand-rolled / truncated `[options]` synopsis) falls to
+    declared-evidence, never a false FAIL. A **non-cli (web)** unit runs its front-declared probe as-given
+    (the front owns its read-only-ness; no `--help`, no flag-strip); the rest is read from the capture
+    manifest (declared-evidence).
 
 Trust tiers are declaration-bound (grammar `oracle-containers:`): a container is oracle-verified where an
-executed capture actually runs (its unit declares a `cmd:`), else declared-evidence (manifest). The
-verdict reports the oracle-verified count and how many units ran an executed capture.
+executed capture runs AND the tool's `--help` is two-witness parseable (its unit declares a `cmd:`), else
+declared-evidence (manifest). The verdict reports the oracle-verified count and how many units were
+two-witness oracle-verified.
 
 Grammar resolution: `--grammar <path>` argv, else $SAID_GRAMMAR; the section is selected by
 $SAID_SURFACE. A missing grammar die(2)s with a named redirect; two matching surface-sections exit 2.
@@ -53,7 +57,12 @@ import sys
 
 RULE_TOKEN = "UXP-R-1"
 KEY_RE = re.compile(r"^(\s*)-\s+(.+?):\s*$")   # a valueless bulleted key: `- <key>:`
-FLAG_RE = re.compile(r"(?<![\w-])(--?[A-Za-z][\w-]*)")   # a flag token in --help output
+FLAG_RE = re.compile(r"(?<![\w=-])(--?[A-Za-z][\w-]*)")   # a flag token in --help output (a value after `=` is not a flag)
+# an option-definition line: indented, opening with a flag cluster (flag + comma-separated aliases).
+# group(1) = the leading indent (for column-anchoring), group(2) = the leading flag cluster.
+OPT_RE = re.compile(r"([ \t]+)(-{1,2}[A-Za-z][\w-]*(?:[ \t]*,[ \t]*-{1,2}[A-Za-z][\w-]*)*)")
+SECTION_HDR_RE = re.compile(r"(?i)^(options|optional arguments|flags):\s*$")   # an options-section header
+USAGE_HDR_RE = re.compile(r"(?i)^\s*usage:")   # the usage-synopsis header
 
 
 def die(msg, code):
@@ -237,25 +246,88 @@ def read_manifest(cap):
     return built, dropped, cmds
 
 
+def _usage_synopsis_flags(text):
+    """Witness-1: the optional flags in the FIRST `usage:` synopsis block, read as synopsis GRAMMAR (not as
+    raw flag-shaped tokens - that is what makes this witness independent of the options section).
+
+    The block is the `usage:` line plus its indented continuation lines, ending at the first blank line,
+    options-section header, or column-0 line (so it never absorbs the options section). Then:
+      - from the FIRST `usage:` line, every flag token (a value after `=` is excluded by FLAG_RE's
+        lookbehind) - this covers a bare required option (argparse prints it unbracketed) and bracketed
+        optionals alike;
+      - from each wrapped CONTINUATION line, only flags inside a `[...]` group (a real wrapped optional).
+    A bare flag-shaped token on a continuation line, or a flag named in prose, is NOT a synopsis optional
+    and is ignored - so a phantom cannot enter witness-1 (this is the boundary a raw-token scan got wrong).
+    A truncated `[options]` synopsis yields no flags; a `usage:` line forged later (an epilog) injects nothing."""
+    lines = text.splitlines()
+    start = next((i for i, ln in enumerate(lines) if USAGE_HDR_RE.match(ln)), None)
+    if start is None:
+        return set()
+    block = [lines[start]]
+    for ln in lines[start + 1:]:
+        if ln.strip() == "" or SECTION_HDR_RE.match(ln) or not ln[:1].isspace():
+            break                     # a blank line, an options header, or a column-0 line ends the synopsis
+        block.append(ln)
+    flags = set(FLAG_RE.findall(block[0]))                       # first usage line: bare + bracketed optionals
+    for ln in block[1:]:                                         # continuations: only bracketed optionals
+        for grp in re.findall(r"\[([^\]]*)\]", ln):
+            flags.update(FLAG_RE.findall(grp.split("=")[0]))
+    return flags
+
+
+def _options_section_clusters(text):
+    """Witness-2: the option-definition CLUSTERS at the definition column inside a detected options
+    section (an `options:` / `optional arguments:` / `flags:` header to the next column-0 line). Each
+    cluster is the flag tokens of one definition line's leading cluster (`-j, --json` -> {-j, --json}).
+    Column-anchored to the shallowest indent, so a wrapped description line (deeper column) or a flag
+    named inside a description never becomes a definition. Empty if no section (hand-rolled help)."""
+    lines = text.splitlines()
+    in_sec = False
+    defs = []
+    for ln in lines:
+        if SECTION_HDR_RE.match(ln):
+            in_sec = True
+            continue
+        if in_sec and re.match(r"^\S", ln):   # a column-0 line ends the section
+            in_sec = False
+        if in_sec:
+            m = OPT_RE.match(ln)
+            if m:
+                defs.append((len(m.group(1)), set(FLAG_RE.findall(m.group(2)))))
+    if not defs:
+        return []
+    col = min(ind for ind, _ in defs)
+    return [flags for ind, flags in defs if ind == col]
+
+
 def capture_help(cmd_str):
-    """Read-only executed capture: run ONLY the command-path tokens + --help and return the
-    set of flag tokens the command's own --help lists in its OPTION LINES (author-independent BUILT for
-    the oracle tier).
+    """Read-only executed capture for the cli oracle tier - the two-witness sound-tier.
 
-    Read-only guarantee (the leg that must never re-open the read-only hole (a flag from the invocation reaching the spawned process)):
-      - shlex-split the declared command and DROP every token starting with '-', so no flag from the
-        invocation ever executes (a mutating / `--dangerous` flag is stripped, never spawned);
-      - reject a token carrying a shell metacharacter or '=' (a `cmd:` is a command path, not a shell
-        line or an operand=value) - defense-in-depth on top of the no-shell spawn;
-      - keep the FULL command path (binary + every subcommand word), never a truncated parent;
-      - append only `--help`; run list-form (shell=False) with a timeout.
-    The `cmd:` names a read-only command path the lane maintainer declares (the same trust model as
-    `said-recompute` / `SAID.commands`), assumed to treat `--help` as a short-circuit; the engine cannot
-    tell a subcommand word from a positional operand, so a maintainer who declares a mutating command
-    path owns that - the engine's guarantee is that IT forwards no flag and appends only `--help`.
+    Runs ONLY the command-path tokens + `--help` and returns `(oracle_tier, verified)`:
+      - shlex-split the declared command and DROP every token starting with '-', so no invocation flag
+        ever executes (a mutating / `--dangerous` flag is stripped, never spawned);
+      - reject a token carrying a shell metacharacter or '=' - defense-in-depth on the no-shell spawn;
+      - keep the FULL command path (binary + every subcommand word); append only `--help`; list-form
+        (shell=False) with a timeout. This adds NO new execution surface over the prior capture.
+    The `cmd:` is a read-only command path the maintainer declares (same trust model as `said-recompute`
+    / `SAID.commands`); the engine forwards no flag and appends only `--help`.
 
-    Extraction is scoped to OPTION LINES (first non-space char is '-'), never the whole capture, so a
-    flag named only in --help PROSE ("--x was removed; use --y") is not miscounted as built (P3-G).
+    `oracle_tier` is True iff the --help presents BOTH machine witnesses: a first usage-synopsis block
+    that enumerates flags (witness-1) AND an options section with a definition column (witness-2). Both
+    present signals framework-generated help, where the options column is the parser's own authoritative
+    flag list. Missing either witness -> False, and the caller keeps the unit at declared-evidence
+    (manifest) - never a false FAIL (hand-rolled help, or a truncated `[options]` synopsis).
+
+    `verified` is the flag tokens of every option-definition cluster CORROBORATED by the usage synopsis
+    (shares >=1 token with witness-1). Cluster-level, so an aliased flag (usage shows `-j`, the section
+    lists `-j, --json`) is verified for either spelling; a lone option-column line not in the synopsis (a
+    hand-added or prose-injected flag) is NOT verified. Empty when not oracle_tier.
+
+    Soundness: a flag named only in prose, an epilog, a description column, a markdown bullet, or a forged
+    non-first `usage:` line is in neither witness, so it is never verified - closing the indented
+    flag-initial prose residual a single-witness line scan could not. The honest residual (an inherent
+    ceiling): a flag presented as a real option in BOTH the synopsis and the options column is trusted; a
+    tool that prints a phantom flag in both surfaces has its own --help bug, not a completeness miss.
     """
     bad = re.compile(r"[;&|<>`$()=]")   # shell control / redirect / subshell / operand=value
     try:
@@ -275,26 +347,20 @@ def capture_help(cmd_str):
         proc = subprocess.run(path + ["--help"], capture_output=True, text=True, timeout=10, check=False)
     except (OSError, ValueError, subprocess.SubprocessError) as e:
         die("FAIL: read-only capture spawn failed for %r: %s" % (" ".join(path), e), 1)
-    # Harvest flags from the OPTION-DEFINITION lines of --help. An option definition is INDENTED and
-    # opens with a flag token; take only its leading flag cluster (the flag + comma-separated aliases,
-    # stopping at the first non-flag token). So a flag named in a description ("--json  use instead of
-    # --ghost"), a usage synopsis ("usage: t [--ghost]"), a markdown bullet, or a column-0
-    # prose/deprecation line ("--ghost was removed; use --json") is NOT counted - author-independent and
-    # robust to the common prose-mention shapes.
-    #
-    # BOUND (honest, not a formal --help parser): an *indented* prose line that itself opens with a flag
-    # token ("  --ghost is planned") is indistinguishable from an option definition and IS counted - the
-    # oracle trusts the tool's own --help layout. So the guarantee is "a designed flag must appear as an
-    # option-definition-shaped line in the tool's own --help", not "the flag is implemented". A tool that
-    # lists a non-existent flag in option-definition shape is the tool's own --help bug. (SAID-17
-    # round-2 acceptance: the per-line prose heuristic cannot close this fully; see the ADR.)
-    OPT_RE = re.compile(r"[ \t]+(-{1,2}[A-Za-z][\w-]*(?:[ \t]*,[ \t]*-{1,2}[A-Za-z][\w-]*)*)")
-    flags = set()
-    for line in ((proc.stdout or "") + "\n" + (proc.stderr or "")).splitlines():
-        m = OPT_RE.match(line)
-        if m:
-            flags.update(FLAG_RE.findall(m.group(1)))
-    return flags
+    # Two-witness extraction. A single-witness scan (any indented flag-initial line) could not reject an
+    # indented flag-initial PROSE line - it was miscounted. A flag is now oracle-verified only
+    # where TWO machine-emitted witnesses agree: the first usage-synopsis block (witness-1) AND an
+    # option-definition cluster in the options section (witness-2), the cluster corroborated by the synopsis.
+    text = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    usage = _usage_synopsis_flags(text)          # witness-1
+    clusters = _options_section_clusters(text)   # witness-2 (option-definition clusters, column-anchored)
+    if not (usage and clusters):
+        return False, set()                      # not two-witness parseable -> caller keeps declared-evidence
+    verified = set()
+    for cl in clusters:
+        if cl & usage:                           # cluster corroborated by the usage synopsis
+            verified |= cl
+    return True, verified
 
 
 def capture_web(cmd_str):
@@ -370,23 +436,31 @@ def main():
         die("no capture manifest at %s" % cap, 2)
     built, dropped, cmds = read_manifest(cap)
 
-    # executed read-only capture for the oracle tier: a designed element in an oracle-container whose unit
-    # declares a `cmd:` is proven BUILT only if it appears in that command's own --help (a manifest
-    # `built:` line cannot bluff it). A unit without a `cmd:` stays declared-evidence (manifest).
-    oracle_built, executed_units, help_cache = set(), set(), {}
+    # executed read-only capture for the oracle tier (two-witness). A designed element in an
+    # oracle-container whose unit declares a `cmd:` is proven BUILT only where the command's own --help is
+    # two-witness parseable AND the flag is verified by both witnesses (a manifest `built:` cannot bluff
+    # it). A unit whose --help is NOT two-witness parseable (hand-rolled help / truncated synopsis) stays
+    # declared-evidence (manifest) - the honest fallback, never a false FAIL. A unit without a `cmd:` is
+    # declared-evidence too.
+    oracle_built, oracle_units, help_cache = set(), set(), {}
     for (u, key) in designed:
         if container_of.get((u, key)) not in g["oracle_containers"] or u not in cmds:
             continue
         if u not in help_cache:
-            # cli: the safe `--help` capture (flags from option lines); other surfaces (web): the
-            # front-supplied read-only probe (built keys, one per line). SAID_SURFACE selects.
-            help_cache[u] = capture_help(cmds[u]) if surface == "cli" else capture_web(cmds[u])
-            executed_units.add(u)
-        if key in help_cache[u]:
+            # cli: capture_help returns (oracle_tier, verified). web: the front-supplied probe is machine
+            # output (built keys, one per line), always oracle-tier. SAID_SURFACE selects.
+            if surface == "cli":
+                help_cache[u] = capture_help(cmds[u])
+            else:
+                help_cache[u] = (True, capture_web(cmds[u]))
+            if help_cache[u][0]:
+                oracle_units.add(u)          # only a two-witness-parseable tool is oracle-enforced
+        tier, verified = help_cache[u]
+        if tier and key in verified:
             oracle_built.add((u, key))
 
     def oracle_executed(u, key):
-        return u in executed_units and container_of.get((u, key)) in g["oracle_containers"]
+        return u in oracle_units and container_of.get((u, key)) in g["oracle_containers"]
 
     missing = []
     for (u, key) in sorted(designed):
@@ -409,12 +483,12 @@ def main():
             "a delivered feature builds at least one designed element", 1)
 
     oracle_intended = sum(1 for k in designed if container_of.get(k) in g["oracle_containers"])
-    if executed_units:
-        cap_note = ("oracle-verified: %d/%d in %d executed-capture unit(s); rest manifest/declared-evidence"
-                    % (len(oracle_built), oracle_intended, len(executed_units)))
+    if oracle_units:
+        cap_note = ("oracle-verified: %d/%d in %d two-witness oracle unit(s); rest manifest/declared-evidence"
+                    % (len(oracle_built), oracle_intended, len(oracle_units)))
     else:
         cap_note = ("capture: manifest/declared-evidence; %d in oracle-intended containers "
-                    "(no executed capture declared)" % oracle_intended)
+                    "(no two-witness-parseable capture)" % oracle_intended)
     print("completeness PASS: %d designed <= %d built + %d dropped (%s)"
           % (len(designed), len(built), len(dropped), cap_note))
     sys.exit(0)
