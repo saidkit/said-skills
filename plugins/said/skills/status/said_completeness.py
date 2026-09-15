@@ -15,9 +15,13 @@ not an element, and it does not disqualify its parent from being a leaf element)
 DESIGNED is a set of `(unit, key)` pairs.
 
 No toc seal: there is NO `toc-checksum:` read. The operator hand-edits `toc.md` freely; no check fails
-on a legitimate design-content edit. The two bounded exceptions are machine-written front-matter (an
-absent `grammar:<token>` stamp FAILs - provenance is not opt-out by deletion) and a unit that
-yields zero designed elements (a hollow FAIL; a legitimately-emptied container is written `<container>: none - <reason>`).
+on a legitimate design-content edit. The bounded exceptions are all machine-written front-matter or
+structural: (1) an absent `grammar:<token>` stamp FAILs - provenance is not opt-out by deletion;
+(2) a unit that yields zero designed elements is a hollow FAIL (a legitimately-emptied container is
+written `<container>: none - <reason>`); (3) on a `dir:` unit-home lane the sealed `units: A;B;C
+(count: N)` line is required (absent -> FAIL) and count-sealed (mismatch -> FAIL) - it names the
+DECLARED unit set the durable-spec check resolves, machine-written by uxtoc; an `inline` lane has no
+such line. None of these reads or digests the design content, so a content edit never FAILs.
 
 Honesty rests on the comparison + recompute + capture:
   - the comparison DESIGNED subset-of (BUILT union accounted-drops), with the attribute-group
@@ -58,6 +62,16 @@ import sys
 
 RULE_TOKEN = "UXP-R-1"
 KEY_RE = re.compile(r"^(\s*)-\s+(.+?):\s*$")   # a valueless bulleted key: `- <key>:`
+# the sealed DECLARED-units line uxtoc stamps into toc.md: `units: A;B;C (count: N)`. The engine reads the
+# declared unit set from HERE - read explicitly, never inferred from free-form outline prose (uxtoc knows
+# exactly which units it mirrored, so it declares them and `count` seals the line, exactly like the grammar's
+# `count=` sentinel; inferring "is this markdown header a real unit" from prose is fragile by construction).
+UNITS_RE = re.compile(r"(?m)^units:\s*(.*?)\s*\(count:\s*(\d+)\)\s*$")
+# auto-added flags every CLI framework emits; never "designed", so flagging them under-spec is pure noise.
+# Judged by the LONG form where a cluster has one (so `-v, --version` suppresses but `-h, --hard-reset` does
+# not); a lone short flag with no long form falls back to the unambiguous-help short set.
+BOILERPLATE_LONG = frozenset({"--help", "--version", "--usage", "--help-all"})
+BOILERPLATE_SHORT = frozenset({"-h", "-?"})
 FLAG_RE = re.compile(r"(?<![\w=-])(--?[A-Za-z][\w-]*)")   # a flag token in --help output (a value after `=` is not a flag)
 # an option-definition line: indented, opening with a flag cluster (flag + comma-separated aliases).
 # group(1) = the leading indent (for column-anchoring), group(2) = the leading flag cluster.
@@ -148,11 +162,81 @@ def load_grammar(path, surface):
     }
 
 
-def read_grammar_stamp(path):
-    """The `grammar:<token>` front-matter line uxtoc stamps into toc.md, or None if absent."""
+_FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")   # a CommonMark fence opener: indented at most 3 spaces
+
+
+def _content_lines(path):
+    """The file's lines with fenced (``` / ~~~) code blocks removed - the ONE fence rule both the
+    front-matter/`units:` readers and the element parser share (so they can never disagree). A fence opens
+    only when indented <= 3 spaces (CommonMark); a same-kind fence of >= the opening length closes it; a
+    different-kind or shorter marker inside a fence is content. An UNTERMINATED fence is malformed input:
+    FAIL loud (never silently drop the units/elements after it). Line endings stripped; tabs preserved."""
+    kept, fence = [], None
     with open(path, encoding="utf-8") as fh:
-        m = re.search(r"(?m)^grammar:\s*(\S+)\s*$", fh.read())
+        for raw in fh:
+            s = raw.rstrip("\r\n")
+            fm = _FENCE_RE.match(s)
+            if fm:
+                mark = fm.group(1)
+                rest = s.lstrip()[len(mark):].strip()   # text after the marker run (an "info string")
+                if fence is None:
+                    fence = (mark[0], len(mark)); continue   # an opener MAY carry an info string
+                # a CLOSER must be the same kind, >= the opening length, and BARE (no info string) - per
+                # CommonMark; a nested ` ```lang ` inside a block is content, not a close.
+                if mark[0] == fence[0] and len(mark) >= fence[1] and rest == "":
+                    fence = None; continue
+            if fence is None:
+                kept.append(s)
+    if fence is not None:
+        die("FAIL: toc.md has an unterminated code fence - a dangling fence would silently drop every "
+            "unit/element after it; close the fence or remove it", 1)
+    return kept
+
+
+def _defence(path):
+    """The file's text with fenced code blocks removed (a stamp or `units:` line shown inside a documentation
+    fence is not read as the real one). Built on the shared `_content_lines` fence rule."""
+    return "\n".join(_content_lines(path)) + "\n"
+
+
+def read_grammar_stamp(path):
+    """The `grammar:<token>` front-matter line uxtoc stamps into toc.md, or None if absent. Read outside any
+    fenced block (a documentation example of the stamp does not count) - consistent with the unit parser."""
+    m = re.search(r"(?m)^grammar:\s*(\S+)\s*$", _defence(path))
     return m.group(1) if m else None
+
+
+def read_units_decl(path):
+    """The sealed `units: <ID1>;<ID2>;... (count: N)` line uxtoc stamps into toc.md - the AUTHORITATIVE
+    DECLARED unit set for the durable-spec check, read explicitly rather than inferred from prose. Returns a
+    set of ids, or None if the line is absent. A count that disagrees with the listed ids is a stale /
+    hand-fudged line -> FAIL (unbluffable, exactly like the grammar's `count=` sentinel). Read outside any
+    fenced block so a documentation example of the line does not count."""
+    m = UNITS_RE.search(_defence(path))
+    if not m:
+        return None
+    ids = [x.strip() for x in m.group(1).split(";") if x.strip()]
+    # A unit id becomes the durable filename `<ID>.md`. Require a PORTABLE id: ASCII word chars, dot, dash.
+    # This is deliberately strict (not just "no path separators"): a non-ASCII filename resolves through
+    # platform-dependent Unicode normalization (macOS NFD vs Linux byte-exact), so a non-ASCII id would make
+    # the durable-spec verdict non-deterministic across machines. The uxtoc emit slugifies a non-ASCII unit
+    # name so the id stays a plain-ASCII, portable filename component.
+    bad = [x for x in ids if not re.match(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$", x) or ".." in x]
+    if bad:
+        die("FAIL: toc.md `units:` has a non-portable id: %s - a unit id is a portable filename component "
+            "([A-Za-z0-9._-], ASCII, no leading/trailing dot-or-dash, no path separator); a non-ASCII unit "
+            "name must be slugified at emit; re-emit with uxtoc" % ", ".join(bad), 1)
+    n = int(m.group(2))
+    # seal on the UNIQUE id count - `A;A (count: 2)` must not pass as two units (unbluffable like count=).
+    if len(set(ids)) != n:
+        die("FAIL: toc.md `units:` count %d != %d distinct listed id(s) - a stale, duplicated, or miscounted "
+            "units line; re-emit with uxtoc" % (n, len(set(ids))), 1)
+    # two ids differing only by case resolve to the same durable on a case-insensitive filesystem -> a
+    # platform-dependent verdict; reject so the check is deterministic everywhere.
+    if len({x.lower() for x in ids}) != len(set(ids)):
+        die("FAIL: toc.md `units:` has ids differing only by case - ambiguous on a case-insensitive "
+            "filesystem; give each unit a case-distinct id", 1)
+    return set(ids)
 
 
 def parse_designed(path, unit, containers, attributes, not_elements):
@@ -160,18 +244,23 @@ def parse_designed(path, unit, containers, attributes, not_elements):
     element unless its key is a NON-ELEMENT key - the grammar's attribute set (an attribute group)
     OR its not-elements set (declared scaffolding, e.g. Sorts, Empty state) - or it is a real
     sub-grouping (it has a descendant keyed line that is itself an element key - e.g. a form Sections
-    section-name). A nested non-element key never disqualifies its parent from being a leaf."""
+    section-name). A nested non-element key never disqualifies its parent from being a leaf.
+
+    Fenced code blocks are skipped (an outline EXAMPLE in a ``` block is neither designed nor gated) and
+    indentation is tab-aware. The DECLARED unit set (for the durable-spec check) is NOT inferred here - it is
+    read from the sealed `units:` line uxtoc stamps (read_units_decl); this function returns only the projected
+    element set (and its container map)."""
     nonelt = set(attributes) | set(not_elements)
     unit_re = re.compile(r"^##\s+" + re.escape(unit) + r"\s+(\S+)")
-    lines = []
-    with open(path, encoding="utf-8") as fh:
-        for raw in fh:
-            if raw.strip():
-                lines.append(raw.rstrip("\n"))
+    # skip fenced code blocks (an outline EXAMPLE inside a ``` / ~~~ fence must not be parsed as real
+    # units/elements) via the SHARED fence rule (`_content_lines`, same rule the front-matter/`units:`
+    # readers use - so they can never disagree); an unterminated fence FAILs loud there. Then drop blanks.
+    lines = [s for s in _content_lines(path) if s.strip()]
     meta = []
     for ln in lines:
         m = KEY_RE.match(ln)
-        meta.append((len(ln) - len(ln.lstrip(" ")), m.group(2) if m else None))
+        exp = ln.expandtabs(4)                        # tab-aware indent (markdown authors use tabs)
+        meta.append((len(exp) - len(exp.lstrip(" ")), m.group(2) if m else None))
 
     def is_grouping(i, ind):
         """True if the keyed line at i has any descendant keyed line whose key is NOT an attribute
@@ -188,15 +277,20 @@ def parse_designed(path, unit, containers, attributes, not_elements):
 
     designed = set()
     container_of = {}
+    headers = set()                       # every `## <unit> <ID>` header id present in the outline (a
+                                          # presence set for cross-checking the sealed units line - NOT the
+                                          # prose inference that was deleted; a header line unambiguously is one)
     unit_id = ""
     cind = None
     for i, ln in enumerate(lines):
         um = unit_re.match(ln)
         if um:
             unit_id, cind = um.group(1), None
+            headers.add(unit_id)
             continue
-        if ln.startswith("## "):          # any non-unit header closes the container context
-            cind = None
+        if ln.startswith("## "):          # any non-unit header closes the container AND unit context, so a
+            cind = None                   # keyed element under a mis-levelled/mis-worded later header is not
+            unit_id = ""                  # silently reparented to the previous unit (it hits the loud guard below)
             continue
         ind, key = meta[i]
         if key is not None and key in containers:
@@ -214,9 +308,13 @@ def parse_designed(path, unit, containers, attributes, not_elements):
             continue
         if is_grouping(i, ind):           # a real sub-grouping (its children are the elements)
             continue
+        if not unit_id:                   # a keyed element before any `## <unit>` header - never silently drop
+            die("FAIL: toc.md has a keyed element under a container before any `## %s <ID>` header "
+                "(key %r) - a mis-levelled (`# ` vs `## `) or mis-worded unit header leaves its elements "
+                "outside any unit; fix the header" % (unit, key), 1)
         designed.add((unit_id, key))
         container_of[(unit_id, key)] = active_container
-    return designed, container_of
+    return designed, container_of, headers
 
 
 def read_manifest(cap):
@@ -248,27 +346,57 @@ def read_manifest(cap):
     return built, dropped, cmds
 
 
-def check_unit_home(g, grammar_path, designed):
-    """Resolve the grammar's unit-home. For a `dir:<path>` unit-home, every DESIGNED unit needs a durable
+def check_unit_home(g, grammar_path, toc, designed_units, headers):
+    """Resolve the grammar's unit-home. For a `dir:<path>` unit-home, every DECLARED unit needs a durable
     spec at <lane-root>/<path>/<ID>.md - a missing one FAILs (broken-link), and a durable *.md with no
-    DESIGNED unit is an orphan (FAILs). Presence-stat ONLY: never reads a durable file's content, so a
-    legitimate design edit inside it never FAILs (no-seal-safe - a presence stat is not a content/currency
-    digest of the durable spec). An `inline` (or absent) unit-home has no durable dir and skips
-    (medium-agnostic). The lane root reaches a direct harness run via $SAID_ROOT (the reviewer gate injects
-    it); absent, it falls back grammar-relative (grammar at <root>/<docs-root>/ux/feature-ux-grammar.md,
-    so the lane root is three dirs up). Ignore convention: a README, a `_`-prefixed draft, or a dotfile
-    under the durable dir never counts as an orphan."""
+    DECLARED unit is an orphan (FAILs).
+
+    The DECLARED set is read EXPLICITLY from the sealed `units: A;B;C (count: N)` line uxtoc stamps
+    (`declared_line`), NOT inferred from free-form outline prose (inferring "is this markdown header a real
+    unit" from prose is fragile by construction; uxtoc knows exactly which units it mirrored, including one
+    whose containers are legitimately emptied, so it declares them and `count` seals the line). A `dir:` lane
+    therefore REQUIRES the line (absent -> FAIL, re-emit with uxtoc); every unit that projects an element must
+    appear in it (a stale line that omits one -> FAIL); every declared id must be backed by a real `## <unit>
+    <ID>` outline header (a fabricated / stale-basename id -> FAIL, so a phantom cannot mask an orphan); a
+    hand-edited durable that adds/removes an element never changes the declared set, so no legit design edit
+    flips PASS<->FAIL (no-seal-safe). Presence-stat ONLY (never reads a durable's content). An
+    `inline` (or absent) unit-home has no durable dir and skips (medium-agnostic). The lane root reaches a
+    direct harness run via $SAID_ROOT (the reviewer gate injects it); absent, it falls back grammar-relative
+    (grammar at <root>/<docs-root>/ux/feature-ux-grammar.md, so the lane root is three dirs up). Ignore
+    convention: a README, a `_`-prefixed draft, or a dotfile under the durable dir never counts as an orphan."""
     uh = (g.get("unit_home") or "inline").strip()
     if not uh.startswith("dir:"):
-        return
+        return                                  # an inline lane has no durable dir and never reads a units line
+    declared_line = read_units_decl(toc)        # read ONLY on a dir: lane (its shape guards must not fire on inline)
+    if declared_line is None:
+        die("FAIL: unit-home is `dir:` but toc.md has no sealed `units: A;B;C (count: N)` line - the "
+            "durable-spec check reads the DECLARED unit set from it (no prose inference); re-emit with uxtoc", 1)
+    # The declared set must EXACTLY match the outline's `## <unit> <ID>` headers, both directions (a
+    # header-PRESENCE cross-check, NOT the deleted prose inference), and cover every element-projecting unit:
+    #   omitted  = a unit that projects an element but is not on the line (a stale line) -> FAIL
+    #   phantom  = a declared id with no outline header (a fabricated / stale-basename id masking an orphan) -> FAIL
+    #   stranded = an outline header not on the line (a hand-added header, or an emptied unit uxtoc did not
+    #              re-emit) -> FAIL; without this, an element-less header escapes the durable-spec gate.
+    omitted = sorted(designed_units - declared_line)
+    if omitted:
+        die("FAIL: toc.md `units:` line omits unit(s) that design elements: %s - a stale units line; "
+            "re-emit with uxtoc so the sealed set matches the outline" % ", ".join(omitted), 1)
+    stranded = sorted(headers - declared_line)
+    if stranded:
+        die("FAIL: toc.md has `## %s <ID>` header(s) not on the sealed `units:` line: %s - a hand-added or "
+            "un-re-emitted unit escapes the durable-spec gate; re-emit with uxtoc" % (g["unit"], ", ".join(stranded)), 1)
+    phantom = sorted(declared_line - headers)
+    if phantom:
+        die("FAIL: toc.md `units:` line names unit(s) with no `## %s <ID>` outline header: %s - a stale or "
+            "fabricated units line (it must match the outline); re-emit with uxtoc" % (g["unit"], ", ".join(phantom)), 1)
     rel = uh[len("dir:"):].strip().rstrip("/")
     root = os.environ.get("SAID_ROOT") or os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(grammar_path))))
     ddir = os.path.join(root, rel)
-    units = sorted({u for (u, _k) in designed})
+    units = sorted(declared_line)
     missing = [u for u in units if not os.path.isfile(os.path.join(ddir, u + ".md"))]
     if missing:
-        die("FAIL: unit-home dir:%s - durable spec(s) missing for designed unit(s): %s (a renamed / "
+        die("FAIL: unit-home dir:%s - durable spec(s) missing for declared unit(s): %s (a renamed / "
             "deleted / never-authored <ID>.md; re-add or rename it under the durable dir)"
             % (rel, ", ".join(missing)), 1)
     if os.path.isdir(ddir):
@@ -390,12 +518,14 @@ def capture_help(cmd_str):
     usage = _usage_synopsis_flags(text)          # witness-1
     clusters = _options_section_clusters(text)   # witness-2 (option-definition clusters, column-anchored)
     if not (usage and clusters):
-        return False, set()                      # not two-witness parseable -> caller keeps declared-evidence
+        return False, set(), []                  # not two-witness parseable -> caller keeps declared-evidence
     verified = set()
+    corroborated = []
     for cl in clusters:
         if cl & usage:                           # cluster corroborated by the usage synopsis
             verified |= cl
-    return True, verified
+            corroborated.append(frozenset(cl))   # keep clusters so alias groups stay intact (BUILT-DESIGNED WARN)
+    return True, verified, corroborated
 
 
 def capture_web(cmd_str):
@@ -455,14 +585,17 @@ def main():
         die("FAIL: toc.md grammar stamp %r != this grammar's token %r (wrong-grammar outline)"
             % (stamp, g["token"]), 1)
 
-    designed, container_of = parse_designed(toc, g["unit"], g["containers"], g["attributes"], g["not_elements"])
+    designed, container_of, headers = parse_designed(toc, g["unit"], g["containers"], g["attributes"], g["not_elements"])
     if not designed:
         die("FAIL: toc.md yields zero designed elements (hollow - nothing to certify complete; no "
             "keyed elements under container headers, or set Surface: none)", 1)
 
     # resolve the grammar's unit-home: a `dir:` lane's durable per-unit specs are enforced (a missing
     # <ID>.md -> FAIL, an orphan durable file -> FAIL); an inline lane skips. Presence-only (no-seal-safe).
-    check_unit_home(g, grammar, designed)
+    # The DECLARED unit set is read from the sealed `units:` line uxtoc stamps (no prose inference); it is
+    # cross-checked against BOTH the element-projecting units and the outline's `## <unit> <ID>` headers.
+    # check_unit_home reads the line ONLY for a `dir:` lane (an inline lane never touches it).
+    check_unit_home(g, grammar, toc, {u for (u, _k) in designed}, headers)
 
     # BUILT capture. For a unit whose manifest declares a `cmd:`, the grammar's oracle-containers are
     # verified author-independently by executing the command's own --help (capture_help, read-only);
@@ -486,15 +619,17 @@ def main():
         if container_of.get((u, key)) not in g["oracle_containers"] or u not in cmds:
             continue
         if u not in help_cache:
-            # cli: capture_help returns (oracle_tier, verified). web: the front-supplied probe is machine
-            # output (built keys, one per line), always oracle-tier. SAID_SURFACE selects.
+            # cli: capture_help returns (oracle_tier, verified, clusters). web: the front-supplied probe is
+            # machine output (built keys, one per line), always oracle-tier; each key is its own cluster (no
+            # aliases). SAID_SURFACE selects.
             if surface == "cli":
                 help_cache[u] = capture_help(cmds[u])
             else:
-                help_cache[u] = (True, capture_web(cmds[u]))
+                keys = capture_web(cmds[u])
+                help_cache[u] = (True, keys, [frozenset({k}) for k in keys])
             if help_cache[u][0]:
                 oracle_units.add(u)          # only a two-witness-parseable tool is oracle-enforced
-        tier, verified = help_cache[u]
+        tier, verified = help_cache[u][0], help_cache[u][1]
         if tier and key in verified:
             oracle_built.add((u, key))
 
@@ -520,6 +655,53 @@ def main():
     if not ((built & designed) | oracle_built):
         die("FAIL: no designed element is built (every designed element dropped) - vacuous completeness; "
             "a delivered feature builds at least one designed element", 1)
+
+    # BUILT - DESIGNED: an element present in BUILT but absent from the outline (under-specification) is a
+    # non-blocking WARN, NEVER a FAIL - a built-but-undesigned element may be intentional, and a WARN keeps
+    # the no-seal substrate intact (the comparison is one-directional by design). Signal scales with capture
+    # independence: a flag the author-independent --help presents but the outline never designed is
+    # high-signal; a builder-declared manifest key is advisory. The verdict states which.
+    # Cluster-aware + boilerplate-aware: a corroborated --help cluster under-specifies the outline only when
+    # NONE of its flag tokens is designed for the unit (so an alias group `-j, --json` is covered when either
+    # spelling is designed - mirroring the FAIL direction's cluster-level resolution) AND it is not a pure
+    # auto-added boilerplate cluster (-h/--help/--version). Report one representative token (prefer a long
+    # `--flag`). Without this the high-signal channel fires on every framework boilerplate flag and on the
+    # short alias of a designed long flag - noise that trains operators to ignore it.
+    designed_by_unit = {}
+    for (du, dk) in designed:
+        designed_by_unit.setdefault(du, set()).add(dk)
+    def _cluster_rep(cl):
+        longs = sorted((t for t in cl if t.startswith("--")), key=len, reverse=True)
+        return longs[0] if longs else sorted(cl)[0]
+    def _is_boilerplate(cl):
+        # judged by the LONG form: `-v, --version` is boilerplate (long is `--version`), but `-h, --hard-reset`
+        # is NOT (a real flag that merely shares a short letter). A lone short flag with no long form falls back
+        # to the unambiguous-help short set.
+        longs = {t for t in cl if t.startswith("--")}
+        return bool(longs & BOILERPLATE_LONG) if longs else bool(cl & BOILERPLATE_SHORT)
+    oracle_under = set()
+    oracle_seen_tokens = set()                    # EVERY token in ANY corroborated --help cluster of an oracle
+                                                  # unit - an oracle observation, so manifest_under never re-lists
+                                                  # it (incl. an alias-covered or boilerplate cluster's tokens).
+    for u in oracle_units:
+        for cl in help_cache[u][2]:
+            oracle_seen_tokens |= {(u, t) for t in cl}
+            if cl & designed_by_unit.get(u, set()):
+                continue                          # some spelling is designed -> alias group covered
+            if _is_boilerplate(cl):               # auto-added help/version cluster -> not under-spec
+                continue
+            oracle_under.add((u, _cluster_rep(cl)))
+    manifest_under = (built - designed) - oracle_seen_tokens
+    if oracle_under or manifest_under:
+        parts = []
+        if oracle_under:
+            parts.append("author-independent --help presents, outline under-specifies (high-signal): "
+                         + ", ".join(sorted("%s / %s" % p for p in oracle_under)))
+        if manifest_under:
+            parts.append("manifest-declared (advisory): "
+                         + ", ".join(sorted("%s / %s" % p for p in manifest_under)))
+        sys.stderr.write("completeness WARN: built element(s) absent from DESIGNED (under-specified "
+                         "outline; not a FAIL) -- %s\n" % "; ".join(parts))
 
     # Own the coverage ceiling: a designed oracle-container flag can fall to declared-evidence when its unit
     # DECLARED a capture cmd: but the tool's --help is not two-witness parseable (hand-formatted / truncated

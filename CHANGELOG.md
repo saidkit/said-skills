@@ -2,6 +2,15 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.12.0] — 2026-09-15
+
+Completeness durable-spec resolution for a `dir:` unit-home lane, plus emit-time and under-specification signals.
+
+- **Added (BREAKING for a `dir:` unit-home lane):** on a lane whose grammar declares `unit-home=dir:<path>`, the completeness check now resolves the per-unit durable spec `<lane-root>/<path>/<ID>.md` for every declared unit — a missing one FAILs (broken-link), an orphan durable file FAILs. The **declared unit set is read from a sealed `units: <ID1>;<ID2>;... (count: N)` front-matter line `uxtoc` now stamps** into `toc.md` (read explicitly, never inferred from prose; `count`-sealed; every element-projecting unit and every listed id cross-checked against the outline). **A `dir:` lane must re-emit its `toc.md` with `uxtoc`** so the line is present (absent → FAIL). An `inline` unit-home lane is unaffected (no `units:` line needed). Presence-only, so a hand-edited durable never fails the gate (no-seal-safe).
+- **Added:** `uxtoc` warns at emit time on a missing/orphan durable spec (a `dir:` lane), on a key that would collide across two of a unit's containers, and on an off-grammar `none - owned by <component>` ownership handoff (a reused container references its own standalone unit instead).
+- **Added:** the completeness verdict now WARNs (never FAILs) when a built element is absent from the outline (under-specification); the high-signal channel is alias- and boilerplate-aware.
+- **Changed:** the `toc.md` reader is fenced-code aware (an outline example inside a ``` / `~~~` block is not parsed; an unterminated fence FAILs loud) and tab-indent aware.
+
 ## [0.11.0] — 2026-09-14
 
 SAID-17 — the SAID-16 follow-ups (completeness executed-capture + built-floor, engine-word purge, plain-ASCII glyph gate).

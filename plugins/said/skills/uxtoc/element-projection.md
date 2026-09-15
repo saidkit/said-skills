@@ -25,7 +25,9 @@ the scaffolding excluded from the projection - lives in the injected lane gramma
   `(unit, container, key)` - so the same key under two containers on one unit, or repeated across a
   tabbed unit's sub-groups, would collapse to one element. Qualify one (e.g. `status-filter`,
   `members-name`) whenever a key would otherwise repeat on a unit, so the projection keeps the two
-  distinct and a tabbed unit never silently collapses two elements into one.
+  distinct and a tabbed unit never silently collapses two elements into one. `uxtoc` WARNs (advisory)
+  at emit when a key would collide across two of a unit's containers, so the collapse is surfaced, not
+  silent.
 
 ## Scaffolding excluded from the projection
 The grammar's `## Machine-readable` block declares, per surface, the `attributes:` (the closed
