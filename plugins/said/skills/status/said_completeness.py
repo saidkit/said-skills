@@ -144,6 +144,7 @@ def load_grammar(path, surface):
         "attributes": _mr_line(body, "attributes"),
         "not_elements": _mr_line(body, "not-elements"),
         "oracle_containers": oracle,
+        "unit_home": _hdr_kv(fields, "unit-home"),
     }
 
 
@@ -245,6 +246,39 @@ def read_manifest(cap):
                     die("FAIL: dropped element '%s' has an empty reason" % eid.strip(), 1)
                 dropped.add((unit, eid.strip()))
     return built, dropped, cmds
+
+
+def check_unit_home(g, grammar_path, designed):
+    """Resolve the grammar's unit-home. For a `dir:<path>` unit-home, every DESIGNED unit needs a durable
+    spec at <lane-root>/<path>/<ID>.md - a missing one FAILs (broken-link), and a durable *.md with no
+    DESIGNED unit is an orphan (FAILs). Presence-stat ONLY: never reads a durable file's content, so a
+    legitimate design edit inside it never FAILs (no-seal-safe - a presence stat is not a content/currency
+    digest of the durable spec). An `inline` (or absent) unit-home has no durable dir and skips
+    (medium-agnostic). The lane root reaches a direct harness run via $SAID_ROOT (the reviewer gate injects
+    it); absent, it falls back grammar-relative (grammar at <root>/<docs-root>/ux/feature-ux-grammar.md,
+    so the lane root is three dirs up). Ignore convention: a README, a `_`-prefixed draft, or a dotfile
+    under the durable dir never counts as an orphan."""
+    uh = (g.get("unit_home") or "inline").strip()
+    if not uh.startswith("dir:"):
+        return
+    rel = uh[len("dir:"):].strip().rstrip("/")
+    root = os.environ.get("SAID_ROOT") or os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(grammar_path))))
+    ddir = os.path.join(root, rel)
+    units = sorted({u for (u, _k) in designed})
+    missing = [u for u in units if not os.path.isfile(os.path.join(ddir, u + ".md"))]
+    if missing:
+        die("FAIL: unit-home dir:%s - durable spec(s) missing for designed unit(s): %s (a renamed / "
+            "deleted / never-authored <ID>.md; re-add or rename it under the durable dir)"
+            % (rel, ", ".join(missing)), 1)
+    if os.path.isdir(ddir):
+        uset = set(units)
+        orphans = [fn for fn in sorted(os.listdir(ddir))
+                   if fn.endswith(".md") and fn != "README.md" and not fn.startswith(("_", "."))
+                   and fn[:-3] not in uset]
+        if orphans:
+            die("FAIL: unit-home dir:%s - orphan durable spec(s) with no outline unit: %s (remove it, or "
+                "add its `## %s <ID>` unit to the outline)" % (rel, ", ".join(orphans), g["unit"]), 1)
 
 
 def _usage_synopsis_flags(text):
@@ -425,6 +459,10 @@ def main():
     if not designed:
         die("FAIL: toc.md yields zero designed elements (hollow - nothing to certify complete; no "
             "keyed elements under container headers, or set Surface: none)", 1)
+
+    # resolve the grammar's unit-home: a `dir:` lane's durable per-unit specs are enforced (a missing
+    # <ID>.md -> FAIL, an orphan durable file -> FAIL); an inline lane skips. Presence-only (no-seal-safe).
+    check_unit_home(g, grammar, designed)
 
     # BUILT capture. For a unit whose manifest declares a `cmd:`, the grammar's oracle-containers are
     # verified author-independently by executing the command's own --help (capture_help, read-only);

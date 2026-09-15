@@ -704,6 +704,9 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
         # that does not need it ignores it. SAID_SURFACE selects the grammar's surface section.
         env = {**os.environ, "SAID_WORKDIR": os.path.abspath(workdir), "SAID_CAPTURE": cap_path,
                "SAID_PLUGIN_ROOT": plugin_root,
+               # the lane root, so a completeness recompute can resolve the grammar's unit-home=dir:<path>
+               # durable specs; a recompute that does not need it ignores it.
+               "SAID_ROOT": os.path.abspath(root),
                "SAID_GRAMMAR": os.path.join(os.path.abspath(root), _lane_key(root, "docs-root") or "docs", "ux", "feature-ux-grammar.md")}
         if surface:
             env["SAID_SURFACE"] = surface
