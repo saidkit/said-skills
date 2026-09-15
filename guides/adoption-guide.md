@@ -19,7 +19,7 @@ SAID's default layout. If yours differs, note the remapping in your `## Lane` bl
 | `docs/features/<FEAT>.tasks.md`     | append-only task log                                                                |
 | `docs/adr/`                         | architecture decision records                                                       |
 | `docs/ux/feature-ux-rules.md`       | the surface-contract **rule registry** (screen-shape taxonomy + routing the architect/impl skills consume; carries a proof-of-load sentinel) -- required on a surface-bearing lane |
-| `docs/ux/feature-ux-grammar.md`     | the per-surface **unit grammar** (one `SC-HEADER` section per surface: `unit`, `containers`, attribute set) that `uxtoc` + the completeness check consume -- required on a surface-bearing lane |
+| `docs/ux/feature-ux-grammar.md`     | the per-surface **unit grammar** (one `SC-HEADER` section per surface: `unit`, `containers` in emit order, per-container attribute schema, and a `## Unit-spec stencil`) -- `uxtoc` **emits from it**, the completeness check projects against it; required on a surface-bearing lane |
 | `docs/ux/feature-ux-checklist.md`   | UX-gate rules (read by the `web-ux` reviewer for a `web` surface)                   |
 | `docs/qa/feature-qa-checklist.md`   | hygiene-gate rules (read by `said:review-qa`)                                        |
 
@@ -44,7 +44,7 @@ No starter for your stack yet? The plain files you can author directly; the **su
   <!-- SC-HEADER: feature-ux-grammar,surface=web,unit=Screen,unit-home=inline,containers=Columns;Sections;Row actions,token=UXG-WEB-1,count=3 -->
   ```
 
-  (comma-separated; `count` MUST equal the number of `containers`.) The rules registry opens with its own sentinel naming its token + rule count. These two are the newest part of the contract, and a published starter for your stack may not ship them yet -- if your clone's `docs/ux/` has only a checklist, you author them: copy from a starter release that includes them if one exists, else write them by hand (authoring the full grammar -- unit + containers + attribute set -- is an advanced task). Either way, if you run a surface-bearing lane without them, `said:architect` / `said:uxtoc` HALT with a named redirect telling you exactly what to author -- that HALT (not `/said:setup`, which does not ledger these files) is what catches a missing grammar.
+  (comma-separated; `count` MUST equal the number of `containers`.) The rules registry opens with its own sentinel naming its token + rule count. These two are the newest part of the contract, and a published starter for your stack may not ship them yet -- if your clone's `docs/ux/` has only a checklist, you author them: copy from a starter that ships them, if one exists for your stack, else write them by hand (authoring the full grammar -- `unit` + `containers` in emit order + per-container attribute schema + the `## Unit-spec stencil` `uxtoc` emits from -- is an advanced task). Either way, if you run a surface-bearing lane without them, `said:architect` / `said:uxtoc` HALT with a named redirect telling you exactly what to author -- that HALT (not `/said:setup`, which does not ledger these files) is what catches a missing grammar.
 
 ## Step 3 -- Write the `## Lane` block in your `CLAUDE.md`
 
@@ -80,7 +80,7 @@ Legend (do NOT paste into the block -- these are notes, not part of any value):
 - `SAID.reviewers` -- the Checkers that gate this surface, a WHOLE-read list (see Step 4). Required for a surface-bearing lane.
 - `SAID.commands` -- your umbrella gate command, language-neutral (e.g. `make pre-commit`, `npm run check`, `cargo test`).
 - `SAID.profile` -- the lane's work profile: `code`, `doc`, or `work`.
-- `SAID.version` -- the STARTER release this lane is based on, `<starter>@<semver>` (optional; see "Versioning"). A standalone lane not built on a starter omits it.
+- `SAID.version` -- which starter you applied, `<starter>@<semver>`, stamped once at setup (optional; a standalone lane not built on a starter omits it).
 - Optional axes for special cases: `SAID.lanes:` (a registry, when one feature spans two or more lanes) and `SAID.checkers-dir:` (only when this lane ships its own agent-form Checker -- **declaring it REPLACES the plugin's shipped agents dir, not adds to it**, so a mixed set that also names a shipped Checker like `web-ux` must re-declare it there or drop the name).
 
 Then add three supporting sections to the same `CLAUDE.md`:
@@ -109,10 +109,6 @@ Then add three supporting sections to the same `CLAUDE.md`:
 
 That block + these sections are the contract. The skills resolve every `<ADR-ID>` / `<RULE-LABEL>` / path / command through them.
 
-### Versioning (SAID.version + CHANGELOG)
-
-`SAID.version:` records **which starter release** this lane was built on (`<starter>@<semver>`), so a later upgrade is legible. Each **starter** ships a root `CHANGELOG.md` mapping each release to the shape it bundles; a **consuming** project carries the marker but no CHANGELOG. Stamp it at clone; bump it when you roll a newer starter release into the lane. An absent marker reads as pre-versioning and never blocks -- but stamping it is what lets you tell which lanes still need a roll.
-
 ## Step 4 -- Declare your surface + reviewers (what gates the work)
 
 The lane declares two things: `SAID.surface:` (what this lane IS) and `SAID.reviewers:` (which Checkers gate it). A Checker is either **agent-form** (a shipped subagent you just NAME) or **recipe-form** (a block you DECLARE in your own `docs/ux/feature-ux-rules.md`). Either form is no engine edit -- but a name in `SAID.reviewers:` that resolves to no Checker makes the gate a BLOCKER (it would report a nominal pass while running nothing), so every name must resolve.
@@ -131,13 +127,13 @@ Only `web-ux`, `cli-gate`, and `doc-editorial` ship as agent-form Checkers you n
 
 ```markdown
 said-checker:   completeness
-said-governs:   surface=web
+said-governs:   surface=<your surface>
 said-capture:   process-spawn
 said-judge:     oracle
 said-recompute: python3 "$SAID_PLUGIN_ROOT/skills/status/said_completeness.py"
 ```
 
-Adapt that block into your `docs/ux/feature-ux-rules.md`, setting `said-governs: surface=` to your medium (a starter for your surface ships a ready copy). Naming `completeness` in `SAID.reviewers:` WITHOUT this block makes the gate a BLOCKER.
+Adapt that block into your `docs/ux/feature-ux-rules.md`, instantiating `said-governs: surface=` to your medium (a left-in `<...>` is a config-error gate FAIL). `said-capture: process-spawn` means an oracle-tier container is verified by executing a read-only probe **when your capture manifest supplies a per-unit `cmd:`** -- for a **cli** lane that probe is the command's own `--help` (nothing extra to wire); for a **web** lane it is a DOM/route probe your lane supplies under its own cycle. **Absent a probe `cmd:`, the container falls to declared-evidence honestly** (read from the manifest's `built:` lines, reported as such) -- so the block applies one-shot on any surface and auto-strengthens to the oracle tier once you add a probe. Naming `completeness` in `SAID.reviewers:` WITHOUT this block makes the gate a BLOCKER.
 
 Prerequisites by Checker:
 - **`web-ux`** needs a running dev server URL the task ships to, a **seeded reference fixture** (visual-parity walks fail against an empty/404 backend -- provision seed data first), and a way to mint a dev auth token if the app is gated (document the recipe in your `## Lane` block).
@@ -165,4 +161,4 @@ Confirm it writes `docs/working/<feature>/scope.md` in your layout. If it asks f
 ## What ships generic vs what you own
 
 - **Ships generic (don't edit in the plugin):** the said:* skills + agents (currently 17 skills + 6 agents) -- all placeholder-driven. The plugin ships no project files; scaffolding comes from your starter.
-- **You own (per project):** the `## Lane` block, your `## Earned rules`, your ADRs / UX-specs / rule registry / grammar, the filled checklists, your docs layout. Upgrading the plugin never touches these.
+- **You own (per project):** the `## Lane` block, your `## Earned rules`, your ADRs / UX-specs / rule registry / grammar, the filled checklists, your docs layout -- all yours; the plugin ships none of it.
