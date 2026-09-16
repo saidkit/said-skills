@@ -67,6 +67,10 @@ KEY_RE = re.compile(r"^(\s*)-\s+(.+?):\s*$")   # a valueless bulleted key: `- <k
 # exactly which units it mirrored, so it declares them and `count` seals the line, exactly like the grammar's
 # `count=` sentinel; inferring "is this markdown header a real unit" from prose is fragile by construction).
 UNITS_RE = re.compile(r"(?m)^units:\s*(.*?)\s*\(count:\s*(\d+)\)\s*$")
+REUSES_RE = re.compile(r"^\s*(?:-\s+)?reuses:\s*(\S+)\s*$")  # a `reuses: <ID>` attribute value on a durable
+                                                            # element - a VALUE line (KEY_RE gives key=None), so
+                                                            # it is read here for broken-link resolution, never
+                                                            # projected as an element by parse_designed.
 # auto-added flags every CLI framework emits; never "designed", so flagging them under-spec is pure noise.
 # Judged by the LONG form where a cluster has one (so `-v, --version` suppresses but `-h, --hard-reset` does
 # not); a lone short flag with no long form falls back to the unambiguous-help short set.
@@ -458,6 +462,30 @@ def check_unit_home(g, grammar_path, toc, designed_units, headers):
     # another feature's file. The declared set is sealed by `units:`, and each declared durable is parsed
     # DIRECTLY (main, level=1) with an identity cross-check (it must head its own id), so a copied / renamed
     # / stale / 0-byte durable is caught there; presence + identity are the teeth, not a directory sweep.
+
+    # reuses: broken-link resolution. A `dir:` durable may carry a `reuses: <ID>` attribute pointing at a unit
+    # owned by ANOTHER feature (a reused table tab). Resolve each against <ddir>/<ID>.md - ANY lane-wide durable,
+    # NOT this feature's sealed `units:` set (a reused unit's home is normally a different feature, matching the
+    # no-orphan-sweep shared-dir model). A dangling reference is a broken-link FAIL - the same teeth as the
+    # missing-durable check above, reached from an attribute value; a `reuses:` id passes the same portable-id
+    # guard as a `units:` id (a path-escape / non-portable id never resolves outside the unit-home dir). The
+    # `reuses:` value is read fence-aware from the durable (a `reuses:` in a ``` example is not a real one).
+    dangling = []
+    for u in units:
+        for ln in _content_lines(os.path.join(ddir, u + ".md")):
+            m = REUSES_RE.match(ln)
+            if not m:
+                continue
+            rid = m.group(1)
+            if not re.match(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$", rid) or ".." in rid:
+                die("FAIL: unit-home dir:%s - durable %s.md `reuses: %s` is a non-portable id (a reuses target "
+                    "is a portable filename component: ASCII [A-Za-z0-9._-], no path separator / `..`); fix it"
+                    % (rel, u, rid), 1)
+            if not os.path.isfile(os.path.join(ddir, rid + ".md")):
+                dangling.append("%s -> %s" % (u, rid))
+    if dangling:
+        die("FAIL: unit-home dir:%s - dangling reuses reference(s) (no durable at <unit-home>/<ID>.md): %s "
+            "(author the reused unit's durable, or fix the `reuses:` id)" % (rel, ", ".join(dangling)), 1)
 
 
 def _usage_synopsis_flags(text):

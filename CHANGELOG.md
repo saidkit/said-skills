@@ -2,6 +2,14 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.14.0] — 2026-09-16
+
+Completeness projection hardening (nested-container stack + attribute-name collision) and a `dir:`-lane `reuses:` broken-link check. All three make the gate stricter — a surface that previously shipped a green PASS may now correctly FAIL.
+
+- **Fixed (stricter gate, all lanes):** the element-projection loop tracked a single active-container depth, so on a unit with nested containers (an outer container whose items each open an inner container, then sibling leaf items) a dedent past an inner container swallowed every sibling leaf item after the first nested one — a whole class of elements shipped green (they passed vacuously). The loop now uses a container **stack** that restores the enclosing container on a dedent, so those sibling leaf items project and gate.
+- **Fixed (stricter gate, all lanes):** a keyed line that is a **direct child of a container** but whose key collides with a declared attribute name was dropped before projection and silently un-gated. The attribute-set skip is now **context-aware** — it applies only to a key nested under a leaf element (a real attribute group); a direct container child, or a field under a grouping, projects. Declared scaffolding (`not-elements`) still skips at any depth, and the attribute-group projection is preserved.
+- **Added (`dir:` unit-home lane):** the completeness check now resolves a `reuses: <ID>` attribute value against `<lane-root>/<unit-home>/<ID>.md` — a dangling reference (the reused unit's durable does not exist) is a broken-link FAIL. Resolution spans **any** lane-wide durable (a reused unit's home is normally a different feature), is single-ID, and the `<ID>` passes the same portable-id guard as the `units:` ids. An `inline` lane is unaffected.
+
 ## [0.13.0] — 2026-09-16
 
 Durable-as-source-of-truth for a `dir:` unit-home lane: the per-unit durable spec, not the `toc.md` mirror, is what the completeness check gates, and `uxtoc` stops duplicating the durable bodies into the `toc.md`.
