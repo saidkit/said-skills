@@ -239,7 +239,7 @@ def read_units_decl(path):
     return set(ids)
 
 
-def parse_designed(path, unit, containers, attributes, not_elements):
+def parse_designed(path, unit, containers, attributes, not_elements, level=2):
     """DESIGNED = set of (unit, key), attribute-set-aware. A keyed line under a container is an
     element unless its key is a NON-ELEMENT key - the grammar's attribute set (an attribute group)
     OR its not-elements set (declared scaffolding, e.g. Sorts, Empty state) - or it is a real
@@ -251,7 +251,9 @@ def parse_designed(path, unit, containers, attributes, not_elements):
     read from the sealed `units:` line uxtoc stamps (read_units_decl); this function returns only the projected
     element set (and its container map)."""
     nonelt = set(attributes) | set(not_elements)
-    unit_re = re.compile(r"^##\s+" + re.escape(unit) + r"\s+(\S+)")
+    # The unit header sits at `level` hashes: 2 (`## <unit> <ID>`) for a toc or an inline spec, 1
+    # (`# <unit> <ID>`) for a durable per-unit file parsed DIRECTLY (a standalone file titles its unit at H1).
+    unit_re = re.compile(r"^#{%d}\s+" % level + re.escape(unit) + r"\s+(\S+)")
     # skip fenced code blocks (an outline EXAMPLE inside a ``` / ~~~ fence must not be parsed as real
     # units/elements) via the SHARED fence rule (`_content_lines`, same rule the front-matter/`units:`
     # readers use - so they can never disagree); an unterminated fence FAILs loud there. Then drop blanks.
@@ -288,10 +290,13 @@ def parse_designed(path, unit, containers, attributes, not_elements):
             unit_id, cind = um.group(1), None
             headers.add(unit_id)
             continue
-        if ln.startswith("## "):          # any non-unit header closes the container AND unit context, so a
-            cind = None                   # keyed element under a mis-levelled/mis-worded later header is not
-            unit_id = ""                  # silently reparented to the previous unit (it hits the loud guard below)
-            continue
+        if ln.startswith("#" * level + " "):  # a non-unit header AT THE UNIT'S OWN LEVEL closes the container
+            cind = None                        # AND unit context, so a keyed element under a mis-levelled /
+            unit_id = ""                        # mis-worded later header is not silently reparented to the
+            continue                            # previous unit (it hits the loud guard below). LEVEL-AWARE: at
+            # level=1 (a durable parsed directly) only another H1 resets - an ordinary H2/H3 SUBHEADING is
+            # subordinate content of the same unit, not a boundary, so it must not reset (its container closes
+            # by the dedent rule below). At level=2 (toc/inline) this stays `## ` exactly as before.
         ind, key = meta[i]
         if key is not None and key in containers:
             cind = ind
@@ -308,10 +313,11 @@ def parse_designed(path, unit, containers, attributes, not_elements):
             continue
         if is_grouping(i, ind):           # a real sub-grouping (its children are the elements)
             continue
-        if not unit_id:                   # a keyed element before any `## <unit>` header - never silently drop
-            die("FAIL: toc.md has a keyed element under a container before any `## %s <ID>` header "
-                "(key %r) - a mis-levelled (`# ` vs `## `) or mis-worded unit header leaves its elements "
-                "outside any unit; fix the header" % (unit, key), 1)
+        if not unit_id:                   # a keyed element before any unit header - never silently drop
+            hh = "#" * level               # the expected header level for THIS parse target (H2 toc/inline, H1 durable)
+            die("FAIL: %s has a keyed element under a container before any `%s %s <ID>` header "
+                "(key %r) - a mis-levelled or mis-worded unit header leaves its elements outside any "
+                "unit; fix the header" % (os.path.basename(path), hh, unit, key), 1)
         designed.add((unit_id, key))
         container_of[(unit_id, key)] = active_container
     return designed, container_of, headers
@@ -346,10 +352,28 @@ def read_manifest(cap):
     return built, dropped, cmds
 
 
+def _dir_home(g, grammar_path):
+    """`(rel, ddir)` for a `dir:<path>` unit-home, else None (an `inline` or absent unit-home). The lane
+    root reaches a direct harness run via $SAID_ROOT (the reviewer gate injects it); absent, it falls back
+    grammar-relative (the grammar sits at <root>/<docs-root>/ux/feature-ux-grammar.md, so the lane root is
+    three dirs up)."""
+    uh = (g.get("unit_home") or "inline").strip()
+    if not uh.startswith("dir:"):
+        return None
+    rel = uh[len("dir:"):].strip().rstrip("/")
+    root = os.environ.get("SAID_ROOT") or os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(grammar_path))))
+    return rel, os.path.join(root, rel)
+
+
 def check_unit_home(g, grammar_path, toc, designed_units, headers):
     """Resolve the grammar's unit-home. For a `dir:<path>` unit-home, every DECLARED unit needs a durable
-    spec at <lane-root>/<path>/<ID>.md - a missing one FAILs (broken-link), and a durable *.md with no
-    DECLARED unit is an orphan (FAILs).
+    spec at <lane-root>/<path>/<ID>.md - a missing one FAILs (broken-link). There is NO lane-wide orphan
+    sweep: a `dir:` unit-home is commonly SHARED across features (many features' unit files in one directory),
+    so a durable this feature never declared is a SIBLING feature's, not this feature's orphan - sweeping it
+    would fail one feature's gate on another's file. The teeth against a copied / renamed / stale / empty
+    durable are elsewhere: `main` parses each DECLARED durable DIRECTLY (level=1) and cross-checks that it
+    heads its OWN id, so a durable answering for the wrong unit FAILs there.
 
     The DECLARED set is read EXPLICITLY from the sealed `units: A;B;C (count: N)` line uxtoc stamps
     (`declared_line`), NOT inferred from free-form outline prose (inferring "is this markdown header a real
@@ -372,11 +396,18 @@ def check_unit_home(g, grammar_path, toc, designed_units, headers):
         die("FAIL: unit-home is `dir:` but toc.md has no sealed `units: A;B;C (count: N)` line - the "
             "durable-spec check reads the DECLARED unit set from it (no prose inference); re-emit with uxtoc", 1)
     # The declared set must EXACTLY match the outline's `## <unit> <ID>` headers, both directions (a
-    # header-PRESENCE cross-check, NOT the deleted prose inference), and cover every element-projecting unit:
-    #   omitted  = a unit that projects an element but is not on the line (a stale line) -> FAIL
+    # header-PRESENCE cross-check, NOT the deleted prose inference):
     #   phantom  = a declared id with no outline header (a fabricated / stale-basename id masking an orphan) -> FAIL
     #   stranded = an outline header not on the line (a hand-added header, or an emptied unit uxtoc did not
-    #              re-emit) -> FAIL; without this, an element-less header escapes the durable-spec gate.
+    #              re-emit) -> FAIL; without this, an element-less header escapes the durable-spec gate. On a
+    #              dir: lane THIS is what catches "a unit designs elements but is off the sealed line": the
+    #              unit's outline header is present (stranded) even though the durable-derived DESIGNED never
+    #              includes an off-line unit.
+    #   omitted  = a unit that projects an element but is not on the line. Since DESIGNED is now derived by
+    #              parsing ONLY the DECLARED durables (main, dir: block), `designed_units` is always a subset of
+    #              `declared_line`, so this branch is VACUOUS on a dir: lane - kept as a cheap defensive
+    #              invariant (it must never fire; if a future change re-derives designed_units differently it
+    #              catches the regression), with `stranded` carrying the real "off-line unit" scenario above.
     omitted = sorted(designed_units - declared_line)
     if omitted:
         die("FAIL: toc.md `units:` line omits unit(s) that design elements: %s - a stale units line; "
@@ -389,24 +420,19 @@ def check_unit_home(g, grammar_path, toc, designed_units, headers):
     if phantom:
         die("FAIL: toc.md `units:` line names unit(s) with no `## %s <ID>` outline header: %s - a stale or "
             "fabricated units line (it must match the outline); re-emit with uxtoc" % (g["unit"], ", ".join(phantom)), 1)
-    rel = uh[len("dir:"):].strip().rstrip("/")
-    root = os.environ.get("SAID_ROOT") or os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(grammar_path))))
-    ddir = os.path.join(root, rel)
+    rel, ddir = _dir_home(g, grammar_path)
     units = sorted(declared_line)
     missing = [u for u in units if not os.path.isfile(os.path.join(ddir, u + ".md"))]
     if missing:
         die("FAIL: unit-home dir:%s - durable spec(s) missing for declared unit(s): %s (a renamed / "
             "deleted / never-authored <ID>.md; re-add or rename it under the durable dir)"
             % (rel, ", ".join(missing)), 1)
-    if os.path.isdir(ddir):
-        uset = set(units)
-        orphans = [fn for fn in sorted(os.listdir(ddir))
-                   if fn.endswith(".md") and fn != "README.md" and not fn.startswith(("_", "."))
-                   and fn[:-3] not in uset]
-        if orphans:
-            die("FAIL: unit-home dir:%s - orphan durable spec(s) with no outline unit: %s (remove it, or "
-                "add its `## %s <ID>` unit to the outline)" % (rel, ", ".join(orphans), g["unit"]), 1)
+    # No lane-wide orphan sweep: a `dir:` unit-home is commonly SHARED across features (many features' unit
+    # files in one directory), so a durable this feature never declared is a SIBLING feature's, not
+    # this feature's orphan - a lane-wide "extra .md is an orphan" sweep would fail one feature's gate on
+    # another feature's file. The declared set is sealed by `units:`, and each declared durable is parsed
+    # DIRECTLY (main, level=1) with an identity cross-check (it must head its own id), so a copied / renamed
+    # / stale / 0-byte durable is caught there; presence + identity are the teeth, not a directory sweep.
 
 
 def _usage_synopsis_flags(text):
@@ -586,9 +612,39 @@ def main():
             % (stamp, g["token"]), 1)
 
     designed, container_of, headers = parse_designed(toc, g["unit"], g["containers"], g["attributes"], g["not_elements"])
+
+    # DIR: unit-home -> the DURABLE is the source of truth. Re-derive DESIGNED by parsing each DECLARED
+    # unit's durable <lane-root>/<path>/<ID>.md DIRECTLY (H1-headed, level=1); the toc supplies ONLY the
+    # manifest (the grammar stamp checked above + the sealed `units:` line + the `## <unit>` outline headers
+    # check_unit_home cross-checks). This makes the operator-authored durable, not the toc mirror, what
+    # gates - a durable and a stale mirror can no longer disagree about the design. An `inline` (or absent)
+    # unit-home keeps parsing the toc, unchanged (the unit-home is the ONLY switch - the engine holds no
+    # medium vocabulary). Each durable must head its OWN unit id (identity cross-check); a missing durable is
+    # reported by check_unit_home (broken-link) below.
+    _dh = _dir_home(g, grammar)
+    if _dh is not None:
+        _rel, _ddir = _dh
+        _declared = read_units_decl(toc)
+        if _declared is None:
+            die("FAIL: unit-home is `dir:` but toc.md has no sealed `units: A;B;C (count: N)` line - the "
+                "durable-spec check reads the DECLARED unit set from it; re-emit with uxtoc", 1)
+        designed, container_of = set(), {}
+        for _u in sorted(_declared):
+            _dpath = os.path.join(_ddir, _u + ".md")
+            if not os.path.isfile(_dpath):
+                continue                       # a missing durable is the broken-link check_unit_home reports
+            _du, _dc, _dhdr = parse_designed(_dpath, g["unit"], g["containers"], g["attributes"], g["not_elements"], level=1)
+            if _dhdr != {_u}:
+                _found = ", ".join(sorted(_dhdr)) or "no unit"
+                die("FAIL: durable %s.md heads unit(s) {%s}, not its own id %r - a copied, renamed, "
+                    "mis-levelled, or empty durable answering for another unit; each `dir:` durable heads "
+                    "`# %s <ID>` for its own id (re-name or re-level it)" % (_u, _found, _u, g["unit"]), 1)
+            designed |= _du
+            container_of.update(_dc)
+
     if not designed:
-        die("FAIL: toc.md yields zero designed elements (hollow - nothing to certify complete; no "
-            "keyed elements under container headers, or set Surface: none)", 1)
+        die("FAIL: zero designed elements (hollow - nothing to certify complete; no keyed elements under "
+            "container headers, or set Surface: none)", 1)
 
     # resolve the grammar's unit-home: a `dir:` lane's durable per-unit specs are enforced (a missing
     # <ID>.md -> FAIL, an orphan durable file -> FAIL); an inline lane skips. Presence-only (no-seal-safe).

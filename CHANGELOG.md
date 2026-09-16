@@ -2,6 +2,14 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.13.0] — 2026-09-16
+
+Durable-as-source-of-truth for a `dir:` unit-home lane: the per-unit durable spec, not the `toc.md` mirror, is what the completeness check gates, and `uxtoc` stops duplicating the durable bodies into the `toc.md`.
+
+- **Changed (BREAKING for a `dir:` unit-home lane):** the completeness check now derives DESIGNED by parsing each declared durable spec `<lane-root>/<path>/<ID>.md` **directly** (the source of truth), instead of the `toc.md` mirror. The `toc.md` on a `dir:` lane supplies only the manifest — the `grammar:` stamp, the sealed `units:` line, and the `## <unit> <ID>` headers it cross-checks — so a durable and a stale `toc.md` can no longer disagree about the design. Each declared durable must **head its own unit id** (a copied / renamed / mis-levelled / empty durable answering for another unit FAILs); this identity check replaces the former lane-wide orphan sweep, which is **removed** (a `dir:` directory is commonly shared across features, so a durable this feature never declared is a sibling's, not this feature's orphan). The missing-durable (broken-link) direction is unchanged. An `inline` unit-home lane is unaffected (it still parses `toc.md`).
+- **Changed (`uxtoc`, `dir:` unit-home lane):** `uxtoc` now emits a **thin-index `toc.md`** on a `dir:` lane — the front matter, the sealed `units:` line, and one `## <unit> <ID> - <title> -> <unit-home>/<ID>.md` header-with-pointer line per unit, with **no container bodies** (the body lives once, in the durable). An `inline` lane still emits the full outline. **No functional migration required** — the 0.13.0 gate reads the durables, not the `toc.md` bodies, so a pre-existing full-body `dir:` `toc.md` still passes; re-emit with `uxtoc` when convenient to drop the now-redundant duplicated bodies.
+- **Fixed:** the unit-header projection is header-level-aware — a durable parsed directly heads its unit at H1 (`# <unit> <ID>`), while a `toc.md` / inline outline heads it at H2 (`## <unit> <ID>`); an ordinary H2 subheading inside a durable is now treated as subordinate content and no longer resets the unit context (it previously false-FAILed a valid durable).
+
 ## [0.12.0] — 2026-09-15
 
 Completeness durable-spec resolution for a `dir:` unit-home lane, plus emit-time and under-specification signals.

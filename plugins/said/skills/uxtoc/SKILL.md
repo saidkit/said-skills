@@ -10,7 +10,9 @@ description: >
   Multi-unit features render one outline section per unit.
   Used at two positions: EARLY on a thin scope.md or unit stub to seed
   a design, or LATE on an authored spec to inspect it - same emit -> spot ->
-  edit -> re-run loop (the design-seed use is detailed in the body). Triggered ONLY by the
+  edit -> re-run loop (the design-seed use is detailed in the body). On a
+  dir: unit-home lane that loop runs on the durable per-unit file; the
+  feature toc.md there is a thin index, not the edit surface. Triggered ONLY by the
   explicit command "/said:uxtoc <path> [output=<file-or-dir>]". Default
   output is inline (chat); operator passes output= to write a file. NOT a
   spec generator - it mirrors what a spec (however thin) already states and
@@ -23,6 +25,8 @@ description: >
 Read-only. Emits a structured outline of what a SAID spec artifact actually says - at element granularity, with each element expanded into its attributes per the loaded grammar's per-container schema (title, type, render, operator, variant, label, target, permission, ... - whatever the grammar names for that container).
 
 Purpose: a tight feedback loop for spec authoring, at two positions in the chain. **Design-seed (early)** - run it on a thin `scope.md` or a unit stub; the outline mirrors what the stub states so far, so the containers / elements / attributes it does not yet mention are simply absent from the outline, and you fill them in against it. **Inspect (late)** - run it on an authored spec to read back exactly what it commits to. Same loop both ways: emit -> spot a missing attribute or wrong shape -> edit the spec -> re-run `/said:uxtoc`. No review-and-fix loop - the TOC carries no judgment, only what the spec says.
+
+**On a `dir:` unit-home lane, the emit-against surface is the durable, not the feature `toc.md`.** There the design lives in the durable per-unit files `<unit-home>/<ID>.md` (already in the mirrored container/element/attribute shape), and those durables are what the accept-time gate reads - so to inspect or seed one unit, run uxtoc on its durable and edit the durable directly. uxtoc's feature-level `toc.md` on a `dir:` lane is a THIN INDEX (front matter + a per-unit pointer line, no bodies - see Pass 3), a manifest / navigation surface, NOT the attribute-level inspection surface. The emit -> spot -> edit loop above is the durable's; an `inline` lane keeps that loop on the `toc.md` itself (there the toc IS the design).
 
 uxtoc supports your authoring loop by **mirroring** the spec; it does not **generate** the spec for you. The design comes from you - uxtoc reflects whatever the spec states, however thin, so you can see the holes and fill them in.
 
@@ -88,9 +92,13 @@ Do not invent. If the spec is silent on a sub-attribute (e.g., an element declar
 
 ## Pass 3 - Emit
 
-**The emit is grammar-driven.** The unit header word is the grammar's `unit`; under each unit, walk the grammar's `containers` in their declared emit order, and under each container emit one keyed element with its attributes per the grammar's per-container schema. Renaming a container (or the unit) in the grammar changes the emit with no skill edit. There is NO `toc-checksum:` line - the outline is not sealed (the operator hand-edits it freely). Machine-written front-matter lines are stamped: `grammar:` (the section token, cross-checked at accept - an absent stamp FAILs), `last-revised:` (the feature-id, provenance, non-gating), and - on a `dir:` unit-home lane - a sealed `units: <ID1>;<ID2>;... (count: N)` line naming EVERY unit emitted, in emit order (`count` = the number of ids, so the line is unbluffable, exactly like the grammar's `count=`). The accept-time durable-spec check reads the DECLARED unit set from this line rather than inferring it from prose, so it must list every unit you emit - including one whose containers are all explicitly emptied (`none - <reason>`).
+**The emit is grammar-driven.** The unit header word is the grammar's `unit`; where a body is emitted (an inline lane's outline, below), under each unit walk the grammar's `containers` in their declared emit order, and under each container emit one keyed element with its attributes per the grammar's per-container schema. Renaming a container (or the unit) in the grammar changes the emit with no skill edit. (On a `dir:` unit-home lane no body is emitted into the toc at all - see the medium switch below.) There is NO `toc-checksum:` line - the outline is not sealed (the operator hand-edits it freely). Machine-written front-matter lines are stamped: `grammar:` (the section token, cross-checked at accept - an absent stamp FAILs), `last-revised:` (the feature-id, provenance, non-gating), and - on a `dir:` unit-home lane - a sealed `units: <ID1>;<ID2>;... (count: N)` line naming EVERY unit emitted, in emit order (`count` = the number of ids, so the line is unbluffable, exactly like the grammar's `count=`). The accept-time durable-spec check reads the DECLARED unit set from this line rather than inferring it from prose, so it must list every unit you emit - including one whose containers are all explicitly emptied (`none - <reason>`).
 
-**The skill carries no surface vocabulary.** The concrete containers, their emit order, each container's attribute schema, and a worked example live in the loaded grammar (`## Containers` + `## Unit-spec stencil`) - the emit walks whatever that grammar declares. The generic shape:
+**The unit-home decides the outline body (the only medium switch).** An `inline` (or absent) unit-home has no durable per-unit files, so the `toc.md` IS the design substrate: emit the FULL outline (walk each unit's containers + elements + attributes, below). A `dir:<path>` unit-home keeps the design in durable per-unit files `<unit-home>/<ID>.md`, and the completeness gate parses those durables directly as the source of truth - so the `toc.md` on a `dir:` lane is a THIN INDEX, never a second body copy: emit the machine-written front matter (`grammar:`, `last-revised:`, and the sealed `units:` line) plus ONE `## <unit> <ID> - <title> -> <unit-home>/<ID>.md` header-with-pointer line per emitted unit, and NO container bodies. The `## <unit> <ID>` header level is kept (the gate cross-checks those headers against the sealed `units:` line; the `-> <unit-home>/<ID>.md` pointer is navigation, appended after the title). A full body in the toc would duplicate the durable and drift + bloat - the durable is the one place the body lives. Resolve the unit-home from the grammar (`unit-home`), never a hardcoded medium.
+
+**The skill carries no surface vocabulary.** The concrete containers, their emit order, each container's attribute schema, and a worked example live in the loaded grammar (`## Containers` + `## Unit-spec stencil`) - the emit walks whatever that grammar declares. The generic shapes:
+
+**Inline unit-home (full outline - the toc IS the design):**
 
 ```
 # TOC: <feature or unit-set name>
@@ -116,6 +124,25 @@ units: <ID>;<ID>;<ID> (count: 3)
 ```
 
 For a multi-unit feature input, repeat the `## <unit>` section per unit in the order the feature spec references them.
+
+**`dir:` unit-home (thin index - the durable is the design):**
+
+```
+# TOC: <feature or unit-set name>
+Source: <input path>
+grammar: <the grammar section token>
+last-revised: <feature-id>
+units: <ID>;<ID>;<ID> (count: 3)
+
+## Scope  (only if scope.md is in input)
+- Section A Purpose - <gloss>
+- ...
+
+## <unit> <ID> - <title> -> <unit-home>/<ID>.md
+## <unit> <next-ID> - <title> -> <unit-home>/<next-ID>.md
+```
+
+One header-with-pointer line per emitted unit, in reference order; NO container bodies (they live in the durable `<unit-home>/<ID>.md`). An emptied unit is still emitted as its header line (so the sealed `units:` count matches).
 
 If `output=<path>`:
 - Directory -> write `<path>/toc.md`. **Write-safety:** if `<path>/toc.md` already exists AND differs from a fresh emit, do NOT overwrite silently - prompt (overwrite / abort), protecting the operator's hand-edited substrate.
