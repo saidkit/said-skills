@@ -250,7 +250,10 @@ def parse_designed(path, unit, containers, attributes, not_elements, level=2):
     indentation is tab-aware. The DECLARED unit set (for the durable-spec check) is NOT inferred here - it is
     read from the sealed `units:` line uxtoc stamps (read_units_decl); this function returns only the projected
     element set (and its container map)."""
-    nonelt = set(attributes) | set(not_elements)
+    nonelt = set(attributes) | set(not_elements)   # non-element keys, for is_grouping's leaf test
+    attrs, not_els = set(attributes), set(not_elements)  # split out: an ATTRIBUTE key colliding with a direct
+                                                          # container-child name (a `description` column) is a real
+                                                          # element; a NOT-ELEMENT (scaffolding) never is.
     # The unit header sits at `level` hashes: 2 (`## <unit> <ID>`) for a toc or an inline spec, 1
     # (`# <unit> <ID>`) for a durable per-unit file parsed DIRECTLY (a standalone file titles its unit at H1).
     unit_re = re.compile(r"^#{%d}\s+" % level + re.escape(unit) + r"\s+(\S+)")
@@ -277,40 +280,61 @@ def parse_designed(path, unit, containers, attributes, not_elements, level=2):
             j += 1
         return False
 
+    def _under_leaf(i, ind):
+        """True when this line's PARENT (the nearest enclosing keyed line) is a LEAF element - i.e. this line is
+        an attribute OF an element. False when the parent is a container (this line is a direct container child,
+        a real element - e.g. a `description` COLUMN that collides with the `description` attribute name) or a
+        grouping (a field of a form section). Only when this returns True does an ATTRIBUTE-set key name a
+        non-element; a not-element (scaffolding) is skipped regardless of depth, separately."""
+        j = i - 1
+        while j >= 0:
+            jind, jkey = meta[j]
+            if jkey is not None and jind < ind:
+                if jkey in containers:
+                    return False                 # parent is a container -> a direct child -> a real element
+                return not is_grouping(j, jind)  # parent is a leaf element iff it has no element descendants
+            j -= 1
+        return False                             # no enclosing keyed line -> not an attribute of anything
+
     designed = set()
     container_of = {}
     headers = set()                       # every `## <unit> <ID>` header id present in the outline (a
                                           # presence set for cross-checking the sealed units line - NOT the
                                           # prose inference that was deleted; a header line unambiguously is one)
     unit_id = ""
-    cind = None
+    stack = []                            # [(container, indent)] outermost-first - a STACK, not one active depth:
+                                          # a dedent past a NESTED container pops back to the ENCLOSING container
+                                          # (never blanks it), so a sibling leaf item after a deep sibling still
+                                          # projects under the popped-back enclosing container - a tabbed detail
+                                          # screen no longer swallows its leaf/reuses tabs that follow a deep tab.
     for i, ln in enumerate(lines):
         um = unit_re.match(ln)
         if um:
-            unit_id, cind = um.group(1), None
+            unit_id, stack = um.group(1), []
             headers.add(unit_id)
             continue
         if ln.startswith("#" * level + " "):  # a non-unit header AT THE UNIT'S OWN LEVEL closes the container
-            cind = None                        # AND unit context, so a keyed element under a mis-levelled /
-            unit_id = ""                        # mis-worded later header is not silently reparented to the
-            continue                            # previous unit (it hits the loud guard below). LEVEL-AWARE: at
-            # level=1 (a durable parsed directly) only another H1 resets - an ordinary H2/H3 SUBHEADING is
-            # subordinate content of the same unit, not a boundary, so it must not reset (its container closes
-            # by the dedent rule below). At level=2 (toc/inline) this stays `## ` exactly as before.
+            unit_id, stack = "", []            # AND unit context, so a keyed element under a mis-levelled /
+            continue                            # mis-worded later header is not silently reparented to the
+            # previous unit (it hits the loud guard below). LEVEL-AWARE: at level=1 (a durable parsed directly)
+            # only another H1 resets - an ordinary H2/H3 SUBHEADING is subordinate content of the same unit, not
+            # a boundary, so it must not reset (its container closes by the dedent-pop below). At level=2
+            # (toc/inline) this stays `## ` exactly as before.
         ind, key = meta[i]
+        while stack and ind <= stack[-1][1]:  # dedented out of one or more open containers - pop them, which
+            stack.pop()                       # restores the nearest still-open ENCLOSING container as active
         if key is not None and key in containers:
-            cind = ind
-            active_container = key
+            stack.append((key, ind))          # open this container, nested under any shallower one still on the stack
             continue
-        if cind is None:
-            continue
-        if ind <= cind:                   # dedented out of the container
-            cind = None
+        if not stack:                     # not inside any container
             continue
         if key is None:                   # an attribute/value line - not an element
             continue
-        if key in nonelt:                 # an attribute group or declared scaffolding - not an element
+        if key in not_els:                # declared scaffolding (Sorts, Empty state) - never an element, any depth
             continue
+        if key in attrs and _under_leaf(i, ind):  # an attribute value-group OF a leaf element - not an element;
+            continue                               # the SAME name as a direct container child (a `description`
+                                                   # column) stays a real element (attribute-name collision)
         if is_grouping(i, ind):           # a real sub-grouping (its children are the elements)
             continue
         if not unit_id:                   # a keyed element before any unit header - never silently drop
@@ -318,6 +342,7 @@ def parse_designed(path, unit, containers, attributes, not_elements, level=2):
             die("FAIL: %s has a keyed element under a container before any `%s %s <ID>` header "
                 "(key %r) - a mis-levelled or mis-worded unit header leaves its elements outside any "
                 "unit; fix the header" % (os.path.basename(path), hh, unit, key), 1)
+        active_container = stack[-1][0]   # the innermost still-open container
         designed.add((unit_id, key))
         container_of[(unit_id, key)] = active_container
     return designed, container_of, headers
