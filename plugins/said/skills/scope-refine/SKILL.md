@@ -94,7 +94,7 @@ After the agent returns:
   - **§D empty** -> "Phase 1 (Scope) is done. Phase 2 (Architect) starts. Run `/said:architect` when ready, or build the spec interactively per `docs/features/template.md`."
   - **§D non-empty** -> "Phase 1 (Scope) is BLOCKED on §D. Resolve each item, then either re-run `/said:scope-refine` to regenerate, or hand-edit `scope.md` so §D is empty before proceeding to `/said:architect`."
 
-DO NOT silently resolve §D items. The agent surfaces conflicts in §D deliberately; this skill carries them through to the operator unchanged.
+DO NOT silently resolve §D items. The agent surfaces conflicts in §D deliberately; this skill carries them through to the operator unchanged. When unattended (a subagent with no operator, or a top-level run with no operator turn to answer), an owed §D decision is never resolved, defaulted, or emptied: it routes into the announce-once-then-hold class -- the `goal: stop` line carries `OPERATOR-DECISION-HELD` -- exactly as `said`/`flow` hold an owed operator decision, then holds.
 
 ## Step 4: Do NOT auto-fix or auto-architect
 

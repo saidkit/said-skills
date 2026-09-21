@@ -37,7 +37,7 @@ If the operator's request is to **add a new task** to an already-architected fea
 
 If the operator's request is to **propagate new info** into an existing feature — BE handoff result, scope refinement, mid-implementation discovery, "process X and update spec + tasks", etc. — do NOT bounce. This is direct-edit work, not re-architecture. Proceed: read the source doc, list the deltas, apply surgical edits to spec + tasks per `docs/features/template-tasks.md` amendment carve-out (uncommitted task -> amend in place + `### Deviations` note; committed task -> append a new task ID). **After applying the spec edit, re-run the recreation-contract self-test** (Pass 2 § Recreation-contract self-test) against the updated spec — this branch owns the relocated spec-write + self-test (formerly `add-task` Step 4.5, moved here per the charter boundary). Report the diff. The 3-pass authoring flow below runs ONLY for INITIAL spec + tasks creation from a `scope.md`.
 
-If `scope.md` doesn't exist or §D is non-empty — BLOCK. Phase 1 is incomplete. Redirect: "scope.md §D non-empty (Phase 1 incomplete). Resolve §D items via `/said:scope-refine` regenerate or hand-edit, then re-run `/said:architect`."
+If `scope.md` doesn't exist, or §D is neither empty nor resolved-with-an-operator-attributed-record -- BLOCK. Phase 1 is incomplete. Redirect: "scope.md §D unresolved (Phase 1 incomplete). Resolve §D items via `/said:scope-refine` regenerate or hand-edit, or supply the operator-attributed resolution record, then re-run `/said:architect`."
 
 ## Step 0 — Preflight
 
@@ -46,7 +46,7 @@ Resolve inputs and ground in calibration sources before the operator interaction
 1. **Resolve scope-path.**
    - Path given as arg -> verify with `ls <path>`. If missing, BLOCK and ask operator.
    - No path given -> list `<SAID.working>/*/scope.md` (from `SAID.working:` on the `## Lane` block; no key -> HALT); if exactly one, use it; if multiple or zero, ASK the operator which feature.
-2. **Verify §D empty.** Read scope.md, locate `## §D`, confirm it's empty (or every item explicitly marked "defer to Phase 2 (Architect)" with reasoning). Otherwise BLOCK.
+2. **Verify §D resolved (empty, or resolved WITH an operator-attributed record).** Read scope.md, locate `## §D`. It passes when EITHER (a) it is empty (or every item explicitly marked "defer to Phase 2 (Architect)" with reasoning), OR (b) it is **resolved WITH an operator-attributed record** -- every open item carries a resolution that cites an operator/user turn, and you apply **cite-and-verify**: verify the cited turn is an operator/user role AND actually carries a decision for that item (role alone is foolable; the role-labelled transcript is the gate-readable source; no marker is trusted in its place). A resolution whose cite is fabricated, roleless, or only mentions the item without deciding it FAILs -> BLOCK; an UNresolved §D (open items, no attributed resolution) BLOCKs (the fallback). The gate checks WHO resolved §D, not merely that it looks resolved. (The decision-signal check -- "decides, not merely mentions" -- is owed a RED-first adversarial harness.)
 3. **Resolve surface.** Read `SAID.surface:` from the `## Lane` block (the medium; required — an omitted key HALTs, never a last-resort default).
 4. **Derive feature name.** Take the leaf segment of the working dir (`docs/working/<feature>/scope.md` -> `<feature>`). Confirm with operator only if ambiguous.
 5. **Resolve output paths.**
@@ -331,6 +331,6 @@ These are positive boundaries of the skill's contract — not negative rules sub
 - **Phase 2 stops at writing spec + tasks.** The operator triggers Phase 3 via `/said:impl`. Never auto-invoke implementation, never spawn coding agents, never begin code edits.
 - **Phase 2 is for INITIAL authoring only.** Adding a task to an existing feature -> `/said:add-task` (direct append per `template-tasks.md`).
 - **Spec and tasks are two files, never one.** Earned design decision (S01-1). Spec is the pre-implementation contract; tasks.md is the post-implementation history.
-- **§D-empty preflight is non-negotiable.** Phase 1 incomplete = Phase 2 starts on bad input. BLOCK and redirect.
+- **The §D-resolved preflight is non-negotiable.** §D must be empty, OR resolved WITH an operator-attributed record (Step 0 #2's cite-and-verify). An unresolved §D means Phase 1 is incomplete = Phase 2 starts on bad input -- BLOCK and redirect.
 - **The recreation-contract test is the authoring gate.** Section procedures produce the right shape by construction; the test verifies. If a section grows large, re-run the procedure for that section — don't add caps or "no X" rules.
 - **The operator owns clarifying-question answers.** AC form, story type, granularity overrides — never auto-resolve silently.
