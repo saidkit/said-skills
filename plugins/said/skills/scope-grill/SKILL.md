@@ -18,6 +18,8 @@ This skill drives the Phase 1 Case 2 path — turning a thin user prompt into a 
 
 There is NO separate agent. You — the main agent — drive the Q&A loop interactively. Read this file, enter the loop, and stay until §D is empty.
 
+**Up-front BLOCK -- no operator, nothing to elicit.** This skill's content source IS the operator's Q&A. When invoked with **no operator channel to answer** its Q&A (a spawned/subagent or autonomous context, a thin idea, no handoff -- Case 1, a handoff, routes to `said:scope-refine` instead), announce "interactive-only, no operator -- nothing to proceed on" and hand back / redirect (to `said:scope-refine` if a handoff appears, else await an attended run); **never fabricate** Q&A answers. The predicate is structural: the loop cannot advance without an operator answer, surfaced at the **first unanswerable question** -- not a global "am-I-unattended" boolean and not a numeric "too thin" metric. This BLOCK/redirect (nothing to do) is **distinct from announce-once-then-hold** (an owed decision mid-run).
+
 ## When this fires
 
 The harness auto-invokes on operator phrases:

@@ -309,6 +309,32 @@ def _sortkey(f):
     return (rank, (-(f["idle_days"] or 0),), f.get("lane", ""), f["id"])  # most-stale first
 
 
+def waiting_reason(workdir):
+    """Derive 'waiting on an owed operator decision' from durable SAID artifacts ONLY
+    (derive, never store): the recorded Deliver-gate verdicts under the feature's working
+    dir. A run-engine hold recorded outside the lane's working dir is out of scope
+    -- operator-visible, not analyzer-visible. Returns a short reason or None."""
+    try:
+        accepts = sorted(glob.glob(os.path.join(workdir, "accept-*.md")), key=os.path.getmtime)
+    except OSError:
+        return None
+    if not accepts:
+        return None
+    try:
+        txt = open(accepts[-1], encoding="utf-8", errors="replace").read()
+    except OSError:
+        return None
+    # Only the accept VERDICT is a structured, unambiguous signal. A could-not-run reviewer-gate
+    # also holds the close, but telling it apart from a ran-and-FAILed reviewer (both fail the
+    # gate) requires a structured could-not-run field the gate does not yet emit; the free-form
+    # per-reviewer probe prose is unsound to parse (mixed reviewers / multi-line recording drop a
+    # real hold). Roster-surfacing it is deferred to that structured field; the close still holds
+    # it via debrief's Phase-3.5 gate. So the axis surfaces the one signal it can trust.
+    if re.search(r"Verdict:\s*MANUAL-PENDING", txt):        # a held owed operator decision
+        return "accept MANUAL-PENDING"
+    return None
+
+
 def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, today, stale_days):
     feats_dir = os.path.join(root, docs_dir)
     work_root = os.path.join(root, work_dir)
@@ -393,6 +419,7 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
             "age_days": age, "idle_days": idle, "stale": stale, "threshold": threshold,
             "next": next_action(fid, phase, relpath(workdir, root), gates, sub),
             "integrity": t["integrity"],
+            "waiting": waiting_reason(workdir) if os.path.isdir(workdir) else None,
             # `paths` stay absolute — they are read from. `paths_rel` is the display form.
             "paths": {"spec": os.path.normpath(specs[0]) if specs else None,
                       "tasks": os.path.normpath(tasks[0]) if tasks else None,
@@ -484,6 +511,8 @@ def flags(f):
         bits.append("%s %dd idle" % (GLYPH["warn"], f["idle_days"]))
     if f.get("integrity"):
         bits.append("! " + f["integrity"])
+    if f.get("waiting"):
+        bits.append("%s waiting: %s" % (GLYPH["warn"], f["waiting"]))
     return "  ".join(bits)
 
 
@@ -585,6 +614,8 @@ def _feature_block(f, lane_label=None):
     out += ["", dl]
     if f["integrity"]:
         out.append("Note    ! " + f["integrity"])
+    if f.get("waiting"):
+        out.append("Waiting %s (operator decision owed)" % f["waiting"])
     if f["next"]:
         out.append("Next    %s" % f["next"])
     p = f.get("paths_rel") or f["paths"]
