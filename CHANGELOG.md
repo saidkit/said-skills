@@ -2,6 +2,14 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.17.0] — 2026-09-22
+
+Gate-independence hardening (SAID-22): no said Deliver/review gate is satisfiable by builder-written text -- every gate is mechanical/independent, or explicitly documented as an agent-side judgement. Extends the SAID-21 principle to three remaining gates.
+
+- **Changed:** `review-ux` no longer pre-clears a rule PASS from the task's `### Fix` claims -- the builder-text skip-list is dropped, so `R-GATE-*` resolves only from the skill's own independent gate re-run (an unrunnable gate surfaces FAIL/BLOCKED, never a builder-claimed PASS).
+- **Added:** `earned-rules.py check` resolves a cited rule's linked record on disk -- a present-but-unresolvable cited link is WARN before the contract date and FAIL on-or-after (pivoting on the task's close date); a no-link cited rule is WARN; "resolves" follows symlinks from the lane root, not git-committed-reachability. Whole-block link-health is advisory in `count`, never gating.
+- **Added:** every `docs/qa/feature-qa-checklist.md` row carries an explicit independence class (mechanical / presence-only / documented-agent-side), asserted fail-closed by the review-qa eval; `R-QA-07` is documented presence-only.
+
 ## [0.16.0] — 2026-09-22
 
 The anti-self-default backstop (SAID-21, socket 4): a decision a task *depends on* is now visible and attribution-checkable, so an autonomous builder under a blanket grant cannot self-default it and build the dependent work.

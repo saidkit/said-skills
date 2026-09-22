@@ -48,9 +48,9 @@ If any input cannot be resolved without guessing, ask the user **one focused que
 
 ## Step 1.5: Pre-stage artifacts (the speedup)
 
-The agent is configured to trust pre-staged artifacts so it skips the auth dance, the quality-gate re-runs, the checklist git-log lookup, and the rules already covered by the task's `### Fix` evidence. The skill does all of that work in parallel BEFORE spawning the agent. This is the single biggest speedup lever; do not skip it.
+The agent is configured to trust pre-staged artifacts so it skips the auth dance, the quality-gate re-runs, and the checklist git-log lookup. The skill does all of that work in parallel BEFORE spawning the agent. This is the single biggest speedup lever; do not skip it. (The gate rules `R-GATE-*` are resolved only from the skill's own re-run in `/tmp/qa-gates.json` -- never pre-cleared from the task's `### Fix` text; a gate is not satisfiable by builder-written claims.)
 
-Run all four sub-steps in parallel (one assistant message, four Bash tool calls):
+Run all three sub-steps in parallel (one assistant message, three Bash tool calls):
 
 1. **Mint JWT to `/tmp/qa-jwt.txt`.** Reuse if the file exists and is < 8 hours old; else mint via the dev-bypass endpoint. The minting command depends on the project (typically `curl -X POST http://localhost:3001/api/v1/auth/dev-bypass` after setting an `email` payload, or a local seed script). If the project has no documented dev-bypass path, write an empty file so the agent reports `BLOCKED` for `R-WIRE-*` instead of hanging.
 
@@ -88,23 +88,11 @@ Run all four sub-steps in parallel (one assistant message, four Bash tool calls)
    git -C $(git rev-parse --show-toplevel) log -1 --format=%h docs/ux/feature-ux-checklist.md > /tmp/qa-checklist-sha.txt
    ```
 
-4. **Build skip list from task evidence to `/tmp/qa-skip.txt`.** Read the task's entry in `docs/features/{FEATURE}.tasks.md` for the `### Fix` block. If the entry explicitly cites quality-gate exit codes ("tests N -> M pass", "typecheck clean", "knip no new regressions"), append `R-GATE-TYPECHECK` / `R-GATE-TESTS` / `R-GATE-LINT` / `R-GATE-KNIP` to the skip list as appropriate. The agent will record these as PASS with evidence "pre-cleared by skill from task entry" without re-checking. This list is conservative — only skip rules whose evidence is unambiguous in the task entry.
-
-   ```bash
-   FIX_BLOCK=$(awk "/^## ${TASK_ID}:/,/^## /" docs/features/{FEATURE}.tasks.md | awk "/^### Fix/,/^### /")
-   {
-     echo "$FIX_BLOCK" | grep -qiE "typecheck.*(clean|green|pass)|tsc.*clean" && echo R-GATE-TYPECHECK
-     echo "$FIX_BLOCK" | grep -qiE "tests? [0-9]+ ?(->|->) [0-9]+|test:src.*pass" && echo R-GATE-TESTS
-     echo "$FIX_BLOCK" | grep -qiE "lint.*(clean|green|pass)|biome.*clean" && echo R-GATE-LINT
-     echo "$FIX_BLOCK" | grep -qiE "knip.*(no new|green|pass|clean)" && echo R-GATE-KNIP
-   } > /tmp/qa-skip.txt
-   ```
-
 If pre-staging fails for one artifact (e.g. JWT mint fails because the backend is down), continue with the others — the agent handles missing artifacts by reporting BLOCKED on the dependent rules. Do not block the QA run on pre-stage failures.
 
 ## Step 2: Spawn the QA agent
 
-Spawn `said:review-ux-agent` (which now runs on Sonnet by default — ~2× faster output than Opus) with the five resolved inputs PLUS pointers to the pre-staged artifacts. The agent reads the checklist, filters by screen-shape, runs every `verify:` action that isn't pre-cleared, and returns its structured report. Pass the inputs as a self-contained prompt — the agent has no memory of this conversation.
+Spawn `said:review-ux-agent` (which now runs on Sonnet by default — ~2× faster output than Opus) with the five resolved inputs PLUS pointers to the pre-staged artifacts. The agent reads the checklist, filters by screen-shape, runs every `verify:` action, and returns its structured report. Pass the inputs as a self-contained prompt — the agent has no memory of this conversation.
 
 Example prompt to the agent:
 
@@ -121,7 +109,6 @@ Pre-staged artifacts (read, do not recompute):
 - /tmp/qa-jwt.txt — bearer token for /api/v1/* against the real backend
 - /tmp/qa-gates.json — {tsc,test,lint,knip} exit codes + log paths
 - /tmp/qa-checklist-sha.txt — git short-sha for the report header
-- /tmp/qa-skip.txt — rule IDs pre-cleared by the skill (record as PASS)
 
 Filter the checklist to rules whose `applies-to` matches `list-table` or `any`.
 Always run the wire-contract probes (R-WIRE-*). Translate R-GATE-* directly
@@ -152,7 +139,7 @@ The skill stops at the report. If the user wants the FAILs fixed, they re-run fe
 ## Anti-patterns
 
 - **Skipping pre-stage (Step 1.5).** This is the speedup. Spawning the agent without pre-staged artifacts forces it to mint its own JWT, re-run quality gates, and grep the task log itself — easily adds 4-5 minutes of wall-clock per run.
-- **Pre-staging sequentially.** The four sub-steps in 1.5 are independent — run them in one assistant message with four parallel Bash tool calls. Sequential pre-stage defeats the purpose.
+- **Pre-staging sequentially.** The three sub-steps in 1.5 are independent — run them in one assistant message with three parallel Bash tool calls. Sequential pre-stage defeats the purpose.
 - **Trusting `/tmp/qa-*` from a previous run blindly.** JWTs expire (8h TTL); quality gates go stale on every commit. Always re-run quality gates as part of pre-stage — they're fast in parallel.
 - Inferring screen-shape from filename guesses without consulting the task's spec entry.
 - Spawning the agent before the dev server is up — wire probes will BLOCK and the report will be uninformative.

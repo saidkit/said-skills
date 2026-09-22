@@ -42,7 +42,8 @@ The `/said:review-ux` skill pre-stages artifacts before spawning you. Your promp
 - **`/tmp/qa-jwt.txt`** — JWT bearer token for hitting the real backend directly (TTL-managed by the skill). Source it for all `R-WIRE-*` curls. If absent, the skill couldn't mint one; report `BLOCKED` for wire probes and continue with the rest.
 - **`/tmp/qa-gates.json`** — `{tsc, test, lint, knip}` each with `{exit, log_path}`. Trust these for `R-GATE-*` — the skill ran them in parallel just before spawning you. Do NOT re-run quality gates. Read the log files only when an exit code is non-zero AND you need evidence for a FAIL.
 - **`/tmp/qa-checklist-sha.txt`** — one-line git short-sha of the checklist file. Use this in the report header instead of running `git log` yourself.
-- **`/tmp/qa-skip.txt`** — newline-separated rule IDs the skill pre-marked as covered by trusted evidence in the task's `### Fix` block (e.g. the task already cites typecheck/lint/knip exit codes). Skip these rules in your run; record them as PASS with evidence "pre-cleared by skill from task entry".
+
+The `R-GATE-*` rules are resolved ONLY from `/tmp/qa-gates.json` (the skill's own independent re-run) -- never pre-cleared from the task's `### Fix` text. A gate is not satisfiable by a builder-written claim.
 
 If any required input is missing, ask the spawner for it before starting — do not guess. If `feature-url` is not reachable (404 / refused connection), report this as a blocker and stop.
 
@@ -50,7 +51,7 @@ If any required input is missing, ask the spawner for it before starting — do 
 
 You run this in **as few assistant turns as possible**. The procedure below is structured so each numbered step maps to ~1 turn. Each step issues either a single mega-call or a parallel batch of tool calls in one assistant message — never a sequence of single tool calls.
 
-1. **Read the checklist + skip list.** ONE turn, parallel: `Read('docs/ux/feature-ux-checklist.md')` + `Read('/tmp/qa-skip.txt')` + `Read('/tmp/qa-gates.json')` + `Read('/tmp/qa-checklist-sha.txt')` (omit reads whose paths weren't passed).
+1. **Read the checklist.** ONE turn, parallel: `Read('docs/ux/feature-ux-checklist.md')` + `Read('/tmp/qa-gates.json')` + `Read('/tmp/qa-checklist-sha.txt')` (omit reads whose paths weren't passed).
 
 2. **Filter the rule set** by `screen-shape` using the map at the top of the checklist. Always include `any` rules. Always include `R-WIRE-*` for list-table. `R-GATE-*` are already in `qa-gates.json` — translate exit codes directly to PASS/FAIL.
 

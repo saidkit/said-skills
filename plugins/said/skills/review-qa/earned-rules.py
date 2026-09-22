@@ -15,6 +15,13 @@ Usage:
       -> FAIL on/after --adr-date, WARN before (the heading is the lane's adoption marker; the date is the
       fallback for a rolled lane's pre-contract closes), no heading in CLAUDE.md -> WARN, never FAIL
       (roll the lane; the HALT on an un-rolled lane is the implement skill's, at close time).
+      Then each CITED rule's linked record is checked against the strict grammar (the record = the rule
+      line's FINAL arrow segment = one lane-root-relative path token, an optional `#anchor` stripped,
+      nothing after it): conforming + resolves (opens as a regular file from the lane root by ANY path
+      form, `..` or symlink alike) -> PASS; conforming + unresolvable -> dangling; an arrow present but its
+      tail non-conforming (trailing prose, a second arrow, a pathless id, a ?query) -> malformed; dangling
+      and malformed both WARN before --link-contract-date / FAIL on-or-after (the task Status-date pivot);
+      a rule line with no arrow at all -> no-link, WARN, never FAIL.
       Exit 0 = PASS or WARN, 1 = FAIL, 2 = config error.
 
 Section definition (the contract):
@@ -26,6 +33,7 @@ Section definition (the contract):
 Example id shapes: R-PROJ-01, R-PROJ-FE-07.
 """
 import argparse
+import os
 import re
 import sys
 
@@ -36,6 +44,35 @@ ID_TOKEN = re.compile(r"(?<![A-Za-z])R-[A-Z]+-[A-Z0-9-]+")  # a whole token: `AD
 APPLIED_LINE = re.compile(r"^Rules applied:\s*(?P<ids>.*?)\s*\(block:\s*(?P<n>\d+)\)\s*\.?\s*$")
 LINE_PREFIX = re.compile(r"^\s*(?:[-*]\s+)?`?\s*")  # a bullet marker and/or a backtick before the line is tolerated
 DONE_DATE = re.compile(r"\*\*Status:\*\*\s*Done\s*\((\d{4}-\d{2}-\d{2})\)|^Status:\s*Done\s*\((\d{4}-\d{2}-\d{2})\)", re.M)
+# A rule line's linked record (the earned-rules contract): the record is the line's FINAL
+# `->` / Unicode-right-arrow segment = exactly ONE path token, bare or backticked, lane-root-relative, an
+# optional `#anchor` allowed and stripped, with NOTHING after it. This is a strict grammar, not a
+# heuristic: a tail that does not match (trailing prose, a second arrow after the path, a pathless id,
+# stray punctuation, a `?query`) is MALFORMED -- never silently "no link". The arrow is built with chr()
+# so the source stays plain-ASCII (no glyph in the file) while matching the real glyph in a rule line.
+_ARROW = chr(0x2192)
+# The whole tail after the final arrow: a lone path token (optionally backticked), an optional #anchor, nothing else.
+_TAIL_RE = re.compile(r"^`?(?P<path>[\w./@~-]+?)(?:#[\w./@~-]+)?`?$")
+
+
+def parse_link(line):
+    """Classify a rule line's linked record per the strict grammar. Returns (kind, token):
+      'conforming' -- the tail is a lone path token; token is that path (lane-root-relative, #anchor stripped);
+      'malformed'  -- an arrow is present but its final segment is not a lone path token (trailing prose, a
+                      second arrow after the path, a pathless id, a ?query, stray punctuation);
+      'no-link'    -- the line carries no arrow at all.
+    Resolution is the caller's job; a pathless token (no `/` and no `.`) is not a path and reads MALFORMED."""
+    a_ascii, a_glyph = line.rfind("->"), line.rfind(_ARROW)
+    if a_ascii < 0 and a_glyph < 0:
+        return ("no-link", None)
+    tail = (line[a_glyph + len(_ARROW):] if a_glyph > a_ascii else line[a_ascii + 2:]).strip()
+    m = _TAIL_RE.match(tail)
+    if not m:
+        return ("malformed", None)
+    tok = m.group("path")
+    if "/" not in tok and "." not in tok:  # a bare record id (no path separator, no extension) is not a path token
+        return ("malformed", None)
+    return ("conforming", tok)
 
 
 def read_section(path):
@@ -61,6 +98,43 @@ def read_section(path):
     return len(rules), ids, uncitable
 
 
+def rule_links(path):
+    """id -> (kind, token) per parse_link, for each CITABLE rule line only. Uncitable rule lines (no id)
+    are never cited, so they are skipped. Resolution is the caller's job (relative to the --claude-md's
+    directory, symlink-following)."""
+    try:
+        lines = open(path, encoding="utf-8").read().splitlines()
+    except OSError:
+        return {}
+    start = next((i for i, l in enumerate(lines) if HEADING.match(l)), None)
+    if start is None:
+        return {}
+    out = {}
+    for l in lines[start + 1:]:
+        if NEXT_HEADING.match(l):
+            break
+        if not RULE_LINE.match(l):
+            continue
+        m = ID_TOKEN.search(l)
+        if not m:
+            continue
+        out[m.group(0)] = parse_link(l)
+    return out
+
+
+def link_resolves(base_dir, link):
+    """A cited link 'resolves' when it opens as a regular FILE from the lane root (relative to the
+    --claude-md's directory) by ANY path form -- a `..` cross-lane link and a symlinked dir alike, both
+    following symlinks. Resolution is by REACHABILITY, not spelling: cross-lane `..` record links are the
+    established pattern across the workspace's lanes, and the accepted gitignored docs/ -> sibling symlink
+    is equally non-portable, so singling out `..` was a false distinction. Rejections: an absolute link
+    (os.path.join would discard the base, and a lane record is lane-relative); a directory (isfile, not
+    exists -- a directory is not a record)."""
+    if not link or os.path.isabs(link):
+        return False
+    return os.path.isfile(os.path.join(base_dir, link))
+
+
 def cmd_count(args):
     sec = read_section(args.claude_md)
     if sec is None:
@@ -71,6 +145,17 @@ def cmd_count(args):
     print("ids: " + (" ".join(ids) if ids else "(none)"))
     for u in unc:
         print(f"uncitable: {u}")
+    # Advisory whole-block link-health -- non-gating (count is an echo, never a verdict). This is where an
+    # UNCITED dangling/no-link rule surfaces, without blocking any close.
+    links = rule_links(args.claude_md)
+    base = os.path.dirname(os.path.abspath(args.claude_md))
+    for rid, (kind, tok) in links.items():
+        if kind == "conforming" and not link_resolves(base, tok):
+            print(f"link-advisory: {rid} -> {tok} (missing)")
+        elif kind == "malformed":
+            print(f"link-advisory: {rid} (malformed link: the final arrow segment is not a lone path token)")
+        elif kind == "no-link":
+            print(f"link-advisory: {rid} (no linked record)")
     return 0
 
 
@@ -125,6 +210,34 @@ def cmd_check(args):
     if claimed_n > n:
         print(f"FAIL — block count {claimed_n} > actual {n} rules in {args.claude_md}")
         return 1
+    # Classify each CITED rule's linked record per the strict grammar, INDEPENDENTLY of the block-count
+    # comparison -- a link FAIL must never be skipped by an under-claimed (block-grew) WARN (a close
+    # answers only for what it cites). conforming+resolves -> ok; conforming+unresolvable -> dangling;
+    # arrow present but tail not a lone path token -> malformed; no arrow -> no-link. dangling + malformed
+    # pivot on the linked-record contract date via the task Status-date; an UNDATED close fails CLOSED (an
+    # unknown date is not evidence of being before the pivot), the same polarity as the missing-line branch
+    # above. Only after the links clear does the block-grew WARN (a later rule is not a false close) fire.
+    links = rule_links(args.claude_md)
+    base = os.path.dirname(os.path.abspath(args.claude_md))
+    dangling = [c for c in cited if links.get(c, ("no-link", None))[0] == "conforming" and not link_resolves(base, links[c][1])]
+    malformed = [c for c in cited if links.get(c, ("no-link", None))[0] == "malformed"]
+    nolink = [c for c in cited if links.get(c, ("no-link", None))[0] == "no-link"]
+    grew = f"; block grew since close ({claimed_n} then, {n} now, cited ids verified)" if claimed_n < n else ""
+    if dangling or malformed:
+        parts = []
+        if dangling:
+            parts.append(f"link to a missing record: {', '.join(dangling)}")
+        if malformed:
+            parts.append(f"a malformed link (the final arrow segment is not a lone path token): {', '.join(malformed)}")
+        detail = "; ".join(parts)
+        if done and done < args.link_contract_date:  # only a DATED close before the pivot gets the grace WARN
+            print(f"WARN -- cited rule(s) {detail} (task closed {done}, before the linked-record contract date {args.link_contract_date}; operator-verify){grew}")
+            return 0
+        print(f"FAIL -- cited rule(s) {detail} (task closed {done or 'undated'}, linked-record contract date {args.link_contract_date})")
+        return 1
+    if nolink:
+        print(f"WARN -- cited rule(s) carry no linked record: {', '.join(nolink)} (no arrow on the rule line, operator-verify){grew}")
+        return 0
     if claimed_n < n:
         print(f"WARN — block grew since close: {claimed_n} then, {n} now in {args.claude_md}; cited ids verified (operator-verify)")
         return 0
@@ -137,7 +250,9 @@ def main(argv=None):
     sub = p.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("count"); c.add_argument("claude_md"); c.set_defaults(fn=cmd_count)
     k = sub.add_parser("check"); k.add_argument("--claude-md", required=True); k.add_argument("--task-file", required=True)
-    k.add_argument("--task-id"); k.add_argument("--adr-date", required=True); k.set_defaults(fn=cmd_check)
+    k.add_argument("--task-id"); k.add_argument("--adr-date", required=True)
+    k.add_argument("--link-contract-date", default="2026-09-22")  # the linked-record grammar's phased date (WARN before, FAIL on/after)
+    k.set_defaults(fn=cmd_check)
     a = p.parse_args(argv)
     return a.fn(a)
 
