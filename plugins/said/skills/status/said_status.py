@@ -335,6 +335,37 @@ def waiting_reason(workdir):
     return None
 
 
+# The blocked-decision marker + its append-only resolution ledger -- a defined grammar (not prose),
+# so a targeted parse is sound (the toolkit-parsers rule bars parsing free-form text, not a grammar).
+_BLOCKED_MARKER = re.compile(r"^\*\*Blocked-on decision:\*\*\s*([A-Za-z0-9_-]+)\s*$", re.MULTILINE | re.IGNORECASE)
+_DECISION_REC = re.compile(r"^-\s+(\S+)\s+resolved-by:\s*user@", re.MULTILINE)
+_TASK_HEAD = re.compile(r"^## (\S+):", re.MULTILINE)
+_STATUS_DONE = re.compile(r"^\*\*Status:\*\*\s*Done\b", re.MULTILINE)
+
+
+def waiting_on_decision(tasks_paths):
+    """Derive 'waiting on decision <id>' from durable STRUCTURED state (derive, never store): a
+    non-Done task carrying a `**Blocked-on decision:** <id>` marker with no resolving `## Decisions`
+    record (a `user@` record for that id). A structured-field parse over a defined grammar, never a
+    free-form prose parse. The authoritative attribution gate is the bundled decision-gate checker
+    at close; this is only the observability axis. Returns a short reason or None."""
+    for path in tasks_paths or []:
+        try:
+            txt = open(path, encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        resolved = {m.group(1) for m in _DECISION_REC.finditer(txt)}
+        heads = list(_TASK_HEAD.finditer(txt))
+        for i, h in enumerate(heads):
+            block = txt[h.end():heads[i + 1].start() if i + 1 < len(heads) else len(txt)]
+            if _STATUS_DONE.search(block):
+                continue
+            m = _BLOCKED_MARKER.search(block)
+            if m and m.group(1) not in resolved:
+                return "decision " + m.group(1)
+    return None
+
+
 def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, today, stale_days):
     feats_dir = os.path.join(root, docs_dir)
     work_root = os.path.join(root, work_dir)
@@ -419,7 +450,7 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
             "age_days": age, "idle_days": idle, "stale": stale, "threshold": threshold,
             "next": next_action(fid, phase, relpath(workdir, root), gates, sub),
             "integrity": t["integrity"],
-            "waiting": waiting_reason(workdir) if os.path.isdir(workdir) else None,
+            "waiting": (waiting_reason(workdir) if os.path.isdir(workdir) else None) or waiting_on_decision(tasks),
             # `paths` stay absolute — they are read from. `paths_rel` is the display form.
             "paths": {"spec": os.path.normpath(specs[0]) if specs else None,
                       "tasks": os.path.normpath(tasks[0]) if tasks else None,

@@ -113,6 +113,7 @@ Acceptance bullets (skill prefills; strip categories that don't apply):
   - [ ] <ComponentName> public props preserved (consumed by <ConsumerFeature>)
   - [ ] Quality gates green; no regression outside scope.
 Refs: [ADR/UX-spec/feature-spec paths this task CREATES or EDITS; empty otherwise]
+Blocked-on decision: [<id> | none -- an owed operator decision this task depends on; explicit, never inferred]
 Priority: [High|Medium|Low; default Medium / High for bugs]
 ```
 
@@ -137,6 +138,7 @@ Before writing, validate the answers against template-tasks.md discipline. Rewri
   
   Typical task ends with 5–10 Acceptance bullets total. Bug tasks may be even leaner (Problem + Fix + Gotchas per template-tasks.md "depth varies").
 - **Refs: empty by default.** Only fill if the task creates or edits an ADR / UX-spec / feature-spec. Reading list ≠ Refs. Refs is the write-set; Reading list (+ Approach citations) is the read-set.
+- **Blocked-on decision (optional field).** When the operator's answer names an owed decision this task depends on (`Blocked-on decision: <id>`), place `**Blocked-on decision:** <id>` as a field after `**Refs:**` (a field, never a `###` section); `none` -> omit it. The id is engine-minted (a resolved §D id, else `D-<n>`), explicit and never inferred from prose. A blocked task is held until a `## Decisions` ledger record resolves it (`template-tasks.md`).
 - **Status: `Todo (YYYY-MM-DD)`** with today's creation date.
 - **Fix / Deviations / Gotchas: HTML-comment placeholders.** Phase 3 close-of-task review fills them.
 
@@ -168,6 +170,7 @@ Use the canonical section order from template-tasks.md:
 **Status:** Todo (YYYY-MM-DD)
 **Priority:** <High|Medium|Low>
 **Refs:** <paths or empty>
+[optional] **Blocked-on decision:** <id>
 
 ### Problem
 <problem text>
