@@ -2,6 +2,15 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.16.0] — 2026-09-22
+
+The anti-self-default backstop (SAID-21, socket 4): a decision a task *depends on* is now visible and attribution-checkable, so an autonomous builder under a blanket grant cannot self-default it and build the dependent work.
+
+- **Added:** a task carries a write-once `**Blocked-on decision:** <id>` marker; its resolution is an append-only `## Decisions` ledger record (`- <id> resolved-by: user@<turn> -- "<verbatim quote>" -- <date> [supersedes: <prior>]`), authored by `architect` and `add-task` (explicit, never inferred) and written only by a main-context resolve step.
+- **Added:** `decision-gate.py`, a bundled **structural** checker — it PASSes only when the ledger record cites a user-role turn with a verbatim substring quote, a basis not in the self-default deny-list (grant / standing-autonomy / default / assistant / subagent / arm), postdating the marker; else HOLD. The semantic "decides, not merely mentions" check stays agent-side.
+- **Added:** `impl` blocks a marked-and-unresolved task at start and at close (returning it as an owed item, coining no marker); `said`/`flow` emit `OPERATOR-DECISION-HELD` and hold; `status`/`board` derive a "waiting on decision `<id>`" axis from the durable marker + ledger (derived, never stored).
+- **Added:** a `decision-gate` eval package — a RED reproduction of a grant-basis self-default holding, negative controls (operator-cited, named-class, no-marker, legacy), and a documented `misattributed-cite` limit (structural PASS, agent-side FAIL).
+
 ## [0.15.0] — 2026-09-22
 
 The owed-operator-decision fuse (SAID-21): a decision the engine reserves for the operator is announced once, then held — never settled by an autonomous builder and rubber-stamped by later gates.
