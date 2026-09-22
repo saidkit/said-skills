@@ -335,6 +335,23 @@ def waiting_reason(workdir):
     return None
 
 
+def completeness_note(workdir):
+    """The completeness recompute's advisory report (the under-spec WARN + per-unit last-revised
+    provenance), derived read-only from the recorded review-completeness-*.md note artifact for the
+    board + deep-dive display. Non-gating: display text, never a verdict. Derive-never-store: reads only."""
+    try:
+        hits = sorted(glob.glob(os.path.join(workdir, "review-completeness-*.md")), key=os.path.getmtime)
+    except OSError:
+        return None
+    if not hits:
+        return None
+    try:
+        txt = open(hits[-1], encoding="utf-8", errors="replace").read()
+    except OSError:
+        return None
+    return _completeness_report(txt) or None
+
+
 # The blocked-decision marker + its append-only resolution ledger -- a defined grammar (not prose),
 # so a targeted parse is sound (the toolkit-parsers rule bars parsing free-form text, not a grammar).
 _BLOCKED_MARKER = re.compile(r"^\*\*Blocked-on decision:\*\*\s*([A-Za-z0-9_-]+)\s*$", re.MULTILINE | re.IGNORECASE)
@@ -451,6 +468,7 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
             "next": next_action(fid, phase, relpath(workdir, root), gates, sub),
             "integrity": t["integrity"],
             "waiting": (waiting_reason(workdir) if os.path.isdir(workdir) else None) or waiting_on_decision(tasks),
+            "completeness_note": (completeness_note(workdir) if os.path.isdir(workdir) else None),
             # `paths` stay absolute — they are read from. `paths_rel` is the display form.
             "paths": {"spec": os.path.normpath(specs[0]) if specs else None,
                       "tasks": os.path.normpath(tasks[0]) if tasks else None,
@@ -647,6 +665,8 @@ def _feature_block(f, lane_label=None):
         out.append("Note    ! " + f["integrity"])
     if f.get("waiting"):
         out.append("Waiting %s (operator decision owed)" % f["waiting"])
+    if f.get("completeness_note"):
+        out.append("Complete %s" % f["completeness_note"])
     if f["next"]:
         out.append("Next    %s" % f["next"])
     p = f.get("paths_rel") or f["paths"]
@@ -725,6 +745,30 @@ def index_checkers(*paths):
     return idx
 
 
+def _completeness_report(out):
+    """The completeness recompute's advisory report lines (`completeness-report: ...`) from its stdout (or
+    a recorded note artifact), as a compact one-line summary for the reviewer line / board: the under-spec
+    WARN + each unit's last-revised provenance. Parses the producer's defined machine grammar (never the
+    human sentence); tolerant of a leading markdown list marker / indentation so a recorded note field is
+    extracted rather than silently no-op'd. Non-gating display text -- it never affects the reviewer verdict
+    or the exit code. Sanitized: control chars dropped, length capped, and a literal `reviewer-gate:` /
+    `completeness-report:` marker neutralized, so builder-authored content that reaches this line can never
+    forge an authoritative marker or inject a control sequence."""
+    tag = "completeness-report:"
+    parts = []
+    for ln in out.splitlines():
+        s = ln.lstrip()
+        while s[:1] in ("-", "*"):        # tolerate a leading list marker (a recorded note field)
+            s = s[1:].lstrip()
+        if s.startswith(tag):
+            parts.append(s.split(tag, 1)[1].strip())
+    report = "; ".join(parts)
+    report = "".join(c if 0x20 <= ord(c) < 0x7f else " " for c in report)   # drop control chars
+    for marker in ("reviewer-gate:", tag):                                  # neutralize a forged marker
+        report = report.replace(marker, marker[:-1] + ";")
+    return report[:500]
+
+
 def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
     """Validate one expected reviewer's L1 verdict. Returns (ok, reason)."""
     if meta is None:  # declared reviewer id resolves to no Checker — nominal; a verdict can never redeem it
@@ -772,9 +816,13 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
                "SAID_GRAMMAR": os.path.join(os.path.abspath(root), _lane_key(root, "docs-root") or "docs", "ux", "feature-ux-grammar.md")}
         if surface:
             env["SAID_SURFACE"] = surface
-        rc = subprocess.run(cmd, shell=True, cwd=root, capture_output=True, env=env).returncode
-        if rc != 0:
-            return False, "recompute failed (exit %d)" % rc
+        proc = subprocess.run(cmd, shell=True, cwd=root, capture_output=True, env=env)
+        if proc.returncode != 0:
+            return False, "recompute failed (exit %d)" % proc.returncode
+        # Surface the recompute's advisory report (under-spec WARN + per-unit last-revised provenance) it
+        # emits on stdout onto the reviewer line -- advisory text on a PASS; never flips ok or the exit code.
+        report = _completeness_report(proc.stdout.decode("utf-8", "replace"))
+        return True, ("PASS -- " + report if report else "PASS")
     return True, "PASS"
 
 

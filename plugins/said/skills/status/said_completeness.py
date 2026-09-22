@@ -210,6 +210,14 @@ def read_grammar_stamp(path):
     return m.group(1) if m else None
 
 
+def read_last_revised(path):
+    """The `last-revised:<feature-id>` provenance stamp uxtoc/architect writes, or None if absent. Read
+    outside any fenced block, like the grammar stamp. NON-GATING: this value is displayed only, never
+    compared against a capture time or a prior run, and its absence never fails anything."""
+    m = re.search(r"(?m)^last-revised:\s*(\S+)\s*$", _defence(path))
+    return m.group(1) if m else None
+
+
 def read_units_decl(path):
     """The sealed `units: <ID1>;<ID2>;... (count: N)` line uxtoc stamps into toc.md - the AUTHORITATIVE
     DECLARED unit set for the durable-spec check, read explicitly rather than inferred from prose. Returns a
@@ -674,6 +682,7 @@ def main():
     # unit-home keeps parsing the toc, unchanged (the unit-home is the ONLY switch - the engine holds no
     # medium vocabulary). Each durable must head its OWN unit id (identity cross-check); a missing durable is
     # reported by check_unit_home (broken-link) below.
+    provenance = {}                    # per-unit last-revised provenance (non-gating; displayed only)
     _dh = _dir_home(g, grammar)
     if _dh is not None:
         _rel, _ddir = _dh
@@ -694,6 +703,10 @@ def main():
                     "`# %s <ID>` for its own id (re-name or re-level it)" % (_u, _found, _u, g["unit"]), 1)
             designed |= _du
             container_of.update(_dc)
+            provenance[_u] = read_last_revised(_dpath)   # the durable's stamp per declared unit
+    if _dh is None:                    # inline lane -> the single toc stamp, shared by every unit
+        _toc_lr = read_last_revised(toc)
+        provenance = {_pu: _toc_lr for _pu in {_du for (_du, _dk) in designed}}
 
     if not designed:
         die("FAIL: zero designed elements (hollow - nothing to certify complete; no keyed elements under "
@@ -811,6 +824,14 @@ def main():
                          + ", ".join(sorted("%s / %s" % p for p in manifest_under)))
         sys.stderr.write("completeness WARN: built element(s) absent from DESIGNED (under-specified "
                          "outline; not a FAIL) -- %s\n" % "; ".join(parts))
+        # Also emit the same signal on stdout in a stable machine-readable form so a presenter parses a
+        # defined grammar (never the human sentence); the high-signal-vs-advisory split is preserved.
+        if oracle_under:
+            print("completeness-report: under-spec high-signal: "
+                  + ", ".join(sorted("%s / %s" % p for p in oracle_under)))
+        if manifest_under:
+            print("completeness-report: under-spec advisory: "
+                  + ", ".join(sorted("%s / %s" % p for p in manifest_under)))
 
     # Own the coverage ceiling: a designed oracle-container flag can fall to declared-evidence when its unit
     # DECLARED a capture cmd: but the tool's --help is not two-witness parseable (hand-formatted / truncated
@@ -834,6 +855,11 @@ def main():
     else:
         cap_note = ("capture: manifest/declared-evidence; %d in oracle-intended containers "
                     "(no author-independent capture available)" % oracle_intended)
+    # Carry each designed unit's last-revised provenance on stdout (non-gating; displayed, never compared).
+    # A unit with no stamp prints an explicit `-` marker and never affects the verdict or exit code.
+    for _pu in sorted({_u for (_u, _k) in designed}):
+        _lr = provenance.get(_pu)
+        print("completeness-report: provenance: %s=%s" % (_pu, _lr if _lr else "-"))
     print("completeness PASS: %d designed <= %d built + %d dropped (%s)"
           % (len(designed), len(built), len(dropped), cap_note))
     sys.exit(0)

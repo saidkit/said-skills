@@ -499,14 +499,17 @@ def render_feature(data, fid):
     # the feature name sits below the id in the detail header — full text, wraps freely here
     nm = f.get("display_name")
     d_name = '<div class="d-name">%s</div>' % esc(nm) if nm else ""
+    # the recorded completeness note (under-spec WARN + per-unit last-revised) -- advisory, non-gating
+    comp = ('<div class="d-complete"><span class="lbl">Complete</span> %s</div>'
+            % esc(f["completeness_note"])) if f.get("completeness_note") else ""
     tasks = render_tasks(said_status.feature_tasks([f["paths"]["tasks"]] if f["paths"]["tasks"] else []), f["id"])
     return (
         '<div class="d-head"><span class="rid big">%s</span>%s%s%s</div>%s'
         '<ul class="steps steps-horizontal d-steps">%s</ul>'
-        '<div class="d-gates">%s</div>%s'
+        '<div class="d-gates">%s</div>%s%s'
         '<div class="d-dates">%s</div>%s%s%s'
         '<div class="d-files">%s</div>'
-    ) % (esc(f["id"]), _pill(f["phase"]), lane_tag, chip(f["id"]), d_name, steps, esc(gate_line), prog, dates,
+    ) % (esc(f["id"]), _pill(f["phase"]), lane_tag, chip(f["id"]), d_name, steps, esc(gate_line), comp, prog, dates,
          tasks, mount("thread", scope="feature", feature=f["id"]), nxt, files)
 
 
