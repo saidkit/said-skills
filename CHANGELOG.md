@@ -2,6 +2,15 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.15.0] — 2026-09-22
+
+The owed-operator-decision fuse (SAID-21): a decision the engine reserves for the operator is announced once, then held — never settled by an autonomous builder and rubber-stamped by later gates.
+
+- **Added:** the fuse's three sockets — **routing** (an owed decision emits `OPERATOR-DECISION-HELD` on the `goal: stop` line and holds, in `said`/`flow` and the `scope-refine` §D stop-points), **attribution** (`architect`'s preflight now requires §D *resolved with an operator-attributed record* — cite-and-verify, not merely empty), and **derivation** (a `status`/`board` "waiting on operator" axis derived from the recorded accept verdict, never stored).
+- **Added:** `impl` main-side decisions (unsatisfiable Approach, mid-flight scope-creep, soft-finding defer) no longer relax under a blanket autonomy grant — they classify as owed and hold/return; and `said` consumes a **named** advance decision only for its named class (a blanket grant never covers an owed decision).
+- **Added:** `accept` classification is un-gameable — a `mechanical`/`recorded-probe` label counts only if its evidence-source resolves, else it downgrades to `manual` and holds; `debrief` holds the close on a could-not-run reviewer-gate (distinct from a ran-and-FAILed reviewer); `scope-grill` blocks up-front when run with no operator to answer its Q&A.
+- **Added:** eval packages (characterization harnesses) for `status` and `debrief`, which previously shipped none.
+
 ## [0.14.0] — 2026-09-16
 
 Completeness projection hardening (nested-container stack + attribute-name collision) and a `dir:`-lane `reuses:` broken-link check. All three make the gate stricter — a surface that previously shipped a green PASS may now correctly FAIL.
