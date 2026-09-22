@@ -300,7 +300,12 @@ Classify each decision:
 - **EXTENDS** — handoff decides where contract is silent. Confirm no
   nearby-rule violation; carry forward with handoff rationale.
 - **SILENT** — handoff doesn't speak; contract has a default. Apply
-  default; note in draft body.
+  the default AND surface it in §D as a "default applied — confirm or
+  override" item (name the contract rule + the applied default; ask
+  confirm-or-override with explicit reason), in the forcing-function
+  phrasing below. A body-note alone is not a surface; never
+  body-noted only — the operator sees every default and architect
+  holds until it is confirmed or overridden.
 
 Stage 2 audit findings that contradict the handoff also become
 CONFLICTs at this stage.
@@ -334,6 +339,13 @@ this order:
    - **Open questions** — handoff residuals + any checklist gaps
      surfaced. Each has a forcing function (blocker on what /
      answered when).
+   - **Content-silent defaults** — for every SILENT item (Stage 4:
+     handoff silent, contract has a default), emit a §D item:
+     "Per <contract rule>, default is <X>. Confirm, or override with
+     explicit reason." The default is applied AND shown; never
+     body-noted only. The Shape / Mutation-flow forcing-functions
+     below are named instances of the same surface-and-confirm shape
+     (they trigger on Stage-1 inventory shape, not only on silence).
    - **Shape forcing-functions** — for every governance affordance
      surfaced in Stage 1 inventory whose name matches `Manage X` /
      `Assign Y` / `Members of Z`, OR which would carry a list of
@@ -368,7 +380,8 @@ Before presenting:
 - [ ] §A has real JSON; §B has real screenshots — no placeholders.
 - [ ] Every claim in the draft body has a trace.
 - [ ] §D conflict list is complete — no silently-resolved
-      divergences.
+      divergences; and no content-silent item is body-noted only —
+      every applied default appears in §D.
 - [ ] No `Pass 2` / `polish later` / `decide at execution` language.
 - [ ] Output is scope-shape (no `## Context to load alongside this
       spec`, no Acceptance Criteria sections, no Feature Tasks
