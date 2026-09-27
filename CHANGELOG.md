@@ -4,7 +4,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [0.18.0] — 2026-09-27
 
-A session boundary is a data boundary (SAID-27): the engine sheds inherited context at phase boundaries instead of carrying a build session into Deliver, and a debrief resumes instead of re-running.
+A session boundary is a data boundary: the engine sheds inherited context at phase boundaries instead of carrying a build session into Deliver, and a debrief resumes instead of re-running.
 
 - **Added:** `said`/`flow` read the session's `context.json` at Implement->Deliver, before `debrief` and at every lane rotate; above `SAID.context-checkpoint:` (optional lane key, default 300000 input tokens) they print a `CONTEXT-CHECKPOINT` stop -- an operator action (`/clear`, then re-issue the directive), announced once and held under `/goal`, never an owed decision. A Deliver resume starts at the first gate without a recorded pass.
 - **Added:** shipped hooks -- a `SessionStart` re-anchor (`clear|compact` only, silent outside a `## Lane` cwd) that prints the lane's SAID status and the un-closed think-protocol leaves from disk, and a statusline script that writes `context.json`. Both auto-register with the plugin.
