@@ -46,11 +46,12 @@ After Phase 3 closes (all tasks Done, all quality gates green, operator's manual
 ## Step 0 — Preflight
 
 1. Resolve feature paths from `SAID.feature-spec:` + `SAID.task-log:` + `SAID.working:` on the `## Lane` block; no block/key -> HALT (operator declares it), never glob-guess. The resolved working root is used for every Phase A/B/C output below. **ADR ids + dir:** from `SAID.adr-prefix:` + `SAID.docs-root:` — every promoted/minted ADR id, `Refs:` pointer, and the close-footer migration id binds to `SAID.adr-prefix:`; the ADR dir resolves under `SAID.docs-root:`.
-2. Read both files in full.
-3. Status check. For each task entry, confirm `Status: Done`. If any open -> BLOCK with: "Cannot debrief — N task(s) still open. Close them via `/said:impl <feature-id>` first." List the open IDs.
-4. Sibling check. If spec § Related cites other feature specs, ask operator: "Are these siblings (umbrella, must all close) or successors (post-Debrief)?" BLOCK only if siblings incomplete.
-5. Quality gate spot-check. Resolve and run the project's quality-gate command at runtime the same way `/said:review-qa` Step 0 resolves it. Halt if it goes red — the feature isn't actually closed.
-6. **Phase-3.5 gate check.** Glob `docs/working/<feature-id>/review-qa-*.md` and `accept-*.md` (most recent by mtime). (a) If **neither exists** -> do not proceed silently: surface "No Phase-3.5 gate artifacts for `<feature-id>` — run `/said:review-qa` + `/said:accept` first, or confirm skip." **A confirmed skip is carried forward, not waved through — it is recorded at Phase C as the `Gate-skip` line of the `## Debrief close` footer (step 3), so the omission leaves an audit trail instead of a silent gap.** (b) If the latest `review-qa` **or** `accept` verdict is **FAIL** -> BLOCK with redirect: "Resolve `/said:review-qa` / `/said:accept` failures before debrief." This is the gate `/said:review-qa` and `/said:accept` advertise (their "Gate effect for `/said:debrief`" sections) — without this read it never actually fires. **(c) If the latest `accept` verdict is MANUAL-PENDING** -> HOLD: announce once, then hold (the owed operator decision `accept:164` promises -- operator confirms the manual items inline before debrief proceeds); never proceed on an unresolved MANUAL-PENDING, never auto-promote it. **(d) If the reviewer-gate could-not-run** (a declared reviewer's verdict **could not be produced** -- a missing verdict artifact or an impossible recompute; distinct from a **ran-and-FAILed reviewer** (which stays surfaced-not-blocking) and from an operator `[N/A]` skip (which stays PASS)) -> **HOLD**: announce once, then hold -- a could-not-run gate is **not a passed gate**. The recorded-probe design is preserved: **no auto-block** pre-close hook is introduced (a HOLD is operator-owned, not a machine block).
+2. **Resume + single-run guard (before any full read).** Read the last `## Debrief close` footer of the tasks log (if any) and `docs/working/<feature-id>/debrief.md` (if any). (a) **Resume** -- `debrief.md` has at least one finding row whose `status:` cell is `approved` and not yet `applied` -> this is a resumed run: skip Phase A, continue Phase B from that row; Phase C resumes the same way. A `debrief.md` with no `status:` cells, or with every row `applied | skip | deferred`, is a finished debrief, not a resume. (b) **Single-run guard** -- a footer exists and, **below it in the file** (position, never dates: same-day closes are common), there is neither a task entry with `**Status:** Done` nor a `## Reopen` heading -> STOP: "Feature already debriefed on <footer date>; nothing closed since, a re-run is the single-pass failure mode. Re-open via `/said:add-task` or name what changed." Anything closed below the footer is a **reopen increment**: proceed, and the new footer names it. **Precedence:** (a) is checked first; a resume proceeds and (b) is not evaluated for that invocation. The guard cannot see a footer written for a single task (that is the never-a-footer-per-task anti-pattern below).
+3. **Scope the debrief before reading (scope-by-risk).** Take the **delta since the last footer**: the tasks-log lines below the last `## Debrief close` footer (excluding the footer block itself), plus the spec only where it changed since that footer (`git diff <footer commit>..HEAD -- <spec>`; the whole spec when no git history). Grep the delta for non-empty `### Gotchas` / `### Deviations` bodies and for the leak markers of §A.2. **Both zero -> TINY debrief:** run §A.1 stale-state diff + §A.5 successor only, skip §A.2-§A.4, record `Scope: tiny, 0 gotchas, 0 leak hits` in the footer. Otherwise read both files in full (tasks files > 100 KB: the §A.4 stream-read applies to the whole read). A first debrief (no footer) is always full.
+4. Status check. For each task entry, confirm `Status: Done`. If any open -> BLOCK with: "Cannot debrief — N task(s) still open. Close them via `/said:impl <feature-id>` first." List the open IDs.
+5. Sibling check. If spec § Related cites other feature specs, ask operator: "Are these siblings (umbrella, must all close) or successors (post-Debrief)?" BLOCK only if siblings incomplete.
+6. Quality gate spot-check. Resolve and run the project's quality-gate command at runtime the same way `/said:review-qa` Step 0 resolves it. Halt if it goes red — the feature isn't actually closed.
+7. **Phase-3.5 gate check.** Glob `docs/working/<feature-id>/review-qa-*.md` and `accept-*.md` (most recent by mtime). (a) If **neither exists** -> do not proceed silently: surface "No Phase-3.5 gate artifacts for `<feature-id>` — run `/said:review-qa` + `/said:accept` first, or confirm skip." **A confirmed skip is carried forward, not waved through — it is recorded at Phase C as the `Gate-skip` line of the `## Debrief close` footer (step 3), so the omission leaves an audit trail instead of a silent gap.** (b) If the latest `review-qa` **or** `accept` verdict is **FAIL** -> BLOCK with redirect: "Resolve `/said:review-qa` / `/said:accept` failures before debrief." This is the gate `/said:review-qa` and `/said:accept` advertise (their "Gate effect for `/said:debrief`" sections) — without this read it never actually fires. **(c) If the latest `accept` verdict is MANUAL-PENDING** -> HOLD: announce once, then hold (the owed operator decision `accept:164` promises -- operator confirms the manual items inline before debrief proceeds); never proceed on an unresolved MANUAL-PENDING, never auto-promote it. **(d) If the reviewer-gate could-not-run** (a declared reviewer's verdict **could not be produced** -- a missing verdict artifact or an impossible recompute; distinct from a **ran-and-FAILed reviewer** (which stays surfaced-not-blocking) and from an operator `[N/A]` skip (which stays PASS)) -> **HOLD**: announce once, then hold -- a could-not-run gate is **not a passed gate**. The recorded-probe design is preserved: **no auto-block** pre-close hook is introduced (a HOLD is operator-owned, not a machine block).
 
 ## Phase A — Read + Scan + Propose (STOP for operator review)
 
@@ -60,11 +61,11 @@ Output: `docs/working/<feature-id>/debrief.md` with 5 sections. Then STOP.
 
 2. **§A.2 leak-scan candidates.** Grep spec + tasks for forward-looking rule markers: `must`, `always`, `never`, `frozen`, `convention`, `spec change`. Sort each hit into one of three tiers by the action it implies for Phase B:
 
-   - **§A.2a — Collapse to pointer.** Rule appears verbatim or near-verbatim in an existing `docs/adr/<X>.md` § or `docs/ux/<area>.md` frozen rule. Phase B replaces the spec paraphrase with a one-line `Refs:` pointer. Row: `<file>:<line> | collapse-to-pointer | <existing destination § header> | <reason>`.
+   - **§A.2a — Collapse to pointer.** Rule appears verbatim or near-verbatim in an existing `docs/adr/<X>.md` § or `docs/ux/<area>.md` frozen rule. Phase B replaces the spec paraphrase with a one-line `Refs:` pointer. Row: `<file>:<line> | collapse-to-pointer | <existing destination § header> | <reason> | status: proposed`.
 
-   - **§A.2b — Promote to existing destination.** Rule is new content, the destination file exists, and the rule fits under an existing § header (or amends an existing frozen rule's wording). Phase B appends or amends + adds `Refs:` pointer + removes from spec/tasks. Row: `<file>:<line> | promote-to-existing | <destination § header> | <reason>`.
+   - **§A.2b — Promote to existing destination.** Rule is new content, the destination file exists, and the rule fits under an existing § header (or amends an existing frozen rule's wording). Phase B appends or amends + adds `Refs:` pointer + removes from spec/tasks. Row: `<file>:<line> | promote-to-existing | <destination § header> | <reason> | status: proposed`.
 
-   - **§A.2c — Create new ADR sub-section or new frozen UX rule.** Rule needs a heading that does not exist yet. Row: `<file>:<line> | create-new | <destination path>[ § <draft heading>] | <earn-its-place rationale> | <evidence: task IDs>`. Draft heading is optional — include when the heading is obvious, omit when authoring needs research. §A.2c rows surface in Phase C's pending-proposals list with a suggested authoring prompt; Phase B captures the proposal handle but leaves the new heading body for the operator to author.
+   - **§A.2c — Create new ADR sub-section or new frozen UX rule.** Rule needs a heading that does not exist yet. Row: `<file>:<line> | create-new | <destination path>[ § <draft heading>] | <earn-its-place rationale> | <evidence: task IDs> | status: proposed`. Draft heading is optional — include when the heading is obvious, omit when authoring needs research. §A.2c rows surface in Phase C's pending-proposals list with a suggested authoring prompt; Phase B captures the proposal handle but leaves the new heading body for the operator to author.
 
    **Adjacent-rule scan.** When one frozen rule in a UX-spec file (`docs/ux/<area>.md`) lands in §A.2b or §A.2c, read all other frozen rules in the same file and add any sibling rule showing the same staleness signal as a §A.2b row alongside the original finding. Adjacent rules travel together.
 
@@ -80,7 +81,7 @@ Output: `docs/working/<feature-id>/debrief.md` with 5 sections. Then STOP.
 
 **`pre-completion-checks.md` ingestion.** If `docs/working/<feature-id>/pre-completion-checks.md` exists (cross-cutting verifications surfaced during scope grilling that don't bind to specific tasks), read it. Fold each entry into §A.1 stale-state or §A.2 leak-scan as appropriate.
 
-Default finding row: `<file>:<line> | <proposed action> | <proposed destination> | <reason>`. §A.2 carries per-tier extended shapes — see §A.2a/b/c above.
+Default finding row: `<file>:<line> | <proposed action> | <proposed destination> | <reason> | status: proposed`. **Per-row status** is the resume state: Phase A writes `proposed`; the operator sets `approved | skip | revise`; Phase B sets `applied @ <file>:<line>` or `deferred`. A resumed run (Step 0 item 2a) continues from the first `approved` row not `applied`. §A.2 carries per-tier extended shapes — see §A.2a/b/c above.
 
 **STOP.** Tell operator: "Phase A complete — N findings in `docs/working/<feature-id>/debrief.md`. Review (mark approved / skip / revise) before I begin Phase B."
 
@@ -123,7 +124,7 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> handof
 
    If no candidates qualify, mark Pending proposals N/A in the close footer (next step).
 
-3. Append `## Debrief close` footer to `<feature-id>.tasks.md` (after `## Lessons (<feature-id>)` if present):
+3. Append `## Debrief close` footer to `<feature-id>.tasks.md` (after `## Lessons (<feature-id>)` if present). First confirm no `debrief.md` row is still `approved` and not `applied` -- resolve each to `applied`, `skip` or `deferred`; a footer never lands over an unfinished resume:
 
    ```
    ## Debrief close (YYYY-MM-DD)
@@ -133,7 +134,8 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> handof
    - Lessons: in this file § Lessons (or N/A)
    - Pending proposals: in debrief.md § Pending proposals (or N/A)
    - Successor: `docs/working/<next-feature>/idea.md` (or N/A — reason)
-   - Gate-skip: N/A (or: Phase-3.5 gates skipped per operator YYYY-MM-DD — <reason>, per Step-0 item 6)
+   - Gate-skip: N/A (or: Phase-3.5 gates skipped per operator YYYY-MM-DD — <reason>, per Step-0 item 7)
+   - Scope: full (or: tiny, 0 gotchas, 0 leak hits, per Step-0 item 3), Resumed: no (or: from row N)
    ```
 
 4. **If shipping** (operator confirms feature is being merged/released, not parked), and `--no-reports` not set:
@@ -146,7 +148,7 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> handof
 
 - **Don't run on features with open tasks.** BLOCK + redirect to `/said:impl`.
 - **Don't autonomous-backport.** Phase A -> operator review -> Phase B is mandatory. No exceptions.
-- **Don't create a new task ID for Debrief close.** It's a footer section, not a task. Multiple debriefs (rare; re-opened features) append additional dated footers.
+- **Don't create a new task ID for Debrief close.** It's a footer section, not a task. A **reopen increment** (tasks closed after the last footer) appends a dated footer naming the increment; a **re-run with nothing closed since** is blocked at Step 0 (single-pass goal). Never a footer per task.
 - **Don't cite `docs/working/<feature>/` paths in `Refs:` on backport edits.** Working folder is operator workspace per `template-tasks.md` discipline; durable refs point to spec / ADR / UX-spec / source-code.
 - **Don't promote a pattern to ADR from single-feature evidence** unless the pattern carries independent strong-spec justification. Default: ≥2-feature appearance per the earn-its-place-ADR.
 - **Don't pollute the spec with retrospective content.** Lessons live in `<feature>.tasks.md` § Lessons, NEVER in `<feature>.md`. Spec stays forward-looking contract.

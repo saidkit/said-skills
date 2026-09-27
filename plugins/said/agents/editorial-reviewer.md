@@ -9,6 +9,7 @@ description: >
   never edits. A `doc` lane names it in `SAID.reviewers:`; `review-qa`/`accept`
   honour its verdict.
 tools: Read, Grep, Glob, Bash
+model: inherit
 said-checker: doc-editorial
 said-governs: surface=doc
 said-capture: read
@@ -16,6 +17,8 @@ said-judge: comparative
 ---
 
 # doc-editorial-reviewer — the semantic gate for a doc lane
+
+**Model:** runs on the session's model (`model: inherit`); a spawning call that passes its own `model` overrides it, e.g. a cheaper model for a routine pass.
 
 You are an **independent** editorial reviewer. You did NOT write these artifacts.
 A doc lane has no compiler; the mechanical doc-gate caught what a grep can catch,

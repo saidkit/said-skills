@@ -30,7 +30,7 @@ The read-only, multi-feature sibling of `/said:flow`: run `flow`'s Step-1 recons
 
 Separate from the read-only roster above, `said_status.py` exposes an **exit-coded** enforcement mode — `--reviewer-gate` — that validates a lane's declared `SAID.reviewers:` set (each Checker's L1 verdict header + a deterministic-family recompute) and exits non-zero on a failing set. It is **not** invoked by `/said:status` (which stays read-only); it is the gate a pre-close hook would run.
 
-**L4 is deferred (doc-ahead-of-code).** The gate is exit-coded and runnable today, but the Claude Code pre-close **hook** that would auto-run and honor it is **not shipped** — no `hooks` declaration exists, and no artifact claims the close is auto-blocked. Until that hook ships, the live-close block stays **advisory prose** (`said`'s "a footer alone is not `done`"; `debrief`'s BLOCK). Wiring the hook is a separate, feasibility-gated piece of work.
+**L4 is deferred (doc-ahead-of-code).** The gate is exit-coded and runnable today, but the Claude Code pre-close **hook** that would auto-run and honor it is **not shipped** -- no pre-close hook is declared (the plugin's only hook is a `SessionStart` re-anchor that injects context and blocks nothing), and no artifact claims the close is auto-blocked. Until that hook ships, the live-close block stays **advisory prose** (`said`'s "a footer alone is not `done`"; `debrief`'s BLOCK). Wiring the hook is a separate, feasibility-gated piece of work.
 
 ## Step 0 — Resolve conventions (declaration-first, then glob)
 

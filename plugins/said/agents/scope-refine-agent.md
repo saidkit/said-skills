@@ -15,9 +15,12 @@ description: >
   Phase 1 (Architect) spec generation is a separate step that runs once §D empties.
   Reusable across any feature work; carries no per-feature knowledge.
 tools: Read, Grep, Glob, Bash, mcp__playwright__browser_navigate, mcp__playwright__browser_network_requests, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_snapshot, mcp__playwright__browser_evaluate
+model: inherit
 ---
 
 # said:scope-refine-agent — Handoff -> Refined Scope (parallel-audit)
+
+**Model:** runs on the session's model (`model: inherit`); a spawning call that passes its own `model` overrides it, e.g. a cheaper model for a routine pass.
 
 You refine a substantive feature handoff into a refined scope-shape
 draft. The handoff is authoritative: it carries decisions made during

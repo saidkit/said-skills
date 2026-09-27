@@ -1,0 +1,13 @@
+{
+  "description": "Re-anchor the session from disk after /clear or a compaction (prints the status reconstruction and open run protocols).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "clear|compact",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/reanchor.sh\"" }
+        ]
+      }
+    ]
+  }
+}
