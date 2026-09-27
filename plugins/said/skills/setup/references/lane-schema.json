@@ -24,6 +24,7 @@
     {"key": "SAID.version", "kind": "scalar", "required": false, "severity_if_missing": "ADVISORY", "remediation": "declare SAID.version: <starter>@<semver> to pin the starter axis set a lane was built on"},
     {"key": "SAID.checkers-dir", "kind": "scalar", "required": false, "severity_if_missing": "ADVISORY", "remediation": "declare SAID.checkers-dir: <path> ONLY if the lane ships and executes its own Checkers"},
     {"key": "SAID.code-review", "kind": "scalar", "required": false, "severity_if_missing": "ADVISORY", "remediation": "optional on | off override; absent falls back to the profile's code-review slot"},
+    {"key": "SAID.context-checkpoint", "kind": "scalar", "required": false, "severity_if_missing": "ADVISORY", "remediation": "optional input-token threshold (default 300000 when absent) that said/flow read from the session's context.json at phase boundaries; declare SAID.context-checkpoint: <tokens> only to lower or raise it"},
     {"key": "SAID.lanes", "kind": "list", "read_whole": true, "required": false, "severity_if_missing": "ADVISORY", "remediation": "a multi-lane repo declares the SAID.lanes: registry (read WHOLE) on the umbrella block, one row per lane pointing at that lane's own CLAUDE.md"}
   ],
   "withdrawn_axes": [

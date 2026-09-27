@@ -2,6 +2,16 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.18.0] — 2026-09-27
+
+A session boundary is a data boundary (SAID-27): the engine sheds inherited context at phase boundaries instead of carrying a build session into Deliver, and a debrief resumes instead of re-running.
+
+- **Added:** `said`/`flow` read the session's `context.json` at Implement->Deliver, before `debrief` and at every lane rotate; above `SAID.context-checkpoint:` (optional lane key, default 300000 input tokens) they print a `CONTEXT-CHECKPOINT` stop -- an operator action (`/clear`, then re-issue the directive), announced once and held under `/goal`, never an owed decision. A Deliver resume starts at the first gate without a recorded pass.
+- **Added:** shipped hooks -- a `SessionStart` re-anchor (`clear|compact` only, silent outside a `## Lane` cwd) that prints the lane's SAID status and the un-closed think-protocol leaves from disk, and a statusline script that writes `context.json`. Both auto-register with the plugin.
+- **Added:** `debrief` Step 0 -- resume from an approved-not-applied row, a single-run guard keyed on position below the last close footer (a reopen proceeds, a re-run stops), scope-by-risk over the delta since that footer; the close footer carries `Scope:` and `Resumed:`.
+- **Changed:** the judgment agents `scope-refine-agent` and `editorial-reviewer` pin `model: inherit` (the session's model; a caller may override), mechanical checkers keep their pins.
+- **Added:** `SAID.context-checkpoint:` declared in `lane-schema.json` and the README's `## Lane` key list.
+
 ## [0.17.0] — 2026-09-22
 
 Gate-independence hardening (SAID-22): no said Deliver/review gate is satisfiable by builder-written text -- every gate is mechanical/independent, or explicitly documented as an agent-side judgement. Extends the SAID-21 principle to three remaining gates.
