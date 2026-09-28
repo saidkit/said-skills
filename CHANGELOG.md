@@ -2,6 +2,17 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.19.0] — 2026-09-27
+
+The context checkpoint's statusline becomes a one-step, consented install that survives plugin updates, and a missing one is announced instead of silent.
+
+- **Added:** `hooks/said-statusline.sh` -- a version-stable statusline entry point that runs the newest installed plugin version's statusline script (a release outranks its own pre-release); with no installed plugin it prints the model name and exits 0.
+- **Added:** `/said:setup statusline` -- a consent-gated writer (`setup_statusline.py`): shows the change, then backs up `settings.json`, copies the wrapper to `~/.claude/said-statusline.sh`, sets `statusLine` only, re-parses and restores on failure. `--fix` offers the same step; the read-only ledger reports a `statusline` row (ok / STALE / ADVISORY, never BLOCKER).
+- **Changed:** `said:setup` governs lane configuration plus exactly one environment item, the statusline install; two writer paths (`--fix`, `statusline`), both consent-gated.
+- **Added:** the re-anchor hook prints one line `context checkpoint inactive: run /said:setup statusline` when the session has no `context.json` and the user settings name no statusline script.
+- **Changed:** `said`/`flow` -- when the context check is skipped for a missing `context.json`, the first skip in a session prints one line `context checkpoint inactive: run /said:setup statusline`, then proceeds (never a stop, never a `goal:` line).
+- **Added:** README `## Hooks` section with the statusline install.
+
 ## [0.18.0] — 2026-09-27
 
 A session boundary is a data boundary: the engine sheds inherited context at phase boundaries instead of carrying a build session into Deliver, and a debrief resumes instead of re-running.

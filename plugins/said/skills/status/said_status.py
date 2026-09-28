@@ -330,7 +330,9 @@ def waiting_reason(workdir):
     # per-reviewer probe prose is unsound to parse (mixed reviewers / multi-line recording drop a
     # real hold). Roster-surfacing it is deferred to that structured field; the close still holds
     # it via debrief's Phase-3.5 gate. So the axis surfaces the one signal it can trust.
-    if re.search(r"Verdict:\s*MANUAL-PENDING", txt):        # a held owed operator decision
+    # anchored to the report's own verdict bullet: a recorded probe line (which can carry builder-authored
+    # recompute rows) never reads as the verdict
+    if re.search(r"^\s*[-*]?\s*Verdict:\s*MANUAL-PENDING\s*$", txt, re.M):   # a held owed operator decision
         return "accept MANUAL-PENDING"
     return None
 
@@ -769,6 +771,25 @@ def _completeness_report(out):
     return report[:500]
 
 
+def _gate_recompute_rows(out):
+    """The gate recompute's per-harness rows (`gate-recompute: <unit-path> exit=<n> <PASS|EXPECTED|FAIL> [ids]`)
+    from its stdout, as one compact display string for the reviewer line; every other stdout line is
+    discarded. Display only -- never affects the verdict or the exit code (the recompute's exit code is the
+    only truth). Builder-authored harness text can reach it, so it is sanitized like `_completeness_report`:
+    control chars dropped, each row and the whole string length-capped, authoritative markers neutralized."""
+    tag = "gate-recompute:"
+    rows = []
+    for ln in out.splitlines():
+        s = ln.lstrip()
+        if s.startswith(tag):
+            row = s.split(tag, 1)[1].strip()
+            row = "".join(c if 0x20 <= ord(c) < 0x7f else " " for c in row)
+            for marker in ("reviewer-gate:", tag, "completeness-report:", "Verdict:", "Blocked-on decision:"):
+                row = row.replace(marker, marker[:-1] + ";")
+            rows.append(row[:160])
+    return " | ".join(rows)[:600]
+
+
 def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
     """Validate one expected reviewer's L1 verdict. Returns (ok, reason)."""
     if meta is None:  # declared reviewer id resolves to no Checker — nominal; a verdict can never redeem it
@@ -817,11 +838,13 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
         if surface:
             env["SAID_SURFACE"] = surface
         proc = subprocess.run(cmd, shell=True, cwd=root, capture_output=True, env=env)
+        stdout = proc.stdout.decode("utf-8", "replace")
+        rows = _gate_recompute_rows(stdout)  # per-harness rows on both paths; display only
         if proc.returncode != 0:
-            return False, "recompute failed (exit %d)" % proc.returncode
+            return False, "recompute failed (exit %d)%s" % (proc.returncode, " -- " + rows if rows else "")
         # Surface the recompute's advisory report (under-spec WARN + per-unit last-revised provenance) it
         # emits on stdout onto the reviewer line -- advisory text on a PASS; never flips ok or the exit code.
-        report = _completeness_report(proc.stdout.decode("utf-8", "replace"))
+        report = "; ".join(x for x in (_completeness_report(stdout), rows) if x)
         return True, ("PASS -- " + report if report else "PASS")
     return True, "PASS"
 

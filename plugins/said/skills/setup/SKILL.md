@@ -3,16 +3,17 @@ name: setup
 description: >
   SAID lane CONFIGURATION doctor. Inspects an already-present lane's `## Lane` block, its
   required `CLAUDE.md` sections, reviewer resolvability, and docs skeleton against a shipped
-  well-formed-lane schema; reports a ranked health ledger read-only, and on `--fix` repairs
-  configuration + applies known-safe defaults, composing `said:install` for structural gaps and
-  proposing on genuine choices. Triggered ONLY by "/said:setup [--fix] [--lane <name>]". Use it
+  well-formed-lane schema, plus one environment item: the statusline the context checkpoint
+  reads. Reports a ranked health ledger read-only; on `--fix` repairs configuration + applies
+  known-safe defaults, proposing on genuine choices; `statusline` installs the statusline with
+  consent. Triggered ONLY by "/said:setup [--fix] [--lane <name>]" or "/said:setup statusline". Use it
   whenever the operator wants to validate / check / audit / repair a lane's SAID configuration:
   are the axes current, why does `impl` HALT on this lane, is the `## Earned rules` heading
-  present, do the declared reviewers resolve, is the `## Lane` block stale or malformed. NOT
-  `said:install` (the structural-onboarding WRITER that creates a lane / installs the plugin /
-  scaffolds the skeleton from scratch or a remote source); NOT `said:status` (reports where a
-  FEATURE sits in the phase chain); NOT `said:review-qa` (implementation-hygiene gate). This skill
-  governs lane CONFIGURATION and nothing else.
+  present, do the declared reviewers resolve, is the `## Lane` block stale or malformed, is the
+  context checkpoint inactive. NOT creating a lane or scaffolding one from scratch; NOT
+  `said:status` (reports where a FEATURE sits in the phase chain); NOT `said:review-qa`
+  (implementation-hygiene gate). This skill governs exactly two things: lane CONFIGURATION and the
+  statusline install; no other `settings.json` key.
 ---
 
 # said:setup, the SAID lane configuration doctor
@@ -24,8 +25,9 @@ lane from scratch is `said:install`'s job, not this skill's.
 
 ## Contract, holds every run
 
-- **Read-only by default.** A bare `/said:setup` inspects and reports; it writes nothing. `--fix`
-  is the ONLY path that mutates a file.
+- **Read-only by default.** A bare `/said:setup` inspects and reports; it writes nothing. Two
+  writer paths exist, both consent-gated: `--fix` (lane configuration) and `statusline` (the
+  statusline install: `settings.json` `statusLine` and `~/.claude/said-statusline.sh`, nothing else).
 - **The checker script owns the verdicts.** `setup_check.py` (beside this file) is the
   deterministic oracle; render what it emits, never override a verdict in prose. A wrong verdict
   is a bug to fix in the script or the schema, not a value to hand-edit.
@@ -41,7 +43,8 @@ lane from scratch is `said:install`'s job, not this skill's.
 
 - `/said:setup` , read-only health ledger for the current lane.
 - `/said:setup --lane <name>` , target one lane in a multi-lane repo.
-- `/said:setup --fix [--lane <name>]` , apply repairs + known-safe defaults (the only writer path).
+- `/said:setup --fix [--lane <name>]` , apply repairs + known-safe defaults (writer path).
+- `/said:setup statusline` , install the statusline the context checkpoint reads (writer path).
 
 ## Step 0, resolve the lane (declaration-first)
 
@@ -86,9 +89,29 @@ The script gives the facts; add the reading a script cannot:
   duplicated key, prose between keys). Name the current form.
 - **ADVISORY** , a recommended-but-not-fatal gap (a missing skeleton dir, an absent optional axis).
 
+## The statusline step
+
+`/said:setup statusline` runs `setup_statusline.py` (beside this file); the script owns the write.
+1. Run `python3 <skill-dir>/setup_statusline.py --apply` : it prints the current and the new
+   `statusLine` and the wrapper copy, writes nothing, and exits 3 (plan only, not an error). Show
+   that output to the operator verbatim. Never pass `--yes` on this first run. If `settings.json` is
+   unparseable or the wrapper source is missing it aborts instead (exit 1, no plan, nothing written):
+   show that message and stop.
+2. Ask the operator ONE question: confirm that exact change, yes or no. The question ends your turn:
+   stop and wait; the answer arrives in the operator's next message; never answer it for the operator.
+   No consent -> say nothing was written and stop. `--yes` is never run without the operator's
+   explicit answer to that question.
+3. Only after the operator confirms, run it again with `--apply --yes`: it backs up `settings.json`
+   (an absent `settings.json` is created), copies the version-stable wrapper, sets `statusLine` only,
+   re-parses, and restores on failure. Show what it wrote.
+4. Then re-run `--check` and show its `statusline` row: that row is the proof of the install.
+
+Never edit `settings.json` with any other tool or by hand; the script is the only writer.
+The read-only ledger's `statusline` row comes from `setup_statusline.py --check` (never BLOCKER).
+
 ## The `--fix` dispositions
 
-`--fix` walks the findings and, per finding, does exactly ONE of three things:
+`--fix` walks the findings and, per finding, does exactly ONE of four things:
 
 - **Native config write** , a configuration-value repair the lane clearly needs: refresh a stale
   axis to its current key, add a missing scalar with its schema-stated default, normalize the
@@ -97,6 +120,8 @@ The script gives the facts; add the reading a script cannot:
   the plugin not wired). Invoke `said:install` to create it; never hand-roll the scaffolding it
   owns. Where `said:install` is not available, PROPOSE "run `said:install`" and leave the gap,
   never a half-written scaffold.
+- **Statusline step** , a `statusline` row that is not `ok`: run the statusline step above, with
+  its consent gate; never write `settings.json` without the operator's confirmation.
 - **Propose only** , a genuine choice the schema cannot settle (which `surface` medium? which
   `reviewers` for a surface-bearing lane?). State the proposal with its options and stop; write
   nothing until the operator confirms.

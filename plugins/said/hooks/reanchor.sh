@@ -5,6 +5,7 @@
 # silent outside a SAID lane (the hook is active wherever the plugin is enabled).
 # Env: SAID_STATUS  path to said_status.py (default: the one bundled with this plugin)
 #      SCRATCH_ROOT root of the per-session scratchpads (default: /private/tmp/claude-<uid>, else /tmp/claude-<uid>)
+#      SAID_SETTINGS user settings file checked for a statusline install (default: ~/.claude/settings.json)
 input=$(cat)
 here="$(cd "$(dirname "$0")" && pwd)"   # before any cd: $0 may be relative
 field() { printf '%s' "$input" | python3 -c "import json,sys; d=json.load(sys.stdin); v=$1; print('' if v is None else v)" 2>/dev/null; }
@@ -61,3 +62,13 @@ if [ -n "$open_runs" ]; then
   printf '%s\n' "$open_runs" | sed 's/^/  /'
 fi
 echo "Next: re-issue the same directive; the skill re-derives its phase by inspection."
+
+# Inactive-checkpoint hint: one line when this session has no context.json and the user settings name no
+# said statusline script (the context checkpoint then has nothing to read). Informational only.
+sid=$(field 'd.get("session_id","")')
+settings="${SAID_SETTINGS:-$HOME/.claude/settings.json}"
+if [ ! -f "$SCRATCH_ROOT/$slug/$sid/scratchpad/context.json" ] &&
+   ! grep -Eq 'statusline-context\.sh|said-statusline\.sh' "$settings" 2>/dev/null; then
+  echo "context checkpoint inactive: run /said:setup statusline"
+fi
+exit 0

@@ -233,6 +233,14 @@ def main():
 
     schema = load_schema(a.schema)
     findings = check_lane(a.root, schema, a.claude_md)
+    # The statusline install (the one environment item setup governs): never a BLOCKER.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import setup_statusline
+        findings.append(setup_statusline.check_row())
+    except Exception as e:
+        findings.append({"item": "statusline", "verdict": "unresolvable", "severity": "ADVISORY",
+                         "remediation": "statusline check failed: %s" % e})
 
     try:
         sys.stdout.reconfigure(encoding="utf-8")

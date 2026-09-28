@@ -13,7 +13,7 @@ said-checker: cli-gate
 said-governs: surface=cli
 said-capture: process-spawn
 said-judge: oracle
-said-recompute: claude plugin validate ./plugins/said
+said-recompute: bash "$SAID_PLUGIN_ROOT/skills/status/gate_recompute.sh"
 ---
 
 # said:cli-gate — the cli-surface oracle Checker
@@ -25,8 +25,15 @@ so this Checker's **capture** is a process-spawn (run the gate) and its **judge*
 
 ## What it runs
 
-The lane's declared gate (`SAID.commands:` — the structural `claude plugin validate` plus, where a
-unit ships one, `cd docs/evaluation/<unit> && ./harness.sh`). Exit 0 across the set = PASS.
+The plugin's recompute script, `skills/status/gate_recompute.sh`: it runs the lane's `SAID.commands:`
+line from the lane root, then every `harness.sh` under `<docs-root>/evaluation/`, judged by exit code
+(recursive, each from its own directory). A failing harness is EXPECTED only when every id it
+FAILs is declared for that unit in `<docs-root>/evaluation/EXPECTED-FAIL`; any other failure is undeclared.
+Exit 0 (the command line passes, no undeclared failure) = PASS.
+
+Run it yourself with `SAID_ROOT=<lane root> bash <plugin dir>/skills/status/gate_recompute.sh`, where
+`<plugin dir>` is the directory two levels above this agent file when `$SAID_PLUGIN_ROOT` is unset. Copy
+its `gate-recompute:` rows into the verdict body; never type a row yourself.
 
 ## The L1 verdict it emits
 
@@ -51,12 +58,13 @@ timestamp: <ISO-8601>
 - **Lane-path rule:** a FAIL capture lands under the feature's own working dir, cited lane-relative — **never a temp path** (`/tmp/...`, a scratchpad).
 - The `recomputed` sentinel is accepted **only** for a `said-capture: process-spawn` + deterministic (`oracle`/`metric`) + `said-recompute:` Checker on `verdict: PASS`.
 
-Exit-code table (the green-gate evidence — one row per command the lane's `SAID.commands:` names):
+Exit-code table (the green-gate evidence -- the recompute's rows, one per harness, verbatim):
 
 ```
-command                                   exit
-claude plugin validate ./plugins/said     0
-cd docs/evaluation/<unit> && ./harness.sh 0
+gate-recompute: commands exit=0 PASS
+gate-recompute: evaluation/<unit> exit=0 PASS
+gate-recompute: evaluation/<unit> exit=1 EXPECTED <id>      (declared in EXPECTED-FAIL)
+gate-recompute: evaluation/<unit> exit=1 FAIL <id>          (undeclared -> verdict FAIL)
 ```
 
 ## Why it is an oracle (deterministic)
