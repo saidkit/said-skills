@@ -113,7 +113,7 @@ Acceptance bullets (skill prefills; strip categories that don't apply):
   - [ ] <ComponentName> public props preserved (consumed by <ConsumerFeature>)
   - [ ] Quality gates green; no regression outside scope.
 Refs: [ADR/UX-spec/feature-spec paths this task CREATES or EDITS; empty otherwise]
-Blocked-on decision: [<id> | none -- an owed operator decision this task depends on; explicit, never inferred]
+Blocked-on question: [<id> | none -- an operator question this task depends on; explicit, never inferred]
 Priority: [High|Medium|Low; default Medium / High for bugs]
 ```
 
@@ -138,11 +138,11 @@ Before writing, validate the answers against template-tasks.md discipline. Rewri
   
   Typical task ends with 5–10 Acceptance bullets total. Bug tasks may be even leaner (Problem + Fix + Gotchas per template-tasks.md "depth varies").
 - **Refs: empty by default.** Only fill if the task creates or edits an ADR / UX-spec / feature-spec. Reading list ≠ Refs. Refs is the write-set; Reading list (+ Approach citations) is the read-set.
-- **Blocked-on decision (optional field).** When the operator's answer names an owed decision this task depends on (`Blocked-on decision: <id>`), place `**Blocked-on decision:** <id>` as a field after `**Refs:**` (a field, never a `###` section); `none` -> omit it. The id is engine-minted (a resolved §D id, else `D-<n>`), explicit and never inferred from prose. A blocked task is held until a `## Decisions` ledger record resolves it (`template-tasks.md`).
+- **Blocked-on question (optional field).** When the operator's answer names an operator question this task depends on (`Blocked-on question: <id>`), place `**Blocked-on question:** <id>` as a field after `**Refs:**` (a field, never a `###` section); `none` -> omit it. The id is engine-minted (a resolved §D id, else `Q-<n>`), explicit and never inferred from prose. A blocked task is held until it is lifted (`template-tasks.md`). The hold is lifted by one line in the log's `## Lifted holds` section, `- <id> lifted-by: user@WR-<seconds> -- "<verbatim quote>" -- <date> [supersedes: <prior>]`, that cites the operator's answer as a ruling recorded with the `ruled` skill in the work's `rulings.md` (example: `- Q-1 lifted-by: user@WR-1790160000 -- "use the Postgres advisory lock" -- 2026-09-23`). `user` is a fixed role word (the role of the cited answer); the person's name belongs to the ruling.
 - **Status: `Todo (YYYY-MM-DD)`** with today's creation date.
 - **Fix / Deviations / Gotchas: HTML-comment placeholders.** Phase 3 close-of-task review fills them.
 
-If a §D-class question surfaces during Q&A — an operator decision the skill cannot silently resolve (cross-cutting choice, contract conflict, sequencing ambiguity) — STOP authoring. Surface the question explicitly; wait for operator decision; then proceed. Do not bake guesses into the new task.
+If a §D-class question surfaces during Q&A — an operator question the skill cannot silently resolve (cross-cutting choice, contract conflict, sequencing ambiguity) — STOP authoring. Surface the question explicitly; wait for the operator's answer; then proceed. Do not bake guesses into the new task.
 
 ## Step 3 — Spec coverage gate (read-only — classify + flag, never write)
 
@@ -170,7 +170,7 @@ Use the canonical section order from template-tasks.md:
 **Status:** Todo (YYYY-MM-DD)
 **Priority:** <High|Medium|Low>
 **Refs:** <paths or empty>
-[optional] **Blocked-on decision:** <id>
+[optional] **Blocked-on question:** <id>
 
 ### Problem
 <problem text>
@@ -214,7 +214,7 @@ Report to operator:
 **Auto-mode addendum to report** (when `auto` was set):
 - Step 3 outcome: Covered / Gap (flagged + stopped) / Contradicts (flagged + stopped) — any Gap/Contradicts names the `/said:architect propagate-new-info` action owed before `/said:impl`.
 
-Hard exit. Do NOT begin implementation. Do NOT spawn coding agents. Phase 3 implementation is a separate operator decision — the new task is now in the backlog; the operator picks when to work it.
+Hard exit. Do NOT begin implementation. Do NOT spawn coding agents. Phase 3 implementation is the operator's separate call — the new task is now in the backlog; the operator picks when to work it.
 
 Suggested next step: "Task `<new-task-id>` appended. Run `/said:impl <new-task-id>` to drive Phase 3 — feature-id auto-derived from the task-id prefix."
 

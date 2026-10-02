@@ -125,7 +125,7 @@ If the task has multiple screen shapes (e.g. ships both a browser list and a que
 
 Output the agent's structured report verbatim, followed by:
 
-- a one-paragraph operator summary distilling the verdict (READY-TO-CLOSE / BLOCKED-ON-FIXES / NEEDS-OPERATOR-DECISION),
+- a one-paragraph operator summary distilling the verdict (READY-TO-CLOSE / BLOCKED-ON-FIXES / NEEDS-OPERATOR-ANSWER),
 - a numbered FAIL list with file:line pointers (so the operator can click straight to each finding),
 - the recommended next step:
   - all PASS -> "Task is ready to close. Update status in `docs/features/{FEATURE}.tasks.md` and add a `### Fix` line."

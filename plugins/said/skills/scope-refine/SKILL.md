@@ -94,7 +94,7 @@ After the agent returns:
   - **§D empty** -> "Phase 1 (Scope) is done. Phase 2 (Architect) starts. Run `/said:architect` when ready, or build the spec interactively per `docs/features/template.md`."
   - **§D non-empty** -> "Phase 1 (Scope) is BLOCKED on §D. Resolve each item, then either re-run `/said:scope-refine` to regenerate, or hand-edit `scope.md` so §D is empty before proceeding to `/said:architect`."
 
-DO NOT silently resolve §D items. The agent surfaces conflicts in §D deliberately; this skill carries them through to the operator unchanged. When unattended (a subagent with no operator, or a top-level run with no operator turn to answer), an owed §D decision is never resolved, defaulted, or emptied: it routes into the announce-once-then-hold class -- the `goal: stop` line carries `OPERATOR-DECISION-HELD` -- exactly as `said`/`flow` hold an owed operator decision, then holds.
+DO NOT silently resolve §D items. The agent surfaces conflicts in §D deliberately; this skill carries them through to the operator unchanged. When unattended (a subagent with no operator, or a top-level run with no operator turn to answer), an operator question (a §D item) is never resolved, defaulted, or emptied: it routes into the announce-once-then-hold class -- the `goal: stop` line carries `OPERATOR-QUESTION-HELD` -- exactly as `said`/`flow` hold an operator question, then holds.
 
 ## Step 4: Do NOT auto-fix or auto-architect
 
@@ -104,7 +104,7 @@ The skill stops after presenting §D. If the operator wants conflicts resolved o
 
 - **Don't bypass the agent and run probes inline.** The agent owns Stages 0–6 and enforces parallel-audit + sequential-probe sequencing. Reaching for curl / playwright in the skill body breaks that.
 - **Don't merge with `/said:scope-grill`.** Different cases (Case 1 = handoff exists, Case 2 = thin idea), different drivers (this spawns the agent; grill is interactive and agent-less), different content shapes inside §A/§B/§C/§D. Conflating them produces shape-incoherent `scope.md`.
-- **Don't auto-resolve §D.** Conflicts and open questions are operator-decision items by design. Carry them visibly to the operator; never pick the side yourself.
+- **Don't auto-resolve §D.** Conflicts and open questions are operator questions by design. Carry them visibly to the operator; never pick the side yourself.
 - **Don't write `spec.md`.** This is Phase 1. `spec.md` is Phase 2 (Architect). The earned-design-decision splits them deliberately.
 - **Don't ask the operator the full input questionnaire** when most inputs resolve from path / branch / git state. Reach for an `ASK` only on the gap that genuinely can't be derived.
 - **Don't auto-pick `probe-mode=full`** to "be safe". Default is `curl` for a reason — typical case shrinks 2–3 min playwright to <10s curl. `full` is operator-forced for known auth-gated dev backends or mandatory visual walks.

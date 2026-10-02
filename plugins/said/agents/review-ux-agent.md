@@ -128,7 +128,7 @@ Checklist version: docs/ux/feature-ux-checklist.md @ <git-short-sha-of-that-file
 ```
 
 ## Verdict
-- <READY-TO-CLOSE | BLOCKED-ON-FIXES | NEEDS-OPERATOR-DECISION>
+- <READY-TO-CLOSE | BLOCKED-ON-FIXES | NEEDS-OPERATOR-ANSWER>
 - <one-sentence reason>
 ```
 

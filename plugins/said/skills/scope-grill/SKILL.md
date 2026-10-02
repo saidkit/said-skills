@@ -18,7 +18,7 @@ This skill drives the Phase 1 Case 2 path — turning a thin user prompt into a 
 
 There is NO separate agent. You — the main agent — drive the Q&A loop interactively. Read this file, enter the loop, and stay until §D is empty.
 
-**Up-front BLOCK -- no operator, nothing to elicit.** This skill's content source IS the operator's Q&A. When invoked with **no operator channel to answer** its Q&A (a spawned/subagent or autonomous context, a thin idea, no handoff -- Case 1, a handoff, routes to `said:scope-refine` instead), announce "interactive-only, no operator -- nothing to proceed on" and hand back / redirect (to `said:scope-refine` if a handoff appears, else await an attended run); **never fabricate** Q&A answers. The predicate is structural: the loop cannot advance without an operator answer, surfaced at the **first unanswerable question** -- not a global "am-I-unattended" boolean and not a numeric "too thin" metric. This BLOCK/redirect (nothing to do) is **distinct from announce-once-then-hold** (an owed decision mid-run).
+**Up-front BLOCK -- no operator, nothing to elicit.** This skill's content source IS the operator's Q&A. When invoked with **no operator channel to answer** its Q&A (a spawned/subagent or autonomous context, a thin idea, no handoff -- Case 1, a handoff, routes to `said:scope-refine` instead), announce "interactive-only, no operator -- nothing to proceed on" and hand back / redirect (to `said:scope-refine` if a handoff appears, else await an attended run); **never fabricate** Q&A answers. The predicate is structural: the loop cannot advance without an operator answer, surfaced at the **first unanswerable question** -- not a global "am-I-unattended" boolean and not a numeric "too thin" metric. This BLOCK/redirect (nothing to do) is **distinct from announce-once-then-hold** (an operator question mid-run).
 
 ## When this fires
 
@@ -49,8 +49,9 @@ For a `web` surface - UI surfaces (which screens, where they live in the routing
 What this work MUST respect: performance budget, RBAC role gating, project conventions (cite ADRs / UX-spec frozen rules verbatim), sequencing dependencies (what blocks what, what waits on what), and explicit out-of-scope boundaries.
 
 ## §D — Open questions
-Unresolved items requiring operator decision. EVERY question carries:
+Operator questions: unresolved items the operator answers. EVERY question carries:
 
+- **Id** -- `Q-<n>` (`Q-1`, `Q-2`, ...) for a new question; a scope that already numbers its questions keeps its ids.
 - **Phrasing** — neutral framing of the question.
 - **Forcing function** — what blocks on the answer (which §A/§B/§C bullet, which Phase 2 spec section).
 - **Default + reasoning** — your best guess and why; do NOT pick the side unless the operator confirms.
@@ -83,7 +84,7 @@ Whenever you find yourself about to silently resolve a question — STOP. That's
 
 If the operator wants to defer some §D items to Phase 2 — that's allowed. Mark those items as "defer to Phase 2 (Architect)" with explicit reasoning, treat them as resolved for Phase 1 purposes, and write scope.md. Phase 2 will surface them again if they're real blockers.
 
-## Operator decision points
+## Operator questions
 
 Resolve these EARLY in the loop, not at the end:
 
@@ -94,7 +95,7 @@ Resolve these EARLY in the loop, not at the end:
 
 - **Don't write spec-shape.** No Acceptance Criteria, no Functional / UI-UX / API / Performance / Acceptance sections, no Feature Tasks table. Those are Phase 2 (Architect) artifacts. Scope is idea-shape; spec is implementation-shape.
 - **Don't merge `scope.md` + `spec.md`.** Separate files, separate phases, different content shapes. Earned design decision.
-- **Don't auto-resolve §D.** Every operator-decision item stays open until the operator confirms. Silent resolution defeats Phase 1's whole point.
+- **Don't auto-resolve §D.** Every operator question stays open until the operator answers it. Silent resolution defeats Phase 1's whole point.
 - **Don't ask five questions at once.** Focused, one-or-two-at-a-time. Compounding questions overwhelm and produce shallow answers.
 - **Don't write `scope.md` before §D is empty** (or all §D items explicitly deferred). Premature write = incomplete scope = Phase 2 starts on bad input.
 - **Don't silently invoke `/said:scope-refine`.** That's Case 1, different shape, different agent. If the operator HAS a handoff doc, redirect explicitly: "You have a handoff at `<path>` — run `/said:scope-refine <path>` instead."

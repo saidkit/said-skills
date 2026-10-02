@@ -106,7 +106,7 @@ def parse_tasks(paths):
     dates, todo_items, sections = [], [], 0
     footer = False
     cur_id, cur_title = None, None
-    for path in paths:
+    for path in sorted(paths):
         try:
             lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
         except OSError:
@@ -117,6 +117,7 @@ def parse_tasks(paths):
                 continue
             h = HEADER_RE.match(ln)
             if h:
+                footer = False  # a task below the last close footer reopens the feature
                 cur_id, cur_title = h.group(1), h.group(2).strip()
                 sections += 1
                 continue
@@ -310,7 +311,7 @@ def _sortkey(f):
 
 
 def waiting_reason(workdir):
-    """Derive 'waiting on an owed operator decision' from durable SAID artifacts ONLY
+    """Derive 'waiting on an operator question' from durable SAID artifacts ONLY
     (derive, never store): the recorded Deliver-gate verdicts under the feature's working
     dir. A run-engine hold recorded outside the lane's working dir is out of scope
     -- operator-visible, not analyzer-visible. Returns a short reason or None."""
@@ -332,7 +333,7 @@ def waiting_reason(workdir):
     # it via debrief's Phase-3.5 gate. So the axis surfaces the one signal it can trust.
     # anchored to the report's own verdict bullet: a recorded probe line (which can carry builder-authored
     # recompute rows) never reads as the verdict
-    if re.search(r"^\s*[-*]?\s*Verdict:\s*MANUAL-PENDING\s*$", txt, re.M):   # a held owed operator decision
+    if re.search(r"^\s*[-*]?\s*Verdict:\s*MANUAL-PENDING\s*$", txt, re.M):   # a held operator question
         return "accept MANUAL-PENDING"
     return None
 
@@ -354,34 +355,81 @@ def completeness_note(workdir):
     return _completeness_report(txt) or None
 
 
-# The blocked-decision marker + its append-only resolution ledger -- a defined grammar (not prose),
-# so a targeted parse is sound (the toolkit-parsers rule bars parsing free-form text, not a grammar).
-_BLOCKED_MARKER = re.compile(r"^\*\*Blocked-on decision:\*\*\s*([A-Za-z0-9_-]+)\s*$", re.MULTILINE | re.IGNORECASE)
-_DECISION_REC = re.compile(r"^-\s+(\S+)\s+resolved-by:\s*user@", re.MULTILINE)
-_TASK_HEAD = re.compile(r"^## (\S+):", re.MULTILINE)
-_STATUS_DONE = re.compile(r"^\*\*Status:\*\*\s*Done\b", re.MULTILINE)
+# The hold marker + its append-only lift records are read with the hold gate's own line parser
+# (`../review-qa/hold-gate.py`, same plugin), so status never reads the grammar more laxly than the gate.
+_GATE = []
 
 
-def waiting_on_decision(tasks_paths):
-    """Derive 'waiting on decision <id>' from durable STRUCTURED state (derive, never store): a
-    non-Done task carrying a `**Blocked-on decision:** <id>` marker with no resolving `## Decisions`
-    record (a `user@` record for that id). A structured-field parse over a defined grammar, never a
-    free-form prose parse. The authoritative attribution gate is the bundled decision-gate checker
-    at close; this is only the observability axis. Returns a short reason or None."""
-    for path in tasks_paths or []:
+def _hold_gate():
+    """The bundled hold gate, loaded once from the sibling review-qa skill; None when it cannot load."""
+    if not _GATE:
+        mod = None
+        try:
+            import importlib.util
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "review-qa", "hold-gate.py")
+            spec = importlib.util.spec_from_file_location("said_hold_gate", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+        except Exception:  # a missing or broken gate must not take the board down
+            mod = None
+        _GATE.append(mod)
+    return _GATE[0]
+
+
+def _shown_id(text):
+    """A marker's id as displayed: printable ASCII only, capped (builder-authored text)."""
+    return "".join(c if 0x20 <= ord(c) < 0x7f else "?" for c in text).strip()[:40] or "(empty)"
+
+
+def waiting_on_question(tasks_paths, rulings_path=None, root=None):
+    """Derive 'waiting on question <id>' from durable STRUCTURED state (derive, never store). Every
+    `**Blocked-on question:** <id>` marker is judged by the hold gate's own `judge_marker` against the
+    work's rulings list, so status and the gate share one rule: a marker the gate would HOLD waits
+    (a Done task too: closed without a lift), and so does a malformed or old-spelled marker. With no
+    rulings list a lift cannot be checked, so it shows as unverified. Returns a short reason or None."""
+    gate = _hold_gate()
+    rulings, list_err = None, None
+    if gate is not None and rulings_path and os.path.isfile(rulings_path):
+        try:
+            rulings = gate.load_rulings([rulings_path])
+        except gate.ConfigError as err:
+            list_err = str(err)
+    for path in sorted(tasks_paths or []):
         try:
             txt = open(path, encoding="utf-8", errors="replace").read()
         except OSError:
             continue
-        resolved = {m.group(1) for m in _DECISION_REC.finditer(txt)}
-        heads = list(_TASK_HEAD.finditer(txt))
-        for i, h in enumerate(heads):
-            block = txt[h.end():heads[i + 1].start() if i + 1 < len(heads) else len(txt)]
-            if _STATUS_DONE.search(block):
-                continue
-            m = _BLOCKED_MARKER.search(block)
-            if m and m.group(1) not in resolved:
-                return "decision " + m.group(1)
+        if gate is None:  # cannot parse without the gate: any marker-looking text waits
+            if "Blocked-on" in txt:
+                return "question ? (hold gate unavailable)"
+            continue
+        olds = gate.old_spellings(txt)  # a retired spelling waits on any task, Done or not (as the gate)
+        if olds:
+            _n, kind, detail = olds[0]
+            return "question %s (old spelling: rename the %s)" % (_shown_id(detail), kind)
+        stray = gate.stray_markers(txt)  # a marker the gate half-recognises waits too (it HOLDs there)
+        if stray:
+            return "question ? (malformed marker: %s)" % _shown_id(stray[0][2].strip())
+        tasks, records = gate.parse_log(txt)
+        for name, lines in tasks:
+            found, _date = gate.markers_of(lines)
+            status = gate.task_status_of(lines)
+            for rest in found:
+                qid = _shown_id(rest)
+                if not gate.is_id(rest):  # malformed waits on any task, Done or not (as the gate)
+                    return "question %s (malformed marker)" % qid
+                if not any(r["id"] == rest for r in records):
+                    done = (status[0] or "").casefold() == "done"
+                    return "question " + qid + (" (closed without a lift)" if done else "")
+                if rulings is None:
+                    why = _shown_id(list_err) if list_err else "no rulings list"
+                    return "question %s (lift unverified: %s)" % (qid, why)
+                try:  # one bad document shows that lift unverified; it never takes the board down
+                    verdict = gate.judge_marker(name, status, rest, records, rulings, root or os.getcwd())
+                except Exception as err:
+                    return "question %s (lift unverified: %s)" % (qid, type(err).__name__)
+                if verdict.state != "PASS":
+                    return "question %s (%s)" % (qid, gate.shown(verdict.reason, 60))
     return None
 
 
@@ -469,7 +517,7 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
             "age_days": age, "idle_days": idle, "stale": stale, "threshold": threshold,
             "next": next_action(fid, phase, relpath(workdir, root), gates, sub),
             "integrity": t["integrity"],
-            "waiting": (waiting_reason(workdir) if os.path.isdir(workdir) else None) or waiting_on_decision(tasks),
+            "waiting": (waiting_reason(workdir) if os.path.isdir(workdir) else None) or waiting_on_question(tasks, os.path.join(workdir, "rulings.md"), root),
             "completeness_note": (completeness_note(workdir) if os.path.isdir(workdir) else None),
             # `paths` stay absolute — they are read from. `paths_rel` is the display form.
             "paths": {"spec": os.path.normpath(specs[0]) if specs else None,
@@ -666,7 +714,7 @@ def _feature_block(f, lane_label=None):
     if f["integrity"]:
         out.append("Note    ! " + f["integrity"])
     if f.get("waiting"):
-        out.append("Waiting %s (operator decision owed)" % f["waiting"])
+        out.append("Waiting %s (operator question open)" % f["waiting"])
     if f.get("completeness_note"):
         out.append("Complete %s" % f["completeness_note"])
     if f["next"]:
@@ -752,7 +800,7 @@ def _completeness_report(out):
     a recorded note artifact), as a compact one-line summary for the reviewer line / board: the under-spec
     WARN + each unit's last-revised provenance. Parses the producer's defined machine grammar (never the
     human sentence); tolerant of a leading markdown list marker / indentation so a recorded note field is
-    extracted rather than silently no-op'd. Non-gating display text -- it never affects the reviewer verdict
+    extracted rather than silently dropped. Non-gating display text -- it never affects the reviewer verdict
     or the exit code. Sanitized: control chars dropped, length capped, and a literal `reviewer-gate:` /
     `completeness-report:` marker neutralized, so builder-authored content that reaches this line can never
     forge an authoritative marker or inject a control sequence."""
@@ -784,7 +832,7 @@ def _gate_recompute_rows(out):
         if s.startswith(tag):
             row = s.split(tag, 1)[1].strip()
             row = "".join(c if 0x20 <= ord(c) < 0x7f else " " for c in row)
-            for marker in ("reviewer-gate:", tag, "completeness-report:", "Verdict:", "Blocked-on decision:"):
+            for marker in ("reviewer-gate:", tag, "completeness-report:", "Verdict:", "Blocked-on question:"):
                 row = row.replace(marker, marker[:-1] + ";")
             rows.append(row[:160])
     return " | ".join(rows)[:600]

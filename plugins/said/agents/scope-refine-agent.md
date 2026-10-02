@@ -336,7 +336,9 @@ this order:
 8. **§C — Cross-cutting decisions** — anything affecting 2+ pieces
    (type reconciliations, mock strategy, shared fixtures,
    quality-gate command sequence at task close).
-9. **§D — Conflicts and open questions:**
+9. **§D — Conflicts and open questions:** number each new item
+   `Q-<n>` (`Q-1`, `Q-2`, ...); a scope that already numbers its
+   items keeps its ids.
    - **Conflicts** — Stage 4 CONFLICT entries. Each is a blocker;
      spawner must resolve before Phase 1 (Architect) starts.
    - **Open questions** — handoff residuals + any checklist gaps
@@ -362,7 +364,7 @@ this order:
      affordance) surfaced in Stage 1 inventory, emit a §D Q phrased:
      "Per the surface's routed list-rule spec <RULE-LABEL>, does this action need a
      user-confirmation step?" Default is yes (terse AlertDialog).
-     "No confirm" requires an explicit operator decision recorded in
+     "No confirm" requires the operator's explicit answer recorded in
      scope.md with reason. Never silently default to fire-and-forget;
      intuitive justifications like "reversible toggle" are not
      sufficient — the operator decides per action.
