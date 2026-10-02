@@ -2,6 +2,16 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.20.0] — 2026-10-02
+
+**Breaking.** The hold vocabulary is renamed, and a hold is lifted by citing a recorded ruling. A task log that still carries the old marker, section or field HOLDs until it is renamed; old spellings are rejected with a message naming the rename, never accepted beside the new ones.
+
+- **Changed (breaking):** the open item only the operator may answer is an "operator question". Marker `**Blocked-on question:** <id>` (was `**Blocked-on decision:**`); section `## Lifted holds` (was `## Decisions`); field `lifted-by:` (was `resolved-by:`); stop token `OPERATOR-QUESTION-HELD` (was `OPERATOR-DECISION-HELD`); `review-ux` verdict `NEEDS-OPERATOR-ANSWER` (was `NEEDS-OPERATOR-DECISION`); an id minted mid-flight is `Q-<n>` (was `D-<n>`; a scope id is kept).
+- **Changed (breaking):** `review-qa/decision-gate.py` is now `review-qa/hold-gate.py`, with no alias. A lift line reads `- <id> lifted-by: user@WR-<seconds> -- "<verbatim quote>" -- <date> [supersedes: <prior>]` and passes only when the cited ruling is in the work's `rulings.md` (recorded with the `ruled` skill of the `magic` plugin, 0.13.0 or later), its provenance is typed or dialog, and the quote is inside the operator's message. The turns file is gone.
+- **Changed:** `status` calls the gate's own judge, so the board and the gate agree; a task closed while held shows "closed without a lift".
+- **Fixed:** a reopened feature no longer reads Closed: Todo tasks below the last `## Debrief close` footer read Implement; all Done below it reads Deliver.
+- **Migration:** in each task log and in your `template-tasks.md`, rename the marker, the section heading and the field; record each operator answer as a ruling and cite its id in the lift line; delete `decision-turns.jsonl`. Update the plugin first, then the templates. Re-sync your copy of the macro block from the `magic` plugin (it says "operator question").
+
 ## [0.19.0] — 2026-09-27
 
 The context checkpoint's statusline becomes a one-step, consented install that survives plugin updates, and a missing one is announced instead of silent.
