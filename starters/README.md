@@ -32,11 +32,15 @@ Every surface additionally ships its representation contract — content per `su
 
 Non-`web` starters (server / CLI / library / MCP) still ship a `docs/ux` — its *content* is their surface's contract (endpoint / error-envelope rules for `api`, tool-schemas for `mcp`, flags / exit-codes for `cli`), not screen rules — and declare their lane's `surface` + `reviewers` accordingly. The lane's declared reviewers gate that surface's contract (schema / handshake / invocation) instead of a browser walk. A surface that lacks a `docs/ux` is a project deficiency the framework surfaces, not a supported mode.
 
+A `work` lane (knowledge work, no code: `said-work`) declares `SAID.surface: none`, `SAID.reviewers: []`, `SAID.commands: none`, `SAID.profile: work`. A deliverable has no medium a Checker walks and the `work` profile binds no runner, so the lane's gate is its rubric review in `docs/qa/` by a reviewer who is not the builder; a `docs/ux` is not required. A `doc` lane (`said-lane-doc`) is the non-code lane that does carry a surface: `surface: doc`, `reviewers: [doc-editorial]`, `commands: doc-gate`.
+
 ## Starters
 
 | Starter        | Stack                       | Status    | Repo |
 | -------------- | --------------------------- | --------- | ---- |
 | `said-next`    | Next.js + TS monorepo       | reference | TBD  |
+| `said-work`    | Knowledge work (no code)    | reference | -    |
+| `said-lane-doc`| Document lane (doc surface) | reference | -    |
 | `said-saas`    | Next.js + Supabase for SaaS | roadmap   | -    |
 | `said-ts`      | TS services / Bun / MCP     | reference | TBD  |
 | `said-python`  | Python (FastAPI) / MCP      | reference | TBD  |
