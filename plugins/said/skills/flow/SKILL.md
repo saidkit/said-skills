@@ -37,7 +37,7 @@ Preconditions. Any failure BLOCKS with a named redirect:
 
 - A `scope.md` exists for the feature in at least one lane, §D resolved. Else ->
   `/said:scope-refine` or `/said:scope-grill`.
-- The feature spans **≥ 2 lanes carrying their own SAID artifacts (a `scope.md`, spec, or task log) — not ≥ 2 repos, and NOT counted by task-log presence**. Count lanes by the Step-1 declaration-first enumeration: a lane still at Scope or Architect has no task log yet but is a full lane. A lane owns a full SAID cycle (its own feature specs, task log, working dir, ADRs); a mount is where code lands. One feature may change code in several mounts and remain single-lane. Single-lane -> `/said:impl`.
+- The feature spans **≥ 2 lanes carrying their own SAID artifacts (a `scope.md`, spec, or task log) — not ≥ 2 repos, and NOT counted by task-log presence**. Count lanes by the Step-1 declaration-first enumeration: a lane still at Scope or Architect has no task log yet but is a full lane. A lane owns a full SAID cycle (its own feature specs, task log, working dir, ADRs); a mount is where the lane's production lands. One feature may change files in several mounts and remain single-lane. Single-lane -> `/said:impl`.
 
 ## Output contract
 
@@ -70,7 +70,7 @@ Never read a state file. Derive everything, every time.
 
 | Fact | Probe |
 |---|---|
-| Lanes involved | **Declaration first:** read each candidate tree's `CLAUDE.md` `## Lane` block and take its `SAID.docs-root:` / `SAID.task-log:` / `SAID.working:` / `SAID.id-shape:` / `SAID.adr-prefix:` keys verbatim. **No block -> HALT:** where a candidate tree declares no `## Lane` block, halt and tell the operator to declare the lane's `SAID.<axis>:` keys — do not glob-guess. A repo root's `CLAUDE.md` may carry a `SAID.lanes:` registry naming where each lane starts — enumerate from it when present |
+| Lanes involved | **Declaration first:** read each candidate tree's `CLAUDE.md` `## Lane` block and take its `SAID.docs-root:` / `SAID.task-log:` / `SAID.working:` / `SAID.id-shape:` / `SAID.adr-prefix:` keys verbatim. **No block -> HALT:** where a candidate tree declares no `## Lane` block, halt and tell the operator to declare the lane's `SAID.<axis>:` keys — do not glob-guess. Where the root's `## Lane` block declares a `SAID.lanes:` registry, the lane set is the registry's: take its rows from `python3 ${CLAUDE_SKILL_DIR}/../status/said_status.py --registry --root <root>`, echo the count, and read no tree the registry does not name; on `refused:` HALT with that reason and point the operator at `/said:setup`; candidate trees are enumerated only where no registry is declared |
 | **Feature-id per lane** | the matched `*.tasks.md` filename stem minus `.tasks` — e.g. `PROJ-01` (front), `PROJ-01-BE` (server), `PROJ-02-BE-widgets`. **Record it. Every later invocation targeting that lane uses the lane's own id, never the umbrella id.** A lane's suffix is what makes its id globally unique; assuming the umbrella id silently addresses the wrong lane's log |
 | Lane phase | no `scope.md` -> **Scope**, scope, no spec -> **Architect**, spec+tasks, `Status: Todo` > 0 -> **Implement**, spec+tasks, Todo == 0, no `## Debrief close` footer in the tasks log -> **Deliver** (a `debrief.md` may already exist mid-debrief — it is written at debrief Phase A, before the footer; `debrief.md` presence alone is NOT `Closed`), `## Debrief close` footer present **and no open inbound crossing addressed to the lane** -> **Closed** |
 | Work remaining | count `Status: Todo` in that lane's `*.tasks.md` |

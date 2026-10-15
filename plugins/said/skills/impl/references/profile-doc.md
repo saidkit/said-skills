@@ -2,7 +2,7 @@
 PROFILE-HEADER, doc, 6 slots
 
 ## gate
-`SAID.commands:` carries a plugin verb: `doc-gate` expands, run from the lane root as ONE Bash line, to `set -o pipefail; python3 ${CLAUDE_SKILL_DIR}/../review-qa/doc-gate.py --repo-root . --tasks '<SAID.task-log glob for this feature>' --artifacts <SAID.code-mount> --banned <SAID.docs-root>/qa/banned-lexicon.txt <the lane's arguments after the verb> 2>&1 | tee <SAID.working>/doc-gate-<id>.log` (`<id>` = this task's id) — the engine is the sibling `review-qa` skill's bundled script.
+`SAID.commands:` carries a plugin verb: `doc-gate` expands, run from the lane root as ONE Bash line, to `set -o pipefail; python3 ${CLAUDE_SKILL_DIR}/../review-qa/doc-gate.py --repo-root . --tasks '<SAID.task-log glob for this feature>' --artifacts <each path of SAID.mounts: as its own argument; `none`: nothing to gate, skip> --banned <SAID.docs-root>/qa/banned-lexicon.txt <the lane's arguments after the verb> 2>&1 | tee <SAID.working>/doc-gate-<id>.log` (`<id>` = this task's id) — the engine is the sibling `review-qa` skill's bundled script.
 Exit 0 = clean (WARNs allowed), exit 1 = at least one FAIL, **exit 2 is a HALT, never a verdict**.
 `<typecheck>`, `<tests>`, `<lint>` and `<quality-gates-umbrella>` ALL bind to this one umbrella — it is fast and idempotent, so per-rule and close-time runs are the same command.
 No `Makefile` / `package.json` / operator-prompt step applies here.
@@ -12,7 +12,7 @@ The failing gate row: the `[FAIL] <rule>` line the umbrella prints before the wo
 Green = the row is gone from a fresh run / the item is checked with `file:line` evidence.
 
 ## carve-out
-Structural only for work that is not the deliverable: moving research or notes that live outside `SAID.code-mount:`, retargeting links.
+Structural only for work that is not the deliverable: moving research or notes that live outside `SAID.mounts:`, retargeting links.
 The shipped document **is** the deliverable — its tasks take the red path, never this carve-out.
 
 ## tag

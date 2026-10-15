@@ -3,7 +3,7 @@
 ## Lane
 - SAID.lane:         fixture
 - SAID.docs-root:    docs/
-- SAID.code-mount:   src/
+- SAID.mounts:       [src/]
 - SAID.feature-spec: docs/features/<id>.md
 - SAID.task-log:     docs/features/<id>.tasks.md
 - SAID.working:      docs/working/<id>/

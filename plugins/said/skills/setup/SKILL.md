@@ -53,9 +53,10 @@ path resolves from it. Resolve, and state what resolved:
 
 - Single lane , the lane root is the current repo root (its `CLAUDE.md` carries the `## Lane`
   block).
-- Multi-lane , read the `SAID.lanes:` registry WHOLE from the umbrella block; `--lane <name>`
-  selects one row, else default to the lane whose root is the current directory. Pass the selected
-  lane's root to the checker. (This mirrors how `said:status` resolves lanes.)
+- Multi-lane , take the registry rows WHOLE from
+  `python3 ${CLAUDE_SKILL_DIR}/../status/said_status.py --registry --root <root>`
+  (echo its count; on `refused:` report it, select no row); `--lane <name>` selects one row, else
+  default to the lane whose root is the current directory. Pass the selected lane's root to the checker.
 
 ## Step 1, run the checker
 
@@ -86,8 +87,10 @@ The script gives the facts; add the reading a script cannot:
   no Checker (or an empty `reviewers: []` on a surface-bearing lane) is a gate that reports PASS
   while running nothing. Name what each BLOCKER breaks.
 - **STALE** , a withdrawn or drifted declaration a current lane should not carry (a retired axis, a
-  duplicated key, prose between keys). Name the current form.
-- **ADVISORY** , a recommended-but-not-fatal gap (a missing skeleton dir, an absent optional axis).
+  duplicated key, prose between keys). Name the current form (a `write:` line gives it:
+  `SAID.mounts: [a/]`).
+- **ADVISORY** , a recommended-but-not-fatal gap (a missing skeleton dir, an absent optional axis,
+  lanes beneath a root with no registry).
 
 ## The statusline step
 
@@ -114,8 +117,11 @@ The read-only ledger's `statusline` row comes from `setup_statusline.py --check`
 `--fix` walks the findings and, per finding, does exactly ONE of four things:
 
 - **Native config write** , a configuration-value repair the lane clearly needs: refresh a stale
-  axis to its current key, add a missing scalar with its schema-stated default, normalize the
-  block's shape. Write it, then re-run Step 1 to confirm the finding cleared.
+  axis to its current key and value shape (`SAID.mounts: [a/]`; copy the line the checker
+  prints), add a missing scalar with its schema-stated default, normalize the
+  block's shape; write a `SAID.lanes` row's `write:` line into the root's `## Lane` block,
+  replacing `SAID.lanes: []`, else as a new key line (no `CLAUDE.md` or no block: compose `said:install` first). Write it,
+  then re-run Step 1 to confirm the finding cleared.
 - **Compose `said:install`** , a STRUCTURAL gap (missing docs skeleton, no `## Lane` block at all,
   the plugin not wired). Invoke `said:install` to create it; never hand-roll the scaffolding it
   owns. Where `said:install` is not available, PROPOSE "run `said:install`" and leave the gap,
@@ -123,7 +129,8 @@ The read-only ledger's `statusline` row comes from `setup_statusline.py --check`
 - **Statusline step** , a `statusline` row that is not `ok`: run the statusline step above, with
   its consent gate; never write `settings.json` without the operator's confirmation.
 - **Propose only** , a genuine choice the schema cannot settle (which `surface` medium? which
-  `reviewers` for a surface-bearing lane?). State the proposal with its options and stop; write
+  `reviewers` for a surface-bearing lane? a `SAID.lanes:` registry in another shape: state its
+  one-line form, never write it). State the proposal with its options and stop; write
   nothing until the operator confirms.
 
 Apply a default ONLY where the schema's remediation states one unambiguously; otherwise propose.
@@ -131,11 +138,8 @@ After a `--fix` pass, re-run the checker and show the updated ledger.
 
 ## Anti-patterns
 
-- **Do not auto-invoke a phase or another skill from a read-only run.** Report and stop.
 - **Do not guess a discretionary value.** A choice the schema cannot settle is a proposal, never a
   silent write.
-- **Do not hand-roll structural scaffolding** that `said:install` owns , compose it, or propose it.
 - **Do not run as an always-on gate.** This is a doctor the operator invokes, not a cycle step.
-- **Do not override the checker's verdicts in prose.** Fix the script or the schema instead.
 - **Do not confuse the surface with `said:status`.** That skill reports a FEATURE's phase; this one
   reports whether the LANE is well-formed.

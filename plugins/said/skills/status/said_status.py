@@ -11,7 +11,9 @@ prose contract this implements. Stdlib only, Python 3.8+.
 
 Agnostic by construction: paths, issued id-prefixes, and lanes come from flags
 (the skill resolves them declaration-first from CLAUDE.md and passes them);
-sensible conventional defaults apply when a flag is omitted.
+sensible conventional defaults apply when a flag is omitted. The one thing read
+from CLAUDE.md for lanes is the registry line: `--registry` prints its rows in
+the form `--lane` takes (see read_lane_registry).
 """
 
 import argparse
@@ -21,6 +23,7 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 from datetime import date
 
 # --- grammar (the SAID task-log shape) --------------------------------------
@@ -538,7 +541,9 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
 
 
 def parse_lane_arg(arg, defaults):
-    """'NAME' or 'NAME:key=val;key=val' — keys: root, docs, working, prefixes, legacy."""
+    """'NAME' or 'NAME:key=val;key=val' - keys: root, docs, working, prefixes, legacy.
+    A relative root is taken from the --root directory (defaults["root"]), so a row the
+    registry reader printed for that root resolves from any working directory."""
     name, _, rest = arg.partition(":")
     spec = dict(defaults)
     spec["name"] = name.strip() or defaults.get("name")
@@ -548,7 +553,8 @@ def parse_lane_arg(arg, defaults):
         k, _, v = pair.partition("=")
         k, v = k.strip(), v.strip()
         if k == "root":
-            spec["root"] = v
+            base = defaults.get("root") or ""
+            spec["root"] = v if (not v or os.path.isabs(v) or base in ("", ".")) else os.path.join(base, v)
         elif k == "docs":
             spec["docs_dir"] = v
         elif k == "working":
@@ -960,6 +966,288 @@ def _plugin_agents_dir():
     return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "agents")
 
 
+# --- the lane registry (SAID.lanes:) -----------------------------------------
+# One key line of TOKEN=root pairs in brackets, inside the "## Lane" block of a
+# multi-lane root:  - SAID.lanes: [WEB=web/, API=api/, APP=./]
+# Every script takes a lane's root from read_lane_registry(); none parses the line itself.
+_REG_FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
+
+
+def fence_step(fence, line):
+    """One step of fence tracking: return (is_a_fence_line, fence_now_open). A fence opens on
+    three or more backticks or tildes (a backtick opener's info string holds no backtick)
+    and closes only on a line of the same character, at least as long, with nothing after."""
+    m = _REG_FENCE_RE.match(line)
+    if not m:
+        return False, fence
+    run, rest = m.group(1), m.group(2)
+    if fence is None:
+        if run[0] == "`" and "`" in rest:
+            return False, None
+        return True, run
+    if run[0] == fence[0] and len(run) >= len(fence) and not rest.strip():
+        return True, None
+    return False, fence
+_REG_KEY_RE = re.compile(r"^[ \t]*[-*]?[ \t]*SAID\.lanes:[ \t]*(.*?)[ \t]*$")
+_REG_KEYSHAPE_RE = re.compile(r"^[ \t]*[-*]?[ \t]*SAID\.[\w-]+:")
+# a roster row written as a bullet: `- TOKEN: path/`, `- TOKEN -> path/`, `- TOKEN = path/`, the path also
+# one that ends in CLAUDE.md (`- TOKEN: dir/CLAUDE.md`); or a bullet whose token or path is a markdown link
+# to such a path (`- [TOKEN](dir/CLAUDE.md)`, `- TOKEN: [dir](dir/)`)
+_REG_DIR = r"(?:\.\.?/|[^\s`\"'\]/.~:][^\s`\"'\]/.:]*/)(?:[^\s`\"'\]]*/)?"  # relative, ends in /:
+_REG_CLAUDE = r"CLAUDE\.md(?![\w-]|\.\w)"                                     # never absolute, ~,
+_REG_PATH = r"%s(?:%s)?" % (_REG_DIR, _REG_CLAUDE)                              # a URL or a bare domain
+_REG_LDIR = r"(?:\.\.?/|[^\s`\"'\]\[()/.~:][^\s`\"'\]\[()/.:]*/)(?:[^\s`\"'\]\[()]*/)?"  # in a link target
+_REG_LINK = r"\[[^\]\n]*\]\((?:%s(?:%s)?|%s)(?:[ \t]+\"[^\"]*\")?\)" % (_REG_LDIR, _REG_CLAUDE, _REG_CLAUDE)
+_REG_ROSTER_RE = re.compile(
+    r"^[ \t]*(?:[-*+]|\d+[.)])[ \t]+(?:"               # a bullet or a numbered item
+    + _REG_LINK + r"|"                                 # that opens with a link, or
+    r"(?:\*\*|__|`)?[A-Za-z][\w-]*(?:\*\*|__|`)?"       # the token: plain, bold or in backticks
+    r"(?:[ \t]*\([^)]*\))?"                           # a note on the token
+    r"[ \t]*(?::|->|=|\u2014|\u2013|\u2192)[ \t]*"      # the separator
+    r"(?:" + _REG_LINK + r"|[\"'`\[]?" + _REG_PATH +   # a link, or a path
+    r"[\"'`\]]?(?:[\s,.;)]|$)))")
+# a table's delimiter row, with or without its outer pipes: `--- | ---`, `|:--|--:|`
+_REG_DELIM_RE = re.compile(r"^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)+\|?[ \t]*$")
+_REG_QUOTE_RE = re.compile(r"^[ \t]*(?:>[ \t]?)+")  # a blockquote prefix; what it quotes is read as written
+EMPTY_REGISTRY = "an empty registry; remove the key or declare rows"
+
+
+class RegistryRefused(ValueError):
+    """A registry line the reader does not take. `kind` is 'empty' for `[]`, 'twice' when
+    the key is declared more than once in the block, 'shape' when rows sit beneath the line
+    or the line is indented off the key list, else 'malformed'."""
+
+    def __init__(self, reason, kind="malformed"):
+        ValueError.__init__(self, reason)
+        self.kind = kind
+
+
+def lane_block_numbered(text):
+    """The lane block as [(line_number, line), ...], line numbers 0-based in the file, for the
+    lines that sit outside code fences: under a heading that is exactly '## Lane' at column
+    0, up to the next '## ' heading or EOF. None when the file has no such heading.
+    '## Lane web' and '## Lanes' are not the lane block, and neither a heading nor a key
+    line shown inside a fenced example is ever returned."""
+    block, fence = None, None
+    for n, ln in enumerate(text.splitlines()):
+        marker, fence = fence_step(fence, ln)
+        if marker or fence:
+            continue
+        if block is None:
+            if ln.rstrip() == "## Lane":
+                block = []
+        elif ln.startswith("## "):
+            break
+        else:
+            block.append((n, ln))
+    return block
+
+
+def lane_block_lines(text):
+    """The lines of lane_block_numbered(text), without their numbers; None when no block."""
+    block = lane_block_numbered(text)
+    return None if block is None else [ln for _, ln in block]
+
+
+def key_column(line):
+    """A line's indent in columns (a tab counts four), so a tab cannot pass for a shallower
+    indent. The key list's column is that of the block's first key-shaped line; a key-shaped
+    line at another column is an annotation under a key, not a key line."""
+    return len(line[:len(line) - len(line.lstrip(" \t"))].expandtabs(4))
+
+
+def locate_lane_registry(text):
+    """Where the registry sits in the lane block of `text`. None when the file has no lane
+    block or the block carries no SAID.lanes: line. Else a dict:
+      values  - the value of each SAID.lanes: line that sits at the key list's column
+      nested  - file line numbers of SAID.lanes: lines indented off the key list
+      beneath - file line numbers of what sits beneath the registry line, when there is
+                exactly one: every line that abuts it and, past a blank line, table rows and
+                indented lines up to the next key line or the first plain line; then, to the
+                end of the section, any table row or roster bullet (`TOKEN: path/`), whatever
+                plain lines or headings sit between: the registry's leftover
+    One answer for the reader and for the checker, so they cannot disagree on a shape."""
+    block = lane_block_numbered(text)
+    if block is None:
+        return None
+    shaped = [i for i, (_, ln) in enumerate(block) if _REG_KEYSHAPE_RE.match(ln)]
+    reg = [i for i in shaped if _REG_KEY_RE.match(block[i][1])]
+    if not reg:
+        return None
+    col = key_column(block[shaped[0]][1])
+    on = [i for i in reg if key_column(block[i][1]) == col]
+    loc = {"values": [_REG_KEY_RE.match(block[i][1]).group(1) for i in on],
+           "nested": [block[i][0] for i in reg if i not in on], "beneath": []}
+    if len(reg) == 1:
+        plain = [_REG_QUOTE_RE.sub("", ln) for _, ln in block]
+        tabular = set()  # rows of a table, with or without its outer pipes
+        for i, ln in enumerate(plain):
+            if ln.lstrip(" \t").startswith("|"):
+                tabular.add(i)
+            elif _REG_DELIM_RE.match(ln) and i > 0 and "|" in plain[i - 1]:  # a table has a header row
+                tabular.update((i - 1, i))
+                j = i + 1
+                while j < len(plain) and plain[j].strip() and "|" in plain[j]:
+                    tabular.add(j)
+                    j += 1
+        abuts = attached = True
+        for i in range(reg[0] + 1, len(block)):
+            n, ln = block[i]
+            if not ln.strip():
+                abuts = False
+                continue
+            table = i in tabular
+            if _REG_KEYSHAPE_RE.match(ln) and key_column(ln) == col:
+                abuts = attached = False  # another key; the leftover scan goes on to the section's end
+                continue
+            if attached and (abuts or key_column(ln) > col or table):
+                loc["beneath"].append(n)
+                continue
+            attached = False
+            if table or _REG_ROSTER_RE.match(plain[i]):
+                loc["beneath"].append(n)
+    return loc
+
+
+def read_registry_text(text):
+    """The registry's rows, [(token, root_as_written), ...], from the text of a CLAUDE.md;
+    [] when its lane block declares none. Raises RegistryRefused when the line, or what sits
+    around it, is not the one key line the grammar admits."""
+    loc = locate_lane_registry(text)
+    if loc is None:
+        return []
+    if loc["nested"]:
+        raise RegistryRefused("the SAID.lanes: line on line %d is indented as a sub-bullet; a key line sits at "
+                              "the key list's own column, so no row is read" % (loc["nested"][0] + 1), kind="shape")
+    if len(loc["values"]) > 1:
+        raise RegistryRefused("SAID.lanes: is declared %d times in the lane block; a list key is declared once"
+                              % len(loc["values"]), kind="twice")
+    empty = None
+    try:
+        rows = parse_lane_registry(loc["values"][0])
+    except RegistryRefused as e:
+        if e.kind != "empty":
+            raise
+        empty = e
+    if loc["beneath"]:
+        raise RegistryRefused("%d line(s) sit beneath the SAID.lanes: line, from line %d; a row, a table or a "
+                              "sub-bullet there is read by nothing, and the registry is one key line"
+                              % (len(loc["beneath"]), loc["beneath"][0] + 1), kind="shape")
+    if empty is not None:
+        raise empty
+    return rows
+
+
+def parse_lane_registry(value):
+    """Parse the value of a SAID.lanes: key line into [(token, root), ...].
+
+    Grammar: '[' pair (',' pair)* ']'; pair = TOKEN '=' ROOT; TOKEN = a letter, then letters
+    and digits, unique in the line; ROOT = a relative directory path ending in '/', with no
+    whitespace. Whitespace after '[', before ']' and around ',' is not significant; around
+    '=' it is malformed. Raises RegistryRefused with the reason."""
+    s, n, i = value, len(value), 0
+
+    def skip_ws(k):
+        while k < n and s[k] in " \t":
+            k += 1
+        return k
+
+    def found(k):
+        return "end of line" if k >= n else repr(s[k])
+
+    i = skip_ws(i)
+    if i >= n:
+        raise RegistryRefused("the key line carries no value; a registry is one bracketed line of TOKEN=root pairs")
+    if s[i] != "[":
+        raise RegistryRefused("the value does not open with '['; a registry is [TOKEN=root, TOKEN=root]")
+    i = skip_ws(i + 1)
+    if i < n and s[i] == "]":
+        if skip_ws(i + 1) < n:
+            raise RegistryRefused("text after the closing ']'")
+        raise RegistryRefused(EMPTY_REGISTRY, kind="empty")
+    rows, seen = [], set()
+    while True:
+        j = i
+        if i < n and (("a" <= s[i] <= "z") or ("A" <= s[i] <= "Z")):
+            i += 1
+            while i < n and (("a" <= s[i] <= "z") or ("A" <= s[i] <= "Z") or ("0" <= s[i] <= "9")):
+                i += 1
+        token = s[j:i]
+        if not token:
+            raise RegistryRefused("expected a token (a letter, then letters and digits), found %s" % found(i))
+        if i >= n or s[i] != "=":
+            raise RegistryRefused("token %r is followed by %s, not '='; a pair is TOKEN=root and a bare token is not legal" % (token, found(i)))
+        i += 1
+        j = i
+        while i < n and s[i] not in ", \t]=[;":
+            i += 1
+        root = s[j:i]
+        if i < n and s[i] in "=[;":
+            raise RegistryRefused("unexpected %s in the root of %r" % (found(i), token))
+        if not root:
+            raise RegistryRefused("token %r has no root" % token)
+        if any(unicodedata.category(ch) in ("Cc", "Cf") or ch == "\ufffd" for ch in root):
+            raise RegistryRefused("the root of %r carries a control or format character, or a byte that is not UTF-8" % token)
+        if root.startswith("/"):
+            raise RegistryRefused("the root of %r is absolute; a root is relative to the directory of the file that carries the registry" % token)
+        if not root.endswith("/"):
+            raise RegistryRefused("the root %r of %r does not end with '/'" % (root, token))
+        if token in seen:
+            raise RegistryRefused("token %r is declared twice" % token)
+        seen.add(token)
+        rows.append((token, root))
+        i = skip_ws(i)
+        if i >= n:
+            raise RegistryRefused("the list is not closed with ']'")
+        if s[i] == ",":
+            i = skip_ws(i + 1)
+            if i < n and s[i] == "]":
+                raise RegistryRefused("an empty item before ']'")
+            continue
+        if s[i] == "]":
+            i += 1
+            break
+        raise RegistryRefused("expected ',' or ']' after %s=%s, found %s" % (token, root, found(i)))
+    if skip_ws(i) < n:
+        raise RegistryRefused("text after the closing ']'")
+    return rows
+
+
+def read_lane_registry(root):
+    """Read the lane registry declared in <root>/CLAUDE.md.
+
+    Returns (rows, None) with rows = [(token, root_as_written), ...]; ([], None) when the
+    lane block declares no registry (or there is no lane block, or no file). Raises
+    RegistryRefused when the block's registry line is not one the grammar admits. Only the
+    line inside the lane block is read: a directory the registry does not name is never a row."""
+    try:
+        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8-sig", errors="replace") as fh:
+            text = fh.read()  # a stray byte elsewhere in the file does not hide the registry
+    except (OSError, ValueError):
+        return [], None
+    return read_registry_text(text), None
+
+
+def run_registry(a):
+    """`--registry`: print one TOKEN:root=<root> line per row, the form --lane takes, then
+    `count: <N>`; exit 0. A refused line prints `refused: <reason>` and exits 2."""
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+    try:
+        rows, _ = read_lane_registry(a.root)
+        out = ["%s:root=%s" % (token, lane_root) for token, lane_root in rows] + ["count: %d" % len(rows)]
+    except RegistryRefused as e:
+        print("refused: %s" % e)
+        return 2
+    except Exception as e:  # never a traceback: a caller reads rows or one refused line
+        print("refused: unexpected %s" % type(e).__name__)
+        return 2
+    print("\n".join(out))
+    return 0
+
+
 def _lane_key(root, key):
     """Declaration-first read of a scalar `SAID.<key>:` from the lane's <root>/CLAUDE.md; returns
     the raw value of the first match, or None. The one read-shape resolve_checkers_dir,
@@ -1041,8 +1329,11 @@ def main():
     ap.add_argument("--json", action="store_true", help="emit structured JSON instead of text")
     ap.add_argument("--lane", action="append", default=[], metavar="NAME[:k=v;...]",
                     help="declare a lane (repeatable); keys: root,docs,working,prefixes,legacy. "
-                         "Omit entirely for one default lane.")
+                         "A relative root is taken from --root. Omit entirely for one default lane.")
     ap.add_argument("--project", help="header label (default: --root basename)")
+    ap.add_argument("--registry", action="store_true",
+                    help="print the lane registry declared in <root>/CLAUDE.md: one TOKEN:root=<root> line per "
+                         "row (the form --lane takes), then `count: <N>`; a refused line prints `refused: ...` and exits 2")
     ap.add_argument("--reviewer-gate", action="store_true",
                     help="L2: validate the declared reviewer set for a working dir (exit-coded gate)")
     ap.add_argument("--workdir", help="reviewer-gate: feature working dir holding verdict artifacts")
@@ -1053,6 +1344,8 @@ def main():
     ap.add_argument("--recipe-rules", help="reviewer-gate: a docs/ux rules file to also scan for recipe-form Checkers")
     a = ap.parse_args()
 
+    if a.registry:  # the lane registry's rows, for any caller that needs a lane's root
+        sys.exit(run_registry(a))
     if a.reviewer_gate:  # L2 exit-coded enforcement gate
         sys.exit(run_reviewer_gate(a))
 

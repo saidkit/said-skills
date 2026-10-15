@@ -1,7 +1,7 @@
 {
   "schema": "said-lane-wellformed",
   "version": 1,
-  "description": "Machine-readable definition of a well-formed SAID lane. Read WHOLE (json.load) by said:setup (diagnose + repair a present lane's configuration) and said:install (scaffold a lane's configuration). It enumerates the ## Lane block axes, the required CLAUDE.md sections, the block-shape invariants, the docs skeleton, and the withdrawn axes -- each with a severity class and a self-contained remediation. This file, not a prose stencil, is the single source of truth for the current axis set; when an axis is added or withdrawn, this file is what changes.",
+  "description": "Machine-readable definition of a well-formed SAID lane. Read WHOLE (json.load) by said:setup (diagnose + repair a present lane's configuration) and said:install (scaffold a lane's configuration). It enumerates the ## Lane block axes, the required CLAUDE.md sections, the block-shape invariants, the docs skeleton, and the withdrawn axes -- each with a severity class and a self-contained remediation. It is the machine-readable copy of the lane-block key list the plugin README documents (the ## Lane block): the two declare the same axis set, and an axis is added or withdrawn in both together. A row's kind decides how the checker treats its value and a row's value names the grammar it is checked against; read_whole only restates, for a reader of this file, that a list is consumed whole.",
   "severity_order": ["BLOCKER", "STALE", "ADVISORY"],
   "severity_meaning": {
     "BLOCKER": "a consumer HALTs, or a declared gate runs nothing (a nominal pass); fix before the lane is usable",
@@ -11,7 +11,7 @@
   "axes": [
     {"key": "SAID.lane", "kind": "scalar", "required": true, "severity_if_missing": "STALE", "remediation": "declare SAID.lane: <name> in the ## Lane block"},
     {"key": "SAID.docs-root", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.docs-root: <path>; consumers resolve docs paths from it and HALT without it"},
-    {"key": "SAID.code-mount", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.code-mount: <path>[, <path>] naming where lane code lives"},
+    {"key": "SAID.mounts", "kind": "list", "read_whole": true, "value": "path-list", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.mounts: [<path>, <path>] naming the root or roots where this lane's production lands and what its gate reads, relative to the lane root; bracket a single path too; a lane that ships nothing writes SAID.mounts: none"},
     {"key": "SAID.feature-spec", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.feature-spec: <path pattern>; the spec-authoring and impl skills resolve it declaration-first and HALT without it"},
     {"key": "SAID.task-log", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.task-log: <path pattern>; consumers HALT without it"},
     {"key": "SAID.working", "kind": "scalar", "required": true, "severity_if_missing": "BLOCKER", "remediation": "declare SAID.working: <path pattern> for per-feature working notes"},
@@ -25,12 +25,13 @@
     {"key": "SAID.checkers-dir", "kind": "scalar", "required": false, "severity_if_missing": "ADVISORY", "remediation": "declare SAID.checkers-dir: <path> ONLY if the lane ships and executes its own Checkers"},
     {"key": "SAID.code-review", "kind": "scalar", "required": false, "severity_if_missing": "ADVISORY", "remediation": "optional on | off override; absent falls back to the profile's code-review slot"},
     {"key": "SAID.context-checkpoint", "kind": "scalar", "required": false, "severity_if_missing": "ADVISORY", "remediation": "optional input-token threshold (default 300000 when absent) that said/flow read from the session's context.json at phase boundaries, only in a session that switched the stop on with SAID_CONTEXT_CHECKPOINT=on; declare SAID.context-checkpoint: <tokens> only to lower or raise it"},
-    {"key": "SAID.lanes", "kind": "list", "read_whole": true, "required": false, "severity_if_missing": "ADVISORY", "remediation": "a multi-lane repo declares the SAID.lanes: registry (read WHOLE) on the umbrella block, one row per lane pointing at that lane's own CLAUDE.md"}
+    {"key": "SAID.lanes", "kind": "list", "read_whole": true, "required": false, "severity_if_missing": "ADVISORY", "value": "registry", "remediation": "a multi-lane root declares the SAID.lanes: registry in its ## Lane block as one key line of TOKEN=root pairs in brackets, SAID.lanes: [WEB=web/, API=api/]; a root is that lane's directory, relative to the directory of the file that carries the line, ending in /; nothing sits beneath the line; a root with no registry, or SAID.lanes: [], whose immediate subdirectories hold lane blocks is shown the line to write, each token that lane's SAID.lane value upper-cased, letters and digits only (else the directory name; a number when taken)"}
   ],
   "withdrawn_axes": [
     {"key": "SAID.surface-type", "severity": "STALE", "superseded_by": "SAID.surface + SAID.reviewers", "remediation": "replace SAID.surface-type: with SAID.surface: <medium> plus SAID.reviewers: [<checker>]; the surface-type enum was retired in favor of named Checkers"},
     {"key": "SAID.project-type", "severity": "STALE", "remediation": "remove SAID.project-type: (removed axis); consumers read SAID.surface: instead"},
-    {"key": "SAID.contract-face", "severity": "STALE", "remediation": "remove SAID.contract-face: (never an axis); every lane has both a docs/ux and a docs/qa contract, resolved from docs-root"}
+    {"key": "SAID.contract-face", "severity": "STALE", "remediation": "remove SAID.contract-face: (never an axis); every lane has both a docs/ux and a docs/qa contract, resolved from docs-root"},
+    {"key": "SAID.code-mount", "severity": "STALE", "superseded_by": "SAID.mounts", "remediation": "rename the key to SAID.mounts: and write its value as a bracketed list; a lane that ships nothing keeps the bare word none"}
   ],
   "required_sections": [
     {"heading": "## Lane", "match": "exact", "severity_if_missing": "BLOCKER", "remediation": "add the ## Lane block carrying the SAID.<axis> keys; a repo with no lane block is invisible to the whole cycle"},
@@ -40,7 +41,8 @@
   ],
   "block_invariants": [
     {"id": "one-line-value", "severity": "STALE", "rule": "each key carries its full scalar value on one line; no trailing comment marker, parenthetical, or aside a consumer must strip"},
-    {"id": "single-hit-scalar", "severity": "STALE", "rule": "a scalar SAID.<axis> key is named once in the file; the list keys SAID.lanes and SAID.reviewers are the exceptions, read WHOLE"},
+    {"id": "single-hit-scalar", "severity": "STALE", "rule": "a scalar SAID.<axis> key is named once in the file; the list keys SAID.lanes, SAID.reviewers and SAID.mounts are the exceptions, read WHOLE"},
+    {"id": "list-key-once", "severity": "STALE", "rule": "a list key is declared once per block; it is read WHOLE, so two of them have no defined meaning"},
     {"id": "keys-only-block", "severity": "STALE", "rule": "from the first key to the last, every line is a key line; no prose, sub-bullet, stray bullet, or annotation between keys"}
   ],
   "docs_skeleton": [

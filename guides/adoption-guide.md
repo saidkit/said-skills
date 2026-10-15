@@ -48,14 +48,14 @@ No starter for your stack yet? The plain files you can author directly; the **su
 
 ## Step 3 -- Write the `## Lane` block in your `CLAUDE.md`
 
-Add a `## Lane` block the skills read. It is **keys only**: from the first `SAID.` key to the last, every line is a key line, each carrying its whole value on ONE line with **no trailing comment or parenthetical**. A consumer key-greps the value, so an inline note becomes part of it (and corrupts a list value like `SAID.reviewers:`). Put every explanation in the legend BELOW the block, never inside it. A list value (`SAID.reviewers:`, `SAID.lanes:`) is read WHOLE.
+Add a `## Lane` block the skills read. It is **keys only**: from the first `SAID.` key to the last, every line is a key line, each carrying its whole value on ONE line with **no trailing comment or parenthetical**. A consumer key-greps the value, so an inline note becomes part of it (and corrupts a list value like `SAID.reviewers:`). Put every explanation in the legend BELOW the block, never inside it. A list value (`SAID.reviewers:`, `SAID.lanes:`, `SAID.mounts:`) is read WHOLE.
 
 ```markdown
 ## Lane
 
 SAID.lane:         <name>
 SAID.docs-root:    docs/
-SAID.code-mount:   src/
+SAID.mounts:       [src/]
 SAID.feature-spec: docs/features/PROJ-01.md
 SAID.task-log:     docs/features/PROJ-01.tasks.md
 SAID.working:      docs/working/PROJ-01/
@@ -72,7 +72,7 @@ Legend (do NOT paste into the block -- these are notes, not part of any value):
 
 - `SAID.lane` -- the lane name.
 - `SAID.docs-root` -- where docs live; the path keys below resolve from it.
-- `SAID.code-mount` -- where lane code lives (a lane spans mounts; a mount is not a lane). Comma-separate multiple mounts.
+- `SAID.mounts` -- the root or roots where this lane's production lands and what its gate reads: a WHOLE-read list in brackets (`[src/]`, `[web/, server/]`), relative to the lane root; a lane that ships nothing writes `none`. A lane spans its mounts; a mount is not a lane.
 - `SAID.feature-spec` / `task-log` / `working` -- your path patterns (`PROJ-01` is a placeholder id).
 - `SAID.id-shape` -- your id convention, verbatim (e.g. `PROJ-01` or `PROJ-01-BE-07`); recorded, never normalized.
 - `SAID.adr-prefix` -- your ADR id glob.
@@ -81,7 +81,7 @@ Legend (do NOT paste into the block -- these are notes, not part of any value):
 - `SAID.commands` -- your umbrella gate command, language-neutral (e.g. `make pre-commit`, `npm run check`, `cargo test`).
 - `SAID.profile` -- the lane's work profile: `code`, `doc`, or `work`.
 - `SAID.version` -- which starter you applied, `<starter>@<semver>`, stamped once at setup (optional; a standalone lane not built on a starter omits it).
-- Optional axes for special cases: `SAID.lanes:` (a registry, when one feature spans two or more lanes) and `SAID.checkers-dir:` (only when this lane ships its own agent-form Checker -- **declaring it REPLACES the plugin's shipped agents dir, not adds to it**, so a mixed set that also names a shipped Checker like `web-ux` must re-declare it there or drop the name).
+- Optional axes for special cases: `SAID.lanes:` (a registry on a multi-lane root, when one feature spans two or more lanes: one key line of `TOKEN=root` pairs, `SAID.lanes: [WEB=web/, API=api/]`, each root that lane's directory) and `SAID.checkers-dir:` (only when this lane ships its own agent-form Checker -- **declaring it REPLACES the plugin's shipped agents dir, not adds to it**, so a mixed set that also names a shipped Checker like `web-ux` must re-declare it there or drop the name).
 
 Then add three supporting sections to the same `CLAUDE.md`:
 

@@ -41,7 +41,7 @@ Never hardcode paths or id shapes. Resolve in this order, and state what resolve
 | Docs root, working root | a `## Lane` block's `SAID.docs-root:` + `SAID.working:` keys | `docs/features/` and `docs/working/` |
 | Issued id-prefixes | `CLAUDE.md` (e.g. *"issues `PROJ-NN` only"*) | stems of `<docs>/features/*.md` |
 | Id shape | a `## Lane` block's `SAID.id-shape:` key (`<PREFIX>-<NN>`, sub-phase `-<slug>`, multi-target `-<APP>-<NN>`) | regex `[A-Z]+-[0-9]+` |
-| Lanes | `## Lane` blocks (`SAID.lanes:` registry when multi-lane) | single lane |
+| Lanes | the rows of the root's `SAID.lanes:` registry where one is declared (`--registry`); else `## Lane` blocks | single lane |
 
 **Enumerate the registry as a union** (dedup by feature-id) — a spec-only list hides the states an operator most needs to see (scoped-but-unarchitected, reserved-but-empty). Include:
 
@@ -64,7 +64,7 @@ python3 <skill-dir>/said_status.py \
 
 - Args map to Step-0 values. **Omit `--prefixes` / `--legacy-prefixes`** and the script infers the active set (a prefix is active if any id has a spec or `scope.md`); pass them when `CLAUDE.md` states the issued set, to be exact.
 - No `<feature-id>` -> roster, `<feature-id>` -> deep-dive, `--stale` -> attention filter, `--json` -> the structured data layer (reason over it; don't re-derive by eye).
-- **Lanes default to one.** Omit `--lane` -> single-lane output (no `lane:` headers). Multi-lane: read each `## Lane` block (`/said:flow` Step 1) and pass one `--lane NAME:root=...;prefixes=...` per lane. You resolve the fuzzy `## Lane` declarations; the script aggregates what you pass.
+- **Lanes default to one.** Omit `--lane` -> single-lane output (no `lane:` headers). Multi-lane: where the root declares a `SAID.lanes:` registry, run the script with `--registry --root <root>`, echo its count (on `refused:` stop and show the reason; `/said:setup` reports the line), and pass each printed `TOKEN:root=<root>` row as one `--lane` (add `;prefixes=...` where needed); only with no registry, read each `## Lane` block (`/said:flow` Step 1) and pass one `--lane NAME:root=...;prefixes=...` per lane. You resolve the fuzzy `## Lane` declarations; the script aggregates what you pass.
 - `--today` makes a run reproducible; omit for the real date.
 - **Show the text output verbatim** — columns are deterministically aligned; re-typing reintroduces the drift the script exists to remove.
 - **No `python3`?** Execute the reconstruction contract below by hand with grep/git, and say so.
@@ -142,7 +142,7 @@ Markdown (keep `file:line` paths clickable) — the "position in the SAID cycle"
 
 ### Cross-lane — `/said:status --lanes`
 
-Resolve lanes via `/said:flow` Step 1 (declaration-first `## Lane` blocks; glob fallback), then run the script with one `--lane NAME:root=...;docs=...;working=...;prefixes=...` per lane. One roster section per lane under a `lane: <name>  (<root>)` heading, columns aligned across lanes. A `<feature-id>` spanning lanes matches the umbrella id + suffixed lane ids together (`PROJ-01`, `PROJ-01-BE`), labelling each with its `lane:` and its own phase. (Phase is per-lane; cross-lane `Closed` / crossing semantics stay `/said:flow`'s job — this skill reports, it doesn't gate.)
+Resolve lanes via `/said:flow` Step 1 (the registry's rows where one is declared; else declaration-first `## Lane` blocks, glob fallback), then run the script with one `--lane NAME:root=...;docs=...;working=...;prefixes=...` per lane. One roster section per lane under a `lane: <name>  (<root>)` heading, columns aligned across lanes. A `<feature-id>` spanning lanes matches the umbrella id + suffixed lane ids together (`PROJ-01`, `PROJ-01-BE`), labelling each with its `lane:` and its own phase. (Phase is per-lane; cross-lane `Closed` / crossing semantics stay `/said:flow`'s job — this skill reports, it doesn't gate.)
 
 ## Rendering rules
 
