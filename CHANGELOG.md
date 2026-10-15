@@ -2,6 +2,10 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [Unreleased]
+
+- **Changed:** a doc-surface lane whose `SAID.mounts:` is the bare `none` ships nothing, so its editorial reviewer is recorded as N/A at the gate instead of failing for a missing verdict: `said_status.py --reviewer-gate` prints the reviewer as `N/A -- SAID.mounts: none, nothing shipped` and passes, and `review-ux` spawns no reviewer for it. A doc lane with a real mount still fails when its verdict is missing.
+
 ## [0.21.0] — 2026-10-15
 
 **Breaking.** The context checkpoint is off unless the session switches it on; the mounts key replaces the code-mount key; the lane registry has one written grammar. A lane block that still spells the old key, or a registry in any other shape, is reported by `setup` and read by nothing; no alias period.

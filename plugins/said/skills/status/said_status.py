@@ -919,6 +919,24 @@ def _governs_surface(meta, surface):
     return "any" in vals or (surface or "").strip().lower() in vals
 
 
+def _lane_mounts(root):
+    """The whole SAID.mounts: value on the lane block's own key list, or None."""
+    try:
+        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8-sig", errors="replace") as fh:
+            block = lane_block_lines(fh.read())
+    except (OSError, ValueError):
+        return None
+    if block is None:
+        return None
+    keyed = [ln for ln in block if re.match(r"^\s*[-*]?\s*SAID\.[\w-]+:", ln)]
+    col = key_column(keyed[0]) if keyed else 0
+    for ln in keyed:  # the whole value of the key's own line, so only the bare word reads as none
+        m = re.match(r"^\s*[-*]?\s*SAID\.mounts:[ \t]*(.*?)[ \t]*$", ln)
+        if m and key_column(ln) == col:
+            return m.group(1)
+    return None
+
+
 def reviewer_gate(workdir, surface, reviewers, checker_index, head_sha, root="."):
     """L2 gate over the declared reviewer set. Returns (passed, [(id, ok, reason), ...])."""
     surface = (surface or "").strip()
@@ -929,8 +947,12 @@ def reviewer_gate(workdir, surface, reviewers, checker_index, head_sha, root="."
         return False, [("reviewers", False,
                         "surface-bearing (%s) but no reviewers declared — declare reviewers:, or surface: none" % surface)]
     details, skipped, passed = [], [], True
+    nothing_shipped = surface == "doc" and _lane_mounts(root) == "none"
     for cid in reviewers:
         meta = checker_index.get(cid)
+        if nothing_shipped and cid == "doc-editorial":  # a doc lane that ships nothing has no prose to review
+            details.append((cid, True, "N/A -- SAID.mounts: none, nothing shipped"))
+            continue
         # an un-instantiated said-governs placeholder on a REQUIRED Checker (a lane copied the recipe
         # template's surface=<...> without instantiating it) is a config error, never a silent govern-any:
         # the <...> value fails the surface= value regex below, which would otherwise fall through to
