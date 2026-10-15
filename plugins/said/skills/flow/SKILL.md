@@ -2,7 +2,7 @@
 name: flow
 description: >
   Multi-lane SAID orchestrator. Drives a feature that spans two or more lanes (parts of multi-repository project: frontend / backend / apps) through every lane's own SAID cycle in one session — inspecting on-disk artifacts  to decide the next action, forking independent arms, and batching cross-lane  handovers so lanes don't serialize.
-  Triggered ONLY by the explicit command "/said:flow <feature-id>". Do NOT trigger on general implementation, planning, or orchestration requests.
+  Triggered ONLY by the explicit command "/said:flow <feature-id> [checkpoint]". Do NOT trigger on general implementation, planning, or orchestration requests.
 ---
 
 # said:flow — Multi-lane SAID orchestrator
@@ -25,13 +25,14 @@ Skills compose freely: a skill is instructions loaded into the one agent that ha
 2. **State lives in artifacts, never in conversation.** Every invocation reconstructs by inspection. This is what makes the skill re-entrant across compaction.
 3. **A compaction is not a stop.** Re-enter and continue.
 4. **Minimize crossings, don't schedule around them.** Most cross-lane items are mechanical consequences of decisions already made.
-5. **Context checkpoint at every ROTATE.** The check is off by default: it runs only in a session that switched it on with the environment variable `SAID_CONTEXT_CHECKPOINT` set to `on` (read it first, with one `echo "${SAID_CONTEXT_CHECKPOINT:-unset}"` call); unset or any other value means no check, no stop and no notice -- rotate. When it is on: before loading the next lane, read `context.json` in this session's scratchpad (written by the plugin's statusline script). If its `total_input_tokens` exceeds the lane's `SAID.context-checkpoint:` (optional scalar key; default 300000 when absent), print `CONTEXT-CHECKPOINT -- safe point: /clear, then flow! <feature-id> (resumes at the next lane)`, refresh the resume pointer (Step 5) with `Next: /clear, then flow! <feature-id>`, and stop. A missing `context.json` (or a null value) -> skip the check and rotate, never a block; the first such skip in a session prints one line `context checkpoint inactive: run /said:setup statusline` (once, best effort: a compaction may repeat it; the notice is never a stop and never a `goal:` line). Under `/goal` the threshold stop above is `goal: stop -- CONTEXT-CHECKPOINT`, announce once, then hold on every re-fire; it is an operator action, not an operator question.
+5. **Context checkpoint at every ROTATE.** The check is off by default: it runs only in a session that switched it on, with the environment variable `SAID_CONTEXT_CHECKPOINT` set to `on` or with the opt-in word `checkpoint` in the flow! directive (`flow! <feature-id> checkpoint`; an opt-in, never a grant). On seeing the word, write an empty file `checkpoint-on` in this session's scratchpad (a `/clear` drops it, so the re-issue carries the word). Before each rotate read both first, with one call `echo "${SAID_CONTEXT_CHECKPOINT:-unset}"; test -e <scratchpad>/checkpoint-on && echo marker || echo no-marker`; either source means on, and an unset or any other value with no marker means no check, no stop and no notice -- rotate. When it is on: before loading the next lane, read `context.json` in this session's scratchpad (written by the plugin's statusline script). If its `total_input_tokens` exceeds the lane's `SAID.context-checkpoint:` (optional scalar key; default 300000 when absent), print `CONTEXT-CHECKPOINT -- safe point: /clear, then flow! <feature-id> (resumes at the next lane)` (plus ` checkpoint` after the feature-id when the marker is set and the variable is not `on`), refresh the resume pointer (Step 5) with `Next: /clear, then flow! <feature-id>` (plus ` checkpoint` when the marker is set and the variable is not `on`), and stop. A missing `context.json` (or a null value) -> skip the check and rotate, never a block; the first such skip in a session prints one line `context checkpoint inactive: run /said:setup statusline` (once, best effort: a compaction may repeat it; the notice is never a stop and never a `goal:` line). Under `/goal` the threshold stop above is `goal: stop -- CONTEXT-CHECKPOINT`, announce once, then hold on every re-fire; it is an operator action, not an operator question.
 
 ## Invocation
 
 - `/said:flow <feature-id>` — do the next thing.
 - `/said:flow <feature-id> plan` — author the lane DAG (Step 2), then stop.
 - `/said:flow <feature-id> status` — report Step 1 only, take no action.
+- Trailing token `checkpoint` (exact spelling, after the feature-id, never read from task text): see the Context checkpoint rule (rule 5); ignored in `status` mode.
 
 Preconditions. Any failure BLOCKS with a named redirect:
 

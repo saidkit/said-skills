@@ -51,7 +51,7 @@ surfaces; the web numbers match the terminal board exactly because it imports th
 ## Step 0 — Resolve conventions (declaration-first)
 
 Identical to `/said:status` Step 0: resolve docs/working roots, issued id-prefixes, and lanes
-**declaration-first from `CLAUDE.md`** (lanes from its `SAID.lanes:` registry where one is declared; glob fallback only where none is), and state what resolved. These become
+**declaration-first from `CLAUDE.md`** (lanes from its `SAID.lanes:` registry via the status skill's `--registry`, count echoed, where one is declared; glob fallback only where none is), and state what resolved. These become
 `serve.py` flags, forwarded verbatim to `analyze()`.
 
 ## Step 1 — Launch (or stop) the server

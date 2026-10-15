@@ -1236,8 +1236,12 @@ def run_registry(a):
     except Exception:
         pass
     try:
-        rows, _ = read_lane_registry(a.root)
-        out = ["%s:root=%s" % (token, lane_root) for token, lane_root in rows] + ["count: %d" % len(rows)]
+        if a.resolve:
+            rows, skipped = resolve_lane_rows(a.root)
+            out = rows + skipped + ["count: %d" % len(rows)]
+        else:
+            rows, _ = read_lane_registry(a.root)
+            out = ["%s:root=%s" % (token, lane_root) for token, lane_root in rows] + ["count: %d" % len(rows)]
     except RegistryRefused as e:
         print("refused: %s" % e)
         return 2
@@ -1246,6 +1250,69 @@ def run_registry(a):
         return 2
     print("\n".join(out))
     return 0
+
+
+LANE_DIR_RE = re.compile(r"[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*")
+
+
+def _block_key(block, key):
+    """The value of `SAID.<key>:` on the lane block's own key list (the column of its first key
+    line; a key-shaped annotation under another key is not read), cut at the first blank; None
+    when the block does not declare the key."""
+    keyed = [ln for ln in block if re.match(r"^\s*[-*]?\s*SAID\.[\w-]+:", ln)]
+    col = key_column(keyed[0]) if keyed else 0
+    for ln in keyed:
+        m = re.match(r"^\s*[-*]?\s*SAID\.%s:[ \t]*(\S*)" % re.escape(key), ln)
+        if m and key_column(ln) == col:
+            return m.group(1)
+    return None
+
+
+def _lane_dir(value, key):
+    """The directory a lane path key names, up to its `<id>` segment (the file's own dir when the
+    value names no `<id>`). Raises ValueError naming the key when the value is absent or is not a
+    plain relative path inside the lane: absolute, a `..` segment, or a character outside
+    letters, digits and `._/-` (so a `;` or `=` never reaches the --lane row)."""
+    if not value:
+        raise ValueError("SAID.%s: is not declared in the lane block" % key)
+    if value.startswith(("/", "~")):
+        raise ValueError("SAID.%s: is not a plain relative path inside the lane" % key)
+    cut = value.find("<id>")
+    d = value[:cut] if cut >= 0 else (os.path.dirname(value) if key == "task-log" else value)
+    d = d.rstrip("/") or "."
+    if d != "." and (not LANE_DIR_RE.fullmatch(d) or ".." in d.split("/")):
+        raise ValueError("SAID.%s: is not a plain relative path inside the lane" % key)
+    return d
+
+
+def resolve_lane_rows(root):
+    """`--registry --resolve`: for each registry row, the full --lane argument
+    `TOKEN:root=<root>;docs=<dir>;working=<dir>`, the two dirs read from the lane's OWN `## Lane`
+    block (SAID.task-log, SAID.working). Returns (rows, skipped); a row whose root holds no
+    CLAUDE.md or no lane block, or whose key is absent or unsafe, is skipped with one line.
+    Raises RegistryRefused as read_lane_registry does. A directory the registry does not name
+    is never read."""
+    rows, skipped = [], []
+    for token, lane_root in read_lane_registry(root)[0]:
+        why = None
+        try:
+            with open(os.path.join(root, lane_root, "CLAUDE.md"), encoding="utf-8-sig", errors="replace") as fh:
+                block = lane_block_lines(fh.read())
+        except (OSError, ValueError):
+            block, why = None, "no CLAUDE.md at the lane root"
+        if why is None and block is None:
+            why = "no ## Lane block outside a code fence in its CLAUDE.md"
+        if why is None:
+            try:
+                docs = _lane_dir(_block_key(block, "task-log"), "task-log")
+                work = _lane_dir(_block_key(block, "working"), "working")
+            except ValueError as e:
+                why = str(e)
+        if why:
+            skipped.append("skipped: %s root=%s -- %s" % (token, lane_root, why))
+        else:
+            rows.append("%s:root=%s;docs=%s;working=%s" % (token, lane_root, docs, work))
+    return rows, skipped
 
 
 def _lane_key(root, key):
@@ -1334,6 +1401,10 @@ def main():
     ap.add_argument("--registry", action="store_true",
                     help="print the lane registry declared in <root>/CLAUDE.md: one TOKEN:root=<root> line per "
                          "row (the form --lane takes), then `count: <N>`; a refused line prints `refused: ...` and exits 2")
+    ap.add_argument("--resolve", action="store_true",
+                    help="with --registry: print each row as the full --lane argument, TOKEN:root=<root>;docs=<dir>;"
+                         "working=<dir>, the dirs read from that lane's own lane block; a row that cannot be "
+                         "resolved prints one `skipped: ...` line; `count: <N>` counts the resolved rows")
     ap.add_argument("--reviewer-gate", action="store_true",
                     help="L2: validate the declared reviewer set for a working dir (exit-coded gate)")
     ap.add_argument("--workdir", help="reviewer-gate: feature working dir holding verdict artifacts")
@@ -1344,6 +1415,8 @@ def main():
     ap.add_argument("--recipe-rules", help="reviewer-gate: a docs/ux rules file to also scan for recipe-form Checkers")
     a = ap.parse_args()
 
+    if a.resolve and not a.registry:
+        ap.error("--resolve is a form of --registry")
     if a.registry:  # the lane registry's rows, for any caller that needs a lane's root
         sys.exit(run_registry(a))
     if a.reviewer_gate:  # L2 exit-coded enforcement gate

@@ -429,7 +429,7 @@ def check_block_invariants(block, schema, text=None, skip=(), ignore=()):
     off = {n for n, _ in off_column_keys(block)}
     plain = {n for n, _ in unfenced(lines)}
     key_idx = [n for n, ln in enumerate(lines) if keyline_re.match(ln) and n in plain and n not in off]
-    graded = ({a["key"] for a in schema["axes"] if a.get("value")}  # their value grammar reports a note itself
+    graded = ({a["key"] for a in schema["axes"] if a.get("value") in ("path-list", "registry")}  # their value grammar reports a note itself
               | {w["key"] for w in schema.get("withdrawn_axes", []) if w.get("superseded_by")})  # so does a stale row's line
     list_keys = {a["key"] for a in schema["axes"] if a.get("kind") == "list"}
     counts = {}
@@ -529,6 +529,11 @@ def check_lane(lane_root, schema, claude_md=None):
         if ax.get("required_if") == "surface != none":
             required = (surface not in (None, "", "none"))
         problem = check_path_list(ax["key"], val) if present and ax.get("value") == "path-list" else None
+        if present and ax.get("value") == "positive-integer" and not re.fullmatch(r"[1-9][0-9]*", cut_aside(val.strip())):
+            shown = cut_aside(val.strip()).encode("unicode_escape").decode("ascii")
+            shown = shown if len(shown) <= 40 else shown[:37] + "..."
+            problem = ("unresolvable", ax.get("severity_if_invalid", "BLOCKER"),
+                       "declared %s: %s -- %s" % (ax["key"], shown, ax["remediation_if_invalid"]))
         if problem:
             findings.append({"item": ax["key"], "verdict": problem[0], "severity": problem[1], "remediation": problem[2]})
         elif present:
