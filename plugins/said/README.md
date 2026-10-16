@@ -24,6 +24,15 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 - `said:scope-audit` — the 5-section per-directory audit shape the refine agent follows inline.
 - `said:review-ux-agent` — Phase-3 per-task UX verification against your UX checklist.
 
+### Session roles (main sessions, launched with --agent)
+
+Two definitions you launch as top-level sessions, not subagents the skills spawn: one supervisor directs and verifies, one or more workers build.
+
+- `claude --agent said:supervisor` - the supervisor: briefs the worker sessions you name, accepts a worker's report only after re-running its gate or reading its changes, and keeps your reserved calls (push, merge, deploy, deletes and the like) for you.
+- `claude --agent said:worker` - a worker: builds on the supervisor's brief, forwards your typed words to it, commits only by brief, and holds a reserved call for you instead of acting on it.
+
+Each definition pins a model (the supervisor `fable`, the worker `opus`); `--model` on the launch line overrides the pinned model.
+
 ## Quick start
 
 1. Install the plugin (see the [marketplace README](../../README.md)).
