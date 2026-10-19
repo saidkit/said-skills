@@ -93,7 +93,7 @@ Default finding row: `<file>:<line> | <proposed action> | <proposed destination>
 
 ## Phase B — Execute backports
 
-For each approved finding, in order: stale -> leak -> bloat -> lessons -> handoff.
+For each approved finding, in order: stale -> leak -> bloat -> lessons -> rulings -> handoff.
 
 **One finding, one confirmation.** After each edit: report `<file>:<line>` + 1-sentence summary; await operator nod before next.
 
@@ -103,17 +103,23 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> handof
 
 - **Bloat.** Cut paraphrased bullets; trim § Context to load to template's ~6–10 entries; collapse implementation narrative into one-liners or pointer to commits.
 
-- **Lessons.** Append `## Lessons (<feature-id>)` section to `<feature-id>.tasks.md` immediately **before** the `## Debrief close` footer (or at file end if no footer yet). One bullet per lesson, shape: `**<one-line statement>**. Why: <reason / past incident>. Source: <task ID>.` Terse; ≤ ~10 entries per feature. If no lessons captured — skip section entirely (no empty header).
+- **Lessons.** Append `## Lessons (<feature-id>)` section to `<feature-id>.tasks.md` immediately **before** the `## Debrief close` footer (or at file end if no footer yet). One bullet per lesson, shape: `**<one-line statement>**. Why: <reason / past incident>. Source: <task ID>.` Terse; ≤ ~10 entries per feature. If no lessons captured — skip section entirely (no empty header). When a lesson's Source task cites a §A.5 ruling id (in its task entry), end the bullet with `Ruling: <id>` (several: `Ruling: <id>, <id>`).
+
+- **Rulings.** Work the approved §A.5 rows one at a time; the operator's typed mark line is the row's confirmation. `<list>` is the rulings list the row came from (Step 0's path; a `sibling <feature-id>` row uses that sibling's list, derived as in Step 0 item 5; on a resumed run derive the path again) and `<id>` is the bare ruling id. The status a row asks for is `landed`, unless the operator writes `rejected` or `superseded <new-id>` in the row's home-class cell at the Phase A review. After each row, report `<list>:<n>` and the status in one line; the typed mark line is the only wait.
+  1. Re-read first: `python3 ${CLAUDE_SKILL_DIR}/rulings-read.py status <list> <id>`. It already shows the status the row asks for -> set the row `applied @ <list>:<n>` (`<n>` = the `line <n>` it prints) and take the next row; no mark line is printed, so a resumed run never marks twice. The first re-read exits 1 or prints `warn:` or `error:` -> set the row `deferred` and queue it for `## Pending proposals` with the mark line step 2 would print as its suggested prompt; no mark line is printed for it.
+  2. Otherwise print the exact line for the operator to type and wait: `ruled!! mark <id> landed <home>`, where `<home>` is the concrete path the ruling lands in (the task's log entry for a task-log home; the file under `SAID.docs-root:` or the lane `CLAUDE.md` for a lane home; several as `<home>, <home>`); or `ruled!! mark <id> rejected` / `ruled!! mark <id> superseded <new-id>` when the row asks for that status. Debrief never marks the list itself and never invokes another plugin's skill.
+  3. After the operator types it, run the same `status` command: the printed status equals the one the mark line sets -> set the row `applied @ <list>:<n>`. Any other result (another status, exit 1 for an id not in the list, a `warn:` or `error:` line), or the operator declining to type it -> set it `deferred` and queue it for `## Pending proposals` with its mark line as the suggested prompt.
+  An **owed** row is not marked: it becomes a `## Pending proposals` entry in the ruling shape (Phase C step 2) and the row goes `deferred`.
 
 - **Handoff (if applicable).** Write `docs/working/<next-feature>/idea.md` with §A purpose / §B target shape / §C constraints / §D open questions, per Phase 1 scope-shape convention. Skip if operator marked successor=N/A.
 
-- **Mid-Phase-B findings.** When a candidate surfaces during Phase B work that was not in the §A inventory, append it to the correct section of `debrief.md` (§A.1 / §A.2a/b/c / §A.3 / §A.4), surface the new row inline to operator with the same y/skip/revise prompt, then resume Phase B per the answer. Single-pass discipline holds — the Phase A inventory grows inline as findings appear.
+- **Mid-Phase-B findings.** When a candidate surfaces during Phase B work that was not in the §A inventory, append it to the correct section of `debrief.md` (§A.1 / §A.2a/b/c / §A.3 / §A.4 / §A.5; a new §A.5 row enters `proposed`), surface the new row inline to operator with the same y/skip/revise prompt, then resume Phase B per the answer. Single-pass discipline holds — the Phase A inventory grows inline as findings appear.
 
 ## Phase C — Close
 
 1. Re-verify quality gates green. Resolve and run the project's quality-gate command at runtime the same way `/said:review-qa` Step 0 resolves it. Halt if it goes red.
 
-2. **Pending proposals.** For every §A.2c row, plus every Phase-A row the operator marked `defer` (operator chose to author later), append a `## Pending proposals (<feature-id>)` section to `debrief.md` (working file — tasks file stays clean). Each entry carries:
+2. **Pending proposals.** For every §A.2c row, every §A.5 row carried as owed or deferred (Phase B, Rulings), plus every Phase-A row the operator marked `defer` (operator chose to author later), append a `## Pending proposals (<feature-id>)` section to `debrief.md` (working file — tasks file stays clean). Each entry carries:
 
    - Destination path + draft heading (when supplied) or destination path + topic (when not).
    - One-line rule statement.
@@ -126,6 +132,14 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> handof
    - **`<destination path>` § <draft heading or topic>** — <one-line rule statement>.
      Evidence: <task IDs>.
      Suggested prompt: `Author <destination path> § <draft heading>. Rule: <one-line statement>. Evidence: <task IDs>. Earn-its-place: <rationale>.`
+   ```
+
+   A ruling entry (an owed or deferred §A.5 row) uses this shape instead:
+
+   ```
+   - **`<id>` (ruling)** -- <ruling text>. Owed to <owner>, proposed home <home> (or: deferred, the re-read showed <result>).
+     Evidence: <task IDs, or none>.
+     Suggested prompt: `<the row's mark line>`.
    ```
 
    If no candidates qualify, mark Pending proposals N/A in the close footer (next step).
