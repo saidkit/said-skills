@@ -5,6 +5,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 ## [Unreleased]
 
 - **Changed:** a doc-surface lane whose `SAID.mounts:` is the bare `none` ships nothing, so its editorial reviewer is recorded as N/A at the gate instead of failing for a missing verdict: `said_status.py --reviewer-gate` prints the reviewer as `N/A -- SAID.mounts: none, nothing shipped` and passes. `review-ux` runs nothing for such a lane, at task or feature scope (no checklist load, no reviewer, no verdict file), names that gate line as where the N/A is recorded, and reports the outcome `N/A-NOTHING-SHIPPED` with its next step: close the task. A doc lane with a real mount still fails when its verdict is missing.
+- **Fixed:** the reviewer gate reads, among a reviewer's `review-<checker>-*.md` verdict files, the one whose `target-sha` is HEAD (the newest by modification time if several), else the newest by modification time; never the last by file name. An older verdict whose name sorts later no longer shadows the current one. Every check after the pick is unchanged, so a newest verdict at an older sha still fails on the sha.
 
 ## [0.21.0] — 2026-10-15
 

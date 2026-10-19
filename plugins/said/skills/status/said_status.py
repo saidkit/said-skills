@@ -844,6 +844,18 @@ def _gate_recompute_rows(out):
     return " | ".join(rows)[:600]
 
 
+def _pick_verdict(hits, head_sha):
+    """The verdict file to judge: the one whose target-sha is HEAD (the newest if several), else the newest
+    by modification time; never the last by file name. Equal times fall back to name order."""
+    def mtime(path):
+        try:
+            return os.path.getmtime(path)
+        except OSError:
+            return 0.0
+    at_head = [p for p in hits if head_sha and parse_verdict_header(p).get("target-sha") == head_sha]
+    return max(at_head or hits, key=lambda p: (mtime(p), p))
+
+
 def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
     """Validate one expected reviewer's L1 verdict. Returns (ok, reason)."""
     if meta is None:  # declared reviewer id resolves to no Checker — nominal; a verdict can never redeem it
@@ -851,7 +863,7 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
     hits = sorted(glob.glob(os.path.join(workdir, "review-%s-*.md" % glob.escape(cid))))
     if not hits:
         return False, "missing verdict artifact (review-%s-*.md)" % cid
-    hdr = parse_verdict_header(hits[-1])
+    hdr = parse_verdict_header(_pick_verdict(hits, head_sha))
     if hdr.get("verdict", "").upper() != "PASS":
         return False, "verdict != PASS (%s)" % (hdr.get("verdict") or "absent")
     cap = hdr.get("capture-evidence-ref")
