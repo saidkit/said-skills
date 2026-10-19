@@ -78,9 +78,10 @@ Output: `docs/working/<feature-id>/debrief.md` with 6 sections. Then STOP.
 4. **§A.4 lessons candidates.** Read every Done task entry; harvest `### Gotchas` + `### Deviations`. Each surprise or hard-won insight is a lesson candidate. Format as draft `**<one-line statement>**. Why: <reason>. Source: <task ID>.` For tasks files > 100 KB, stream-read: § Summary Table -> identify Done IDs -> per-task grep `### Gotchas` + `### Deviations` line ranges; avoid full-file load.
 
 5. **§A.5 rulings.** The reader shows each line as `pending`, `landed`, `rejected` or `superseded`. One row per `pending` line in the rulings lists Step 0 read (the other three need no row): `<id> | <ruling text as the reader shows it> | <evidence paths, or `none`> | <proposed home class> | status: proposed`. Propose the first home class that fits, in this order:
-   - **task-log home** -- if a Done task of this feature cites the ruling id or applied it, its log entry is the home;
-   - **lane home** -- else, if the ruling is or should be written under `SAID.docs-root:` or in the lane `CLAUDE.md`;
-   - **owed** -- else (another lane, another project, or code and config the operator lands); name the owner.
+   - **task-log home** -- if a Done task of this feature cites the ruling id in its entry, that entry is the home; a task that only touches the ruling's topic does not count;
+   - **lane home** -- else, if the ruling is or should be written under `SAID.docs-root:` or in the lane `CLAUDE.md`; the cell names that file, `lane home -- <path>` (several: `lane home -- <path>, <path>`), or reads `lane home -- path?` when debrief cannot name it, for the operator to fill at the Phase A review;
+   - **owed** -- else (another lane, another project, or code and config the operator lands); name the owner: `owed -- <owner>`, or `owed -- <owner>, home <path>` when the home it should land in is known.
+   The rulings list itself is never a home.
    A malformed line the reader reports gets a row too (`malformed line <n>`; the operator fixes the list). No list -> the section holds the reader's `warn:` line and nothing else. This section runs on every debrief, a TINY one included.
 
 6. **§A.6 successor.** Ask operator: "Successor feature queued?" If yes, name it. If no, mark N/A.
@@ -107,9 +108,9 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> ruling
 
 - **Rulings.** Work the approved §A.5 rows one at a time; the operator's typed mark line is the row's confirmation. `<list>` is the rulings list the row came from (Step 0's path; a `sibling <feature-id>` row uses that sibling's list, derived as in Step 0 item 5; on a resumed run derive the path again) and `<id>` is the bare ruling id. The status a row asks for is `landed`, unless the operator writes `rejected` or `superseded <new-id>` in the row's home-class cell at the Phase A review. After each row, report `<list>:<n>` and the status in one line; the typed mark line is the only wait.
   1. Re-read first: `python3 ${CLAUDE_SKILL_DIR}/rulings-read.py status <list> <id>`. It already shows the status the row asks for -> set the row `applied @ <list>:<n>` (`<n>` = the `line <n>` it prints) and take the next row; no mark line is printed, so a resumed run never marks twice. The first re-read exits 1 or prints `warn:` or `error:` -> set the row `deferred` and queue it for `## Pending proposals` with the mark line step 2 would print as its suggested prompt; no mark line is printed for it.
-  2. Otherwise print the exact line for the operator to type and wait: `ruled!! mark <id> landed <home>`, where `<home>` is the concrete path the ruling lands in (the task's log entry for a task-log home; the file under `SAID.docs-root:` or the lane `CLAUDE.md` for a lane home; several as `<home>, <home>`); or `ruled!! mark <id> rejected` / `ruled!! mark <id> superseded <new-id>` when the row asks for that status. Debrief never marks the list itself and never invokes another plugin's skill.
-  3. After the operator types it, run the same `status` command: the printed status equals the one the mark line sets -> set the row `applied @ <list>:<n>`. Any other result (another status, exit 1 for an id not in the list, a `warn:` or `error:` line), or the operator declining to type it -> set it `deferred` and queue it for `## Pending proposals` with its mark line as the suggested prompt.
-  An **owed** row is not marked: it becomes a `## Pending proposals` entry in the ruling shape (Phase C step 2) and the row goes `deferred`.
+  2. Otherwise print the exact line for the operator to type and wait: `ruled!! mark <id> landed <home>`, where `<home>` is the concrete path the ruling lands in (`<task-log path>#<task-id>` for a task-log home, where `<task-log path>` is the tasks log Step 0 resolved and the task id comes from the citing entry's heading; the path in the row's home-class cell for a lane home; several as `<home>, <home>`); or `ruled!! mark <id> rejected` / `ruled!! mark <id> superseded <new-id>` when the row asks for that status. Debrief never marks the list itself and never invokes another plugin's skill. A lane-home row asking `landed` whose cell still reads `path?` gets no mark line: set it `deferred` (no home path) and queue it for `## Pending proposals`.
+  3. After the operator types it, run the same `status` command: the printed status equals the one the mark line sets -> set the row `applied @ <list>:<n>`. Any other result (another status, exit 1 for an id not in the list, a `warn:` or `error:` line), or the operator declining to type it (a declined line is not re-read) -> set it `deferred` and queue it for `## Pending proposals` with its mark line as the suggested prompt.
+  An **owed** row is not marked: it becomes a `## Pending proposals` entry in the owed form (Phase C step 2) and the row goes `deferred`. A cell the operator rewrote to `rejected` or `superseded <new-id>` is no longer owed: that row is worked through steps 1-3.
 
 - **Handoff (if applicable).** Write `docs/working/<next-feature>/idea.md` with §A purpose / §B target shape / §C constraints / §D open questions, per Phase 1 scope-shape convention. Skip if operator marked successor=N/A.
 
@@ -134,19 +135,23 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> ruling
      Suggested prompt: `Author <destination path> § <draft heading>. Rule: <one-line statement>. Evidence: <task IDs>. Earn-its-place: <rationale>.`
    ```
 
-   A ruling entry (an owed or deferred §A.5 row) uses this shape instead:
+   A ruling entry uses one of two forms instead: the owed form for a row whose home class is owed, the deferred form for any other deferred row. Both take `Evidence:` from the row's evidence cell.
 
    ```
-   - **`<id>` (ruling)** -- <ruling text>. Owed to <owner>, proposed home <home> (or: deferred, the re-read showed <result>).
-     Evidence: <task IDs, or none>.
-     Suggested prompt: `<the row's mark line>`.
+   - **`<id>` (ruling, owed)** -- <ruling text>. Owed to <owner>, proposed home <home> (the `home <path>` in its cell, or: none named).
+     Evidence: <the row's evidence cell: paths, or `none`>.
+     Suggested prompt, once <owner> has landed it: `ruled!! mark <id> landed <home>` (none named: `<home>` reads `<path>` for the operator to fill).
+
+   - **`<id>` (ruling, deferred)** -- <ruling text>. Deferred: <the re-read result, or: the operator declined, or: no home path>.
+     Evidence: <the row's evidence cell: paths, or `none`>.
+     Suggested prompt: `<the mark line step 2 printed or would print>` (no home path: `<home>` reads `<path>` for the operator to fill).
    ```
 
    If no candidates qualify, mark Pending proposals N/A in the close footer (next step).
 
 3. Append `## Debrief close` footer to `<feature-id>.tasks.md` (after `## Lessons (<feature-id>)` if present). First confirm no `debrief.md` row is still `approved` and not `applied` (resolve each to `applied`, `skip` or `deferred`), and no §A.5 rulings row is still `proposed` or `revise` (the operator reviews it first; debrief never resolves a ruling row on its own); a footer never lands over an unfinished resume or an unreviewed ruling. Owed and deferred rulings ride in `## Pending proposals`; a skipped ruling is not carried. All of them stay `pending` in the list, and a later debrief of this feature (a reopen increment) lists them again in §A.5, because it reads the list afresh.
 
-   Count the `Rulings:` line from the §A.5 rows, each row once (a dropped sibling row and a `malformed line` row are not counted): `applied` with landed -> landed; `applied` with rejected or superseded -> marked; `deferred` with home class owed -> owed; any other `deferred` -> deferred; `skip` -> skipped. The five numbers sum to the counted rows:
+   Count the `Rulings:` line from the §A.5 rows, each row once (a dropped sibling row and a `malformed line` row are not counted): `applied` with landed -> landed; `applied` with rejected or superseded -> marked; `deferred` with home class owed -> owed (the row's home-class cell's first word is `owed`); any other `deferred` -> deferred; `skip` -> skipped. The five numbers sum to the counted rows:
 
    ```
    ## Debrief close (YYYY-MM-DD)
