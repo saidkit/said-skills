@@ -144,7 +144,9 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> ruling
 
    If no candidates qualify, mark Pending proposals N/A in the close footer (next step).
 
-3. Append `## Debrief close` footer to `<feature-id>.tasks.md` (after `## Lessons (<feature-id>)` if present). First confirm no `debrief.md` row is still `approved` and not `applied` -- resolve each to `applied`, `skip` or `deferred`; a footer never lands over an unfinished resume:
+3. Append `## Debrief close` footer to `<feature-id>.tasks.md` (after `## Lessons (<feature-id>)` if present). First confirm no `debrief.md` row is still `approved` and not `applied` (resolve each to `applied`, `skip` or `deferred`), and no §A.5 rulings row is still `proposed` or `revise` (the operator reviews it first; debrief never resolves a ruling row on its own); a footer never lands over an unfinished resume or an unreviewed ruling. Owed and deferred rulings ride in `## Pending proposals`; a skipped ruling is not carried. All of them stay `pending` in the list, and a later debrief of this feature (a reopen increment) lists them again in §A.5, because it reads the list afresh.
+
+   Count the `Rulings:` line from the §A.5 rows, each row once (a dropped sibling row and a `malformed line` row are not counted): `applied` with landed -> landed; `applied` with rejected or superseded -> marked; `deferred` with home class owed -> owed; any other `deferred` -> deferred; `skip` -> skipped. The five numbers sum to the counted rows:
 
    ```
    ## Debrief close (YYYY-MM-DD)
@@ -153,6 +155,7 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> ruling
    - Compactions: K (spec A -> B lines)
    - Lessons: in this file § Lessons (or N/A)
    - Pending proposals: in debrief.md § Pending proposals (or N/A)
+   - Rulings: <a> landed, <b> marked rejected or superseded, <c> owed, <d> deferred, <e> skipped, from §A.5 (or N/A - no rulings list)
    - Successor: `docs/working/<next-feature>/idea.md` (or N/A — reason)
    - Gate-skip: N/A (or: Phase-3.5 gates skipped per operator YYYY-MM-DD — <reason>, per Step-0 item 7)
    - Scope: full (or: tiny, 0 gotchas, 0 leak hits, per Step-0 item 3), Resumed: no (or: from row N)
@@ -192,4 +195,7 @@ Before exiting Phase C:
 - [ ] `## Lessons (<feature-id>)` section present in `<feature>.tasks.md` (or operator-approved absence).
 - [ ] No new artifact category beyond `## Lessons` + `## Debrief close` (both in tasks file) + `## Pending proposals` (in `debrief.md`, when non-N/A) + optional `pr.md` / `report-slack.md` (shipping only).
 - [ ] Phase C lists pending proposals in `debrief.md` (or operator-confirmed N/A).
+- [ ] §A.5 rulings section present (or the reader's `warn:` line).
+- [ ] No §A.5 rulings row left `proposed` or `revise`.
+- [ ] The footer's `Rulings:` numbers sum to the counted §A.5 rows.
 - [ ] `Refs:` pointers in backport edits point to durable hosts (spec / ADR / UX-spec / source-code), never `docs/working/`.
