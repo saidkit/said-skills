@@ -28,10 +28,10 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 
 Two definitions you launch as top-level sessions, not subagents the skills spawn: one supervisor directs and verifies, one or more workers build.
 
-- `claude --agent said:supervisor` - the supervisor: briefs the worker sessions you name, accepts a worker's report only after re-running its gate or reading its changes, and keeps your reserved calls (push, merge, deploy, deletes and the like) for you.
-- `claude --agent said:worker` - a worker: builds on the supervisor's brief, forwards your typed words to it, commits only by brief, and holds a reserved call for you instead of acting on it.
+- `claude --name <session> --agent said:supervisor` - the supervisor: briefs the worker sessions you name, accepts a worker's report only after re-running its gate or reading its changes, and keeps your reserved calls for you: your project's own reserved list where it has one, otherwise the default list (push, merge, deploy, deletes and the like).
+- `claude --name <session> --agent said:worker` - a worker: builds on the supervisor's brief, forwards your typed words to it, commits only by brief, and holds a reserved call for you instead of acting on it.
 
-Each definition pins a model (the supervisor `fable`, the worker `opus`); `--model` on the launch line overrides the pinned model.
+Each definition pins a model (the supervisor `fable`, the worker `opus`); `--model` on the launch line overrides the pinned model. `--name` sets the session's name, the one you give the supervisor when you name its workers.
 
 ## Quick start
 

@@ -23,9 +23,11 @@ The user invokes one of:
 
 ## The doc arm — `doc-editorial`
 
-1. **Inputs.** The task id (or feature id); the task's shipped artifacts under the paths of `SAID.mounts:` (`none`: nothing ships, so record the reviewer as N/A, spawn nothing; no verdict file is expected, and the reviewer gate prints it as N/A), or, at feature scope, ALL the feature's shipped artifacts together; the lane's `<docs-root>/qa/feature-qa-checklist.md` **loaded whole** — echo its `SC-HEADER` `token, N checks` (missing/malformed -> HALT); its editorial context (the preamble) and its semantic rows are the reviewer's contract.
-2. **Spawn** (skipped when `SAID.mounts:` is `none`: step 1 recorded N/A) the plugin's `said:doc-editorial-reviewer` with those inputs — never `review-ux-agent`. Per task it hunts the artifacts for what the mechanical gate cannot see (attack order in the agent); at feature scope it reads every artifact against every other — cross-artifact contradiction, source currency across tasks.
-3. **The verdict artifact.** (Skipped when `SAID.mounts:` is `none`: no file is expected.) The reviewer writes `docs/working/<feature-id>/review-doc-editorial-<task-id>.md` (per task) or `review-doc-editorial-<feature-id>.md` (feature scope) with the five-key header its agent file names. Confirm the file exists before the shared Step 3 (Present the report); a missing file is a FAIL of this gate, never a silent pass.
+**Nothing shipped (`SAID.mounts: none`).** When the lane's `SAID.mounts:` is the bare `none`, at task scope and at feature scope alike, nothing ships, so items 1-4 of this arm do not run: no checklist load, no spawn, no verdict file, no inline read. The skill writes no file; the reviewer gate records the N/A on its own line, `doc-editorial: N/A -- SAID.mounts: none, nothing shipped`. Go to the shared Step 3 (Present the report) and print its N/A outcome.
+
+1. **Inputs.** The task id (or feature id); the task's shipped artifacts under the paths of `SAID.mounts:`, or, at feature scope, ALL the feature's shipped artifacts together; the lane's `<docs-root>/qa/feature-qa-checklist.md` **loaded whole** - echo its `SC-HEADER` `token, N checks` (missing/malformed -> HALT); its editorial context (the preamble) and its semantic rows are the reviewer's contract.
+2. **Spawn** the plugin's `said:doc-editorial-reviewer` with those inputs - never `review-ux-agent`. Per task it hunts the artifacts for what the mechanical gate cannot see (attack order in the agent); at feature scope it reads every artifact against every other - cross-artifact contradiction, source currency across tasks.
+3. **The verdict artifact.** The reviewer writes `docs/working/<feature-id>/review-doc-editorial-<task-id>.md` (per task) or `review-doc-editorial-<feature-id>.md` (feature scope) with the five-key header its agent file names. Confirm the file exists before the shared Step 3 (Present the report); a missing file is a FAIL of this gate, never a silent pass.
 4. **Spawn depth unavailable** (this skill running inside a depth-1 subagent, e.g. `said!` under `/goal`): do NOT fail on "cannot spawn". Perform the editorial read **inline** in this turn against the same inputs and attack order, write the same verdict artifact, and add a `method: inline — agent path unavailable (recorded skip)` line under its header. Reviewer ≠ builder degrades and is recorded — the precedent every arm follows.
 5. **Writes no Eval artifact.** The Deliver-time Eval belongs to the orchestrator (`said:said`).
 
@@ -131,6 +133,8 @@ Output the agent's structured report verbatim, followed by:
   - all PASS -> "Task is ready to close. Update status in `docs/features/{FEATURE}.tasks.md` and add a `### Fix` line."
   - any FAIL on a hard rule -> "Fix the FAIL list, then re-run /said:review-ux <task-id>."
   - SOFT-FLAGs only -> "Soft flags do not block close. Decide whether to address now or defer."
+
+**Nothing shipped.** When the lane's `SAID.mounts:` is `none` (the doc arm's head clause), there is no agent report and no FAIL list: print the verdict `N/A-NOTHING-SHIPPED` in place of the three above. The next step at task scope: "Nothing shipped, nothing to review: the task is ready to close; update status in `docs/features/{FEATURE}.tasks.md` and add a `### Fix` line." At feature scope: "Nothing shipped: the review-ux gate passes as N/A." The reviewer gate records `doc-editorial: N/A -- SAID.mounts: none, nothing shipped`.
 
 ## Step 4: Do NOT auto-fix
 

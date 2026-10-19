@@ -4,7 +4,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
-- **Changed:** a doc-surface lane whose `SAID.mounts:` is the bare `none` ships nothing, so its editorial reviewer is recorded as N/A at the gate instead of failing for a missing verdict: `said_status.py --reviewer-gate` prints the reviewer as `N/A -- SAID.mounts: none, nothing shipped` and passes, and `review-ux` spawns no reviewer for it. A doc lane with a real mount still fails when its verdict is missing.
+- **Changed:** a doc-surface lane whose `SAID.mounts:` is the bare `none` ships nothing, so its editorial reviewer is recorded as N/A at the gate instead of failing for a missing verdict: `said_status.py --reviewer-gate` prints the reviewer as `N/A -- SAID.mounts: none, nothing shipped` and passes. `review-ux` runs nothing for such a lane, at task or feature scope (no checklist load, no reviewer, no verdict file), names that gate line as where the N/A is recorded, and reports the outcome `N/A-NOTHING-SHIPPED` with its next step: close the task. A doc lane with a real mount still fails when its verdict is missing.
 
 ## [0.21.0] — 2026-10-15
 
