@@ -482,6 +482,12 @@ def check_block_invariants(block, schema, text=None, skip=(), ignore=()):
     return out
 
 
+def below_floor(digits, floor):
+    """digits already matched [1-9][0-9]*: compare by length, then digit by digit (no int(), so no size limit)."""
+    f = str(floor)
+    return len(digits) < len(f) or (len(digits) == len(f) and digits < f)
+
+
 def check_lane(lane_root, schema, claude_md=None):
     """Evaluate the lane at lane_root against schema. Return a list of findings:
     dicts {item, verdict, severity, remediation}. verdict in ok/stale/missing/unresolvable."""
@@ -534,6 +540,11 @@ def check_lane(lane_root, schema, claude_md=None):
             shown = shown if len(shown) <= 40 else shown[:37] + "..."
             problem = ("unresolvable", ax.get("severity_if_invalid", "BLOCKER"),
                        "declared %s: %s -- %s" % (ax["key"], shown, ax["remediation_if_invalid"]))
+        elif present and ax.get("value") == "positive-integer" and isinstance(ax.get("floor"), int) \
+                and below_floor(cut_aside(val.strip()), ax["floor"]):
+            problem = ("unresolvable", ax.get("severity_if_below", "ADVISORY"),
+                       "declared %s: %s is below the floor %d -- %s"
+                       % (ax["key"], cut_aside(val.strip()), ax["floor"], ax["remediation_if_below"]))
         if problem:
             findings.append({"item": ax["key"], "verdict": problem[0], "severity": problem[1], "remediation": problem[2]})
         elif present:
