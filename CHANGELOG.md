@@ -2,6 +2,11 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [Unreleased]
+
+- **Changed:** `debrief` no longer waits for you to type a `landed` mark. In the rulings step the session running the debrief opens every home a ruling lands in and checks that it holds the ruling, applies the `ruled!! mark <id> landed <home>` line itself with the installed rulings tool, and records `mark applied by <session role>` on the row; the re-read before and after is unchanged. A `rejected` or `superseded <new-id>` mark is still printed for you to type. Without a rulings tool the row goes deferred to `## Pending proposals`, as before. Debrief still never writes a rulings list or invokes another plugin's skill.
+- **Changed:** in a supervised run (a `said:worker` session under a `said:supervisor` session) the supervisor's brief answers the debrief's Phase A rows and gives the Phase B go-ahead, and you review the `## Debrief close` footer; a row that needs a product or scope call still holds for you. An unsupervised run is unchanged.
+
 ## [0.22.0] — 2026-10-19
 
 Debrief now places a feature's rulings, two session-role definitions ship for running a supervisor session over worker sessions, and the reviewer gate reads the right verdict and passes a lane that ships nothing.

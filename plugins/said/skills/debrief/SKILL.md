@@ -16,7 +16,7 @@ description: >
 
 This skill drives a closed feature through a feature-level retrospective: reconciles spec + tasks against shipped reality, migrates forward-looking rules into durable ADR/UX-spec hosts, compacts the spec back to template shape, captures distilled lessons, and (if shipping) emits PR + Slack summary artifacts. Phase 3 is the input boundary (every task `Status: Done`, quality gates green, manual UX/QA pass complete); operator commit is the output boundary.
 
-The skill itself is the orchestrator — there is NO separate agent. You — the main agent — drive three sequential phases within ONE invocation. **Operator pauses at every phase boundary are mandatory; no auto-progression.** Phase A produces findings + STOPS. Phase B is per-finding with mandatory operator confirmation. Phase C closes only when footer + lessons + handoff (or N/A each) are all settled.
+The skill itself is the orchestrator — there is NO separate agent. You — the main agent — drive three sequential phases within ONE invocation. **Operator pauses at every phase boundary are mandatory; no auto-progression.** The pause is answered by the operator, or in a supervised run the supervisor (Phase A STOP). Phase A produces findings + STOPS. Phase B is per-finding with mandatory confirmation. Phase C closes only when footer + lessons + handoff (or N/A each) are all settled.
 
 **Single-pass goal.** Multiple debrief runs on the same feature = failure mode. The whole point of operator-driven Phase A review is to catch surprises before backports start. If mid-Phase-B you discover Phase A missed a category — STOP, return to Phase A, expand findings.
 
@@ -90,13 +90,13 @@ Output: `docs/working/<feature-id>/debrief.md` with 6 sections. Then STOP.
 
 Default finding row: `<file>:<line> | <proposed action> | <proposed destination> | <reason> | status: proposed`. **Per-row status** is the resume state: Phase A writes `proposed`; the operator sets `approved | skip | revise`; Phase B sets `applied @ <file>:<line>` or `deferred`. A resumed run (Step 0 item 2a) continues from the first `approved` row not `applied`. §A.2 carries per-tier extended shapes — see §A.2a/b/c above.
 
-**STOP.** Tell operator: "Phase A complete — N findings in `docs/working/<feature-id>/debrief.md`. Review (mark approved / skip / revise) before I begin Phase B."
+**STOP.** Tell operator: "Phase A complete — N findings in `docs/working/<feature-id>/debrief.md`. Review (mark approved / skip / revise) before I begin Phase B." In a supervised run (this session runs as the plugin's worker role, launched with `--agent said:worker` or named a worker by its brief, under a supervisor session that briefed it), report the STOP to the supervisor instead: the supervisor's brief gives the row answers (approved / skip / revise) and the go-ahead for Phase B; rows its brief does not answer stay `proposed` and the STOP holds; the operator reviews the `## Debrief close` footer. A row whose answer is a product or scope call stays an operator question even then: hold it with `OPERATOR-QUESTION-HELD` until the operator answers (a product or scope call decides what the feature does or covers, not where a finding is filed). In an unsupervised run the operator reviews the rows.
 
 ## Phase B — Execute backports
 
 For each approved finding, in order: stale -> leak -> bloat -> lessons -> rulings -> handoff.
 
-**One finding, one confirmation.** After each edit: report `<file>:<line>` + 1-sentence summary; await operator nod before next.
+**One finding, one confirmation.** After each edit: report `<file>:<line>` + 1-sentence summary; await operator nod before next (in a supervised run the supervisor's brief is the nod). The rulings step is the exception: a `landed` row needs no nod: its Phase A approval is the confirmation and the step-3 re-read verifies the mark; its only waits are the typed `rejected` and `superseded` lines.
 
 - **Stale-state.** Flip `[ ]` -> `[x]` (or `[N/A — <reason>]`). Sync § Feature Tasks summary table rows from `<feature>.tasks.md` `Status:` lines. Fix narrative tense (future -> past) on shipped-feature descriptions.
 
@@ -106,10 +106,14 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> ruling
 
 - **Lessons.** Append `## Lessons (<feature-id>)` section to `<feature-id>.tasks.md` immediately **before** the `## Debrief close` footer (or at file end if no footer yet). One bullet per lesson, shape: `**<one-line statement>**. Why: <reason / past incident>. Source: <task ID>.` Terse; ≤ ~10 entries per feature. If no lessons captured — skip section entirely (no empty header). When a lesson's Source task cites a §A.5 ruling id (in its task entry), end the bullet with `Ruling: <id>` (several: `Ruling: <id>, <id>`).
 
-- **Rulings.** Work the approved §A.5 rows one at a time; the operator's typed mark line is the row's confirmation. `<list>` is the rulings list the row came from (Step 0's path; a `sibling <feature-id>` row uses that sibling's list, derived as in Step 0 item 5; on a resumed run derive the path again) and `<id>` is the bare ruling id. The status a row asks for is `landed`, unless the operator writes `rejected` or `superseded <new-id>` in the row's home-class cell at the Phase A review. After each row, report `<list>:<n>` and the status in one line; the typed mark line is the only wait.
-  1. Re-read first: `python3 ${CLAUDE_SKILL_DIR}/rulings-read.py status <list> <id>`. It already shows the status the row asks for -> set the row `applied @ <list>:<n>` (`<n>` = the `line <n>` it prints) and take the next row; no mark line is printed, so a resumed run never marks twice. The first re-read exits 1 or prints `warn:` or `error:` -> set the row `deferred` and queue it for `## Pending proposals` with the mark line step 2 would print as its suggested prompt; no mark line is printed for it.
-  2. Otherwise print the exact line for the operator to type and wait: `ruled!! mark <id> landed <home>`, where `<home>` is the concrete path the ruling lands in (`<task-log path>#<task-id>` for a task-log home, where `<task-log path>` is the tasks log Step 0 resolved and the task id comes from the citing entry's heading; the path in the row's home-class cell for a lane home; several as `<home>, <home>`); or `ruled!! mark <id> rejected` / `ruled!! mark <id> superseded <new-id>` when the row asks for that status. Debrief never marks the list itself and never invokes another plugin's skill. A lane-home row asking `landed` whose cell still reads `path?` gets no mark line: set it `deferred` (no home path) and queue it for `## Pending proposals`.
-  3. After the operator types it, run the same `status` command: the printed status equals the one the mark line sets -> set the row `applied @ <list>:<n>`. Any other result (another status, exit 1 for an id not in the list, a `warn:` or `error:` line), or the operator declining to type it (a declined line is not re-read) -> set it `deferred` and queue it for `## Pending proposals` with its mark line as the suggested prompt.
+- **Rulings.** Work the approved §A.5 rows one at a time. `<list>` is the rulings list the row came from (Step 0's path; a `sibling <feature-id>` row uses that sibling's list, derived as in Step 0 item 5; on a resumed run derive the path again) and `<id>` is the bare ruling id. The status a row asks for is `landed`, unless the operator writes `rejected` or `superseded <new-id>` in the row's home-class cell at the Phase A review. After each row, report `<list>:<n>` and the status in one line.
+  1. Re-read first: `python3 ${CLAUDE_SKILL_DIR}/rulings-read.py status <list> <id>`. It already shows the status the row asks for -> set the row `applied @ <list>:<n>` (`<n>` = the `line <n>` it prints) and take the next row; no mark line is applied or printed, so a resumed run never marks twice. The first re-read exits 1 or prints `warn:` or `error:` -> set the row `deferred` and queue it for `## Pending proposals` with the mark line step 2 would build as its suggested prompt; no mark line is applied or printed for it.
+  2. Otherwise build the row's mark line: `ruled!! mark <id> landed <home>`, where `<home>` is the concrete path the ruling lands in (`<task-log path>#<task-id>` for a task-log home, where `<task-log path>` is the tasks log Step 0 resolved and the task id comes from the citing entry's heading; the path in the row's home-class cell for a lane home; several as `<home>, <home>`); or `ruled!! mark <id> rejected` / `ruled!! mark <id> superseded <new-id>` when the row asks for that status. Then, by the line:
+     - **`landed`.** Open every `<home>` on disk first and check it holds the ruling (a task-log home's entry cites the ruling id; a lane home's file holds the rule the ruling states); a home that does not open or does not hold it -> set the row `deferred` and queue it for `## Pending proposals`. Then the session running the debrief applies the line itself, as its own action with the installed rulings tool (the `ruled` skill's `mark` form, the line as built), and the row records `mark applied by <session role>` after its status (the role this session runs as: worker, supervisor, or operator session). No rulings tool installed -> the line is not applied: set the row `deferred` and queue it for `## Pending proposals` with the line as its suggested prompt.
+     - **`rejected` or `superseded <new-id>`.** The line changes what the ruling means: print it for the operator to type (in a supervised run too) and wait; these two are the only waits.
+     - **`path?`.** A lane-home row asking `landed` whose cell still reads `path?` gets no mark line: set it `deferred` (no home path) and queue it for `## Pending proposals`.
+     Debrief never marks the list itself and never invokes another plugin's skill: applying the mark is the session's own action, not a step this skill composes.
+  3. After the mark (applied by the session, or typed by the operator), run the same `status` command: the printed status equals the one the mark line sets -> set the row `applied @ <list>:<n>`. Any other result (another status, exit 1 for an id not in the list, a `warn:` or `error:` line), or the operator declining to type it (a declined line is not re-read), or the session's apply fails (the tool refuses or errors) -> set it `deferred` and queue it for `## Pending proposals` with its mark line as the suggested prompt.
   An **owed** row is not marked: it becomes a `## Pending proposals` entry in the owed form (Phase C step 2) and the row goes `deferred`. A cell the operator rewrote to `rejected` or `superseded <new-id>` is no longer owed: that row is worked through steps 1-3.
 
 - **Handoff (if applicable).** Write `docs/working/<next-feature>/idea.md` with §A purpose / §B target shape / §C constraints / §D open questions, per Phase 1 scope-shape convention. Skip if operator marked successor=N/A.
@@ -142,9 +146,9 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> ruling
      Evidence: <the row's evidence cell: paths, or `none`>.
      Suggested prompt, once <owner> has landed it: `ruled!! mark <id> landed <home>` (none named: `<home>` reads `<path>` for the operator to fill).
 
-   - **`<id>` (ruling, deferred)** -- <ruling text>. Deferred: <the re-read result, or: the operator declined, or: no home path>.
+   - **`<id>` (ruling, deferred)** -- <ruling text>. Deferred: <the re-read result, or: the operator declined, or: no home path, or: a home did not open, or: no rulings tool installed, or: a home did not hold the ruling, or: the session's apply failed>.
      Evidence: <the row's evidence cell: paths, or `none`>.
-     Suggested prompt: `<the mark line step 2 printed or would print>` (no home path: `<home>` reads `<path>` for the operator to fill).
+     Suggested prompt: `<the mark line step 2 built>` (no home path: `<home>` reads `<path>` for the operator to fill).
    ```
 
    If no candidates qualify, mark Pending proposals N/A in the close footer (next step).
@@ -175,7 +179,7 @@ For each approved finding, in order: stale -> leak -> bloat -> lessons -> ruling
 ## Anti-patterns
 
 - **Don't run on features with open tasks.** BLOCK + redirect to `/said:impl`.
-- **Don't autonomous-backport.** Phase A -> operator review -> Phase B is mandatory. No exceptions.
+- **Don't autonomous-backport.** Phase A -> review (the operator's, or in a supervised run the supervisor's) -> Phase B is mandatory. No exceptions.
 - **Don't create a new task ID for Debrief close.** It's a footer section, not a task. A **reopen increment** (tasks closed after the last footer) appends a dated footer naming the increment; a **re-run with nothing closed since** is blocked at Step 0 (single-pass goal). Never a footer per task.
 - **Don't cite `docs/working/<feature>/` paths in `Refs:` on backport edits.** Working folder is operator workspace per `template-tasks.md` discipline; durable refs point to spec / ADR / UX-spec / source-code.
 - **Don't promote a pattern to ADR from single-feature evidence** unless the pattern carries independent strong-spec justification. Default: ≥2-feature appearance per the earn-its-place-ADR.
@@ -194,7 +198,8 @@ Before exiting Phase C:
 
 - [ ] All 3 phases distinct in the conversation transcript.
 - [ ] Phase A produced `docs/working/<feature-id>/debrief.md` with 6 sections + STOPPED.
-- [ ] Phase B is incremental — per-finding confirmation visible in transcript.
+- [ ] Phase B is incremental — per-finding confirmation visible in transcript (in a supervised run, the supervisor's brief; a `landed` rulings row by its re-read).
+- [ ] Every applied `landed` rulings row records `mark applied by <session role>`.
 - [ ] Phase C closes only when footer + lessons + handoff (or N/A each) are all settled.
 - [ ] Quality gates green at Phase C.
 - [ ] `## Lessons (<feature-id>)` section present in `<feature>.tasks.md` (or operator-approved absence).
