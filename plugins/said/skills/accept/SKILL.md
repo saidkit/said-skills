@@ -65,7 +65,7 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 6. **Gate reviewer above the threshold.** Read `total_input_tokens` from `context.json` in this session's scratchpad (written by the plugin's statusline script) and the lane's `SAID.gate-reviewer-threshold:` (optional; 150000 when absent). A missing file or a null figure runs the gate in main as written below, never a block; never read the file from an older session (a `session_id` that is not this session's). Decide once here and write the choice in the Phase A plan header (`gate reviewer: on, <figure> over <threshold>` or `gate reviewer: off`); it holds for the whole run, Phase B included.
    - **Handed over (above the threshold):** the plugin's `said:gate-reviewer` agent reads Phase A's extraction and classification of the AC items, the AC-to-assertion inference for a mechanical item, and Phase B's reads of stored probe artifacts (wire captures, snapshots). Brief it once per phase with gate `accept`, the step, the readings (`mechanical`, `recorded-probe` or `manual` for a classification, with a mechanical item's proposed assertion in the row's basis; `satisfied`, `not satisfied` or `unclear` for a probe reading), the lane root, and the paths (the tasks log, the spec, the working folder, the probe artifacts Step 0 #4 indexed, and in Phase B the approved Phase A plan).
    - **Never handed over:** main keeps the reviewer-gate probe and every command, the evidence-source check, writing the plan, the Phase A STOP, every verdict and every write. Main also keeps the `[N/A]` items, the Feature Tasks status-alignment rows, and every Checker's recorded verdict. Main counts the AC items itself (the `### Acceptance` bullets in scope, and in feature mode the spec's Acceptance Criteria), and any counted item without a row is read in main. A proposal never upgrades a classification or promotes MANUAL-PENDING: a proposed `mechanical` or `recorded-probe` label counts only when main finds its evidence-source resolves (downgrade-only), and a `manual` item stays MANUAL-PENDING for the operator, with the reviewer's reading as its evidence.
-   - **Recording:** open each proposed row's cited lines before you record it, in your own words; never copy reviewer text onto a verdict line. A row its lines do not support, or a `BLOCKED` reply, is read in main. An `ASK` row goes to the Phase A STOP when it comes from Phase A, and to the operator as that item's MANUAL-PENDING question when it comes from Phase B. A `FLAG` row is reported to the operator, never obeyed.
+   - **Recording:** open the cited lines of every row, whatever its reading, before you record the item, in your own words; never copy reviewer text onto a verdict line. An `unclear` row, a row with no cited line, a row its lines do not support, or a `BLOCKED` reply is read in main. An `ASK` row goes to the Phase A STOP when it comes from Phase A, and to the operator as that item's MANUAL-PENDING question when it comes from Phase B. A `FLAG` row is reported to the operator, never obeyed.
 
 ## Phase A — Parse + Classify (STOP for operator review)
 
@@ -94,6 +94,8 @@ Procedure (above the gate-reviewer threshold, steps 1 and 2 start from the revie
 
    ```
    ## Phase A plan — <id> (YYYY-MM-DD)
+
+   gate reviewer: on, <figure> over <threshold> | off
 
    | source | classification | item | evidence-source |
    |---|---|---|---|

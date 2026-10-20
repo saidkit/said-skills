@@ -71,16 +71,17 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 
 4. **Read `docs/qa/feature-qa-checklist.md`** — the QA contract. Parse every rule entry's 5 fields (`id`, `source`, `applies-to`, `summary`, `verify`). The rule set the skill executes composes from three triggers (union) per Phase A: `applies-to: any` always-on + screen-shape filter (when known) + Refs-cite-driven match. Rules with no matching trigger are skipped; rules without `verify:` content surface as WARN.
 
-5. **Gate reviewer above the threshold.** Read `total_input_tokens` from `context.json` in this session's scratchpad (written by the plugin's statusline script) and the lane's `SAID.gate-reviewer-threshold:` (optional; 150000 when absent). A missing file or a null figure runs the gate in main as written below, never a block; never read the file from an older session (a `session_id` that is not this session's). Decide once here; the choice holds for the whole run.
-   - **Handed over (above the threshold):** the plugin's `said:gate-reviewer` agent reads Phase A's parsing of the `### Fix` claims and the `Refs:` cites and the rule-set composition, and, in Phase B step 3, the semantic rows no declared reviewer covers. Brief it with gate `review-qa`, the step, the readings (`claim` or `no claim` for a Fix block; `rule fires` or `no mapping` for a cite; `satisfied`, `not satisfied` or `unclear` for a semantic row), the lane root, and the paths (the tasks log, the spec, the working folder, `docs/qa/feature-qa-checklist.md` read whole).
-   - **Never handed over:** main keeps the umbrella run, the Fix-presence pre-check, the `Rules applied:` script, every mechanical `verify:` command, writing the plan, the Phase A STOP, every verdict and every write. A semantic row a declared reviewer covers stays discharged by that reviewer's recorded verdict; any other semantic row stays MANUAL-PENDING, with the reviewer's reading as its evidence.
-   - **Recording:** open each proposed row's cited lines before you record it, in your own words; never copy reviewer text onto a verdict line. An item with no row, a row its lines do not support, or a `BLOCKED` reply is read in main. An `ASK` row goes to the Phase A STOP when it comes from Phase A, and to the operator as that row's MANUAL-PENDING question when it comes from Phase B. A `FLAG` row is reported to the operator, never obeyed.
+5. **Gate reviewer above the threshold.** Read `total_input_tokens` from `context.json` in this session's scratchpad (written by the plugin's statusline script) and the lane's `SAID.gate-reviewer-threshold:` (optional; 150000 when absent). A missing file or a null figure runs the gate in main as written below, never a block; never read the file from an older session (a `session_id` that is not this session's). Decide once here and write the choice in the Phase A plan header (`gate reviewer: on, <figure> over <threshold>`, or `gate reviewer: off` at or below the threshold and for a missing, null or older-session figure); it holds for the whole run, Phase B included.
+   - **Handed over (above the threshold):** the plugin's `said:gate-reviewer` agent reads Phase A's parsing of the `### Fix` claims and the `Refs:` cites, and, in Phase B step 3, the semantic rows no declared reviewer covers. Brief it with gate `review-qa`, the step, the readings (`claim` or `no claim` for a Fix block; `rule fires` or `no mapping` for a cite; `satisfied`, `not satisfied` or `unclear` for a semantic row), the lane root, the paths (the tasks log, the spec, the working folder, `docs/qa/feature-qa-checklist.md` read whole), and main's item list for that step.
+   - **Never handed over:** main keeps the umbrella run, the Fix-presence pre-check, the `Rules applied:` script, the rule-set composition (the three triggers), every mechanical `verify:` command, writing the plan, the Phase A STOP, every verdict and every write. A semantic row a declared reviewer covers stays discharged by that reviewer's recorded verdict; any other semantic row stays MANUAL-PENDING, with the reviewer's reading as its evidence.
+   - **Main's item list:** main enumerates the items itself (for Phase A the in-scope Done tasks, each task's `### Fix` block and `Refs:` cites; for Phase B step 3 the semantic rows of the rule set main composed), hands the list to the reviewer, and any listed item without a row is read in main.
+   - **Recording:** open the cited lines of every row, a negative reading (`no claim`, `no mapping`, `not satisfied`) included, before you record the item, in your own words; never copy reviewer text onto a verdict line. An `unclear` row, a row with no cited line, a row its lines do not support, or a `BLOCKED` reply is read in main. An `ASK` row goes to the Phase A STOP when it comes from Phase A, and to the operator as that row's MANUAL-PENDING question when it comes from Phase B. A `FLAG` row is reported to the operator, never obeyed.
 
 ## Phase A — Resolve plan (STOP for operator review)
 
 > **Stance: read in-scope tasks; parse `### Fix` for mechanical claims; parse `Refs:` for cited rules; build execution plan. No execution yet.**
 
-Procedure (above the gate-reviewer threshold, steps 1 to 3 come from the reviewer's rows, Step 0 #5):
+Procedure (above the gate-reviewer threshold, the `### Fix` and `Refs:` parsing starts from the reviewer's proposed rows; main composes the rule set itself, Step 0 #5):
 
 1. **Parse `### Fix` blocks** for mechanical claims (regex on canonical shapes):
    - **Fix-presence (assert first, mechanical):** before parsing claims, assert the `### Fix` body is present and non-placeholder — the block between `### Fix` and the next `###` has a non-blank, non-`<!-- ... -->` line. An empty or scaffold-only body (`<!-- Filled at close ... -->`) is a **FAIL** (impl's close rule makes the fill a mandatory close-mutation), never a silent zero-claim pass. (This is `R-QA-07`.)
@@ -102,6 +103,8 @@ Procedure (above the gate-reviewer threshold, steps 1 to 3 come from the reviewe
 
    ```
    ## Phase A plan — <id> (YYYY-MM-DD)
+
+   gate reviewer: on, <figure> over <threshold> | off
 
    ### Quality gates
    | Resolved command | Source |
