@@ -23,6 +23,7 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 - `said:scope-refine-agent` — Phase-1 parallel codebase audit + wire/visual probes.
 - `said:scope-audit` — the 5-section per-directory audit shape the refine agent follows inline.
 - `said:review-ux-agent` — Phase-3 per-task UX verification against your UX checklist.
+- `said:gate-reviewer` - reads one step of `review-qa`, `accept` or `debrief` above `SAID.gate-reviewer-threshold` and proposes rows with file:line evidence; the gate decides and writes.
 
 ### Session roles (main sessions, launched with --agent)
 
