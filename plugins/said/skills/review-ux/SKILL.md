@@ -2,7 +2,7 @@
 name: review-ux
 description: >
   SAID/Phase 3 (Implement) per-task verification gate for <PROJECT> feature work.
-  Resolves the lane's `SAID.reviewers:` and runs the surface's agent-form Checker on a just-completed task: the `web-ux` Checker (the Playwright-driven `said:review-ux-agent` against the surface's UX checklist) or the `doc-editorial` Checker (the plugin's editorial reviewer against the lane's QA checklist), returning a structured pass/fail report. Triggered ONLY by the explicit command "/said:review-ux <task-id>" — or "/said:review-ux <feature-id>" for a feature-scope read on a lane whose Checker supports it — never auto-selected.
+  Resolves the lane's `SAID.reviewers:` and runs the surface's agent-form Checker on a just-completed task: the `web-ux` Checker (the Playwright-driven `said:review-ux-agent` against the surface's UX checklist) or the `doc-editorial` Checker (the plugin's editorial reviewer against the lane's QA checklist), returning a structured pass/fail report. Triggered ONLY by the explicit command "/said:review-ux <task-id>" — or "/said:review-ux <feature-id>" for a feature-scope read on a lane whose Checker supports it, or "/said:review-ux <feature-id> fast-track F<NN>" at a fast-track run's close — never auto-selected.
 ---
 
 # Feature Review UX — Phase 3 (Implement) per-task Verification Gate
@@ -18,6 +18,7 @@ The user invokes one of:
 - `/said:review-ux <task-id>` — run QA on the named task.
 - `/said:review-ux` — run QA on the most recently touched task; resolve from the latest entry in `SAID.task-log:` (`## Lane` block; no key -> HALT).
 - `/said:review-ux <feature-id>` — the **feature-scope** read, on a lane whose Checker supports it (today: the doc arm). Argument precedence is `accept`'s: an id matching the lane's `SAID.id-shape:` task form is a task id; else an id that resolves an existing `<feature-id>.tasks.md` is a feature id; anything else -> BLOCK.
+- `/said:review-ux <feature-id> fast-track F<NN>` -- the **run scope**, at a fast-track run's close (see **Run scope (fast-track)**). A trailing `fast-track F<NN>` selects the run scope: strip it, then the remaining id must resolve as a feature id by the precedence above; a task id before it BLOCKs.
 
 **Which arm.** Read `SAID.reviewers:` WHOLE. `web-ux` -> the web arm (Steps 1, 1.5, 2). `doc-editorial` -> the **doc arm** below (Steps 1, 1.5 and 2 do not apply: no entity, no screen shape, no feature-url, no JWT, no dev-server gates, no UX-checklist sha). Steps 3–4 apply to both.
 
@@ -30,6 +31,16 @@ The user invokes one of:
 3. **The verdict artifact.** The reviewer writes `docs/working/<feature-id>/review-doc-editorial-<task-id>.md` (per task) or `review-doc-editorial-<feature-id>.md` (feature scope) with the five-key header its agent file names. Confirm the file exists before the shared Step 3 (Present the report); a missing file is a FAIL of this gate, never a silent pass.
 4. **Spawn depth unavailable** (this skill running inside a depth-1 subagent, e.g. `said!` under `/goal`): do NOT fail on "cannot spawn". Perform the editorial read **inline** in this turn against the same inputs and attack order, write the same verdict artifact, and add a `method: inline — agent path unavailable (recorded skip)` line under its header. Reviewer ≠ builder degrades and is recorded — the precedent every arm follows.
 5. **Writes no Eval artifact.** The Deliver-time Eval belongs to the orchestrator (`said:said`).
+
+## Run scope (fast-track)
+
+A fast-track run is a `## Fast-track F<NN>` block in the tasks log whose `closed:` line is empty; `/said:add-task` opens it and owns its grammar. Its listed set is the ids on its `tasks:` line plus every task carrying `**Fast-track:** F<NN>`. The run scope is the per-task review its listed tasks deferred, run once at the close.
+
+1. **Preconditions.** BLOCK when the log has no open `## Fast-track F<NN>` block (absent, or its `closed:` filled), and when a listed task is not `Status: Done` (redirect to `/said:impl`).
+2. **Which Checkers.** An agent-form Checker is `web-ux` or `doc-editorial`, the two arms this skill runs; an oracle Checker (such as `cli-gate`) is recomputed by the reviewer gate and never run here. Resolve `SAID.reviewers:` and the arm exactly as at task scope. When the lane declares no agent-form Checker, the run scope runs nothing and writes no verdict: print `review-ux: no agent-form Checker declared, nothing to run at the close` and stop. At run scope with `SAID.mounts: none` the doc arm takes its N/A path (no file); `add-task`'s close does not require that Checker's report.
+3. **Web arm: once per screen shape the listed tasks touch.** Gather Step 1's inputs per shape across the listed tasks (one entity and feature-url per shape, the task ids that touch it), pre-stage once (Step 1.5), and spawn the agent once per shape (Step 2).
+4. **Doc arm: once per run.** Run the doc arm's items 1-4 with the listed tasks' shipped artifacts together, read against each other as feature scope reads them, and pass the reviewer the output path `docs/working/<feature-id>/review-doc-editorial-<feature-id>-F<NN>.md`, which replaces item 3's file name.
+5. **The verdict.** One verdict per Checker, `docs/working/<feature-id>/review-<checker-id>-<feature-id>-F<NN>.md`. The doc reviewer writes its own (item 4). For the web arm main writes `review-web-ux-<feature-id>-F<NN>.md` itself, after every shape's report is in: first the reports verbatim to `capture-web-ux-<feature-id>-F<NN>.md` in the same folder, then the verdict with a five-key header, each key on its own line between `---` lines: `checker-id: web-ux`, `target-sha: <HEAD at the run>`, `capture-evidence-ref: capture-web-ux-<feature-id>-F<NN>.md`, `verdict: PASS|FAIL`, `timestamp: <UTC ISO>`, then a body summarizing each shape. Map each shape's report: READY-TO-CLOSE -> `verdict: PASS`, BLOCKED-ON-FIXES -> `verdict: FAIL`; NEEDS-OPERATOR-ANSWER writes no verdict and holds the run's close as an operator question; after the operator answers, re-run the run scope. `verdict:` reads PASS only when every shape passes. A missing file is a FAIL of this gate. The verdict is the run's, never a task's or the feature's; while it is the newest at HEAD, the reviewer gate reads it for that Checker, as intended.
 
 ## Step 1: Gather inputs
 
@@ -133,8 +144,9 @@ Output the agent's structured report verbatim, followed by:
   - all PASS -> "Task is ready to close. Update status in `docs/features/{FEATURE}.tasks.md` and add a `### Fix` line."
   - any FAIL on a hard rule -> "Fix the FAIL list, then re-run /said:review-ux <task-id>."
   - SOFT-FLAGs only -> "Soft flags do not block close. Decide whether to address now or defer."
+- At run scope: all PASS -> "Continue the run's close: `/said:accept <feature-id> fast-track F<NN>`." SOFT-FLAGs only at run scope -> the verdict is PASS and the flags are listed in its body; continue the close the same way. Any FAIL -> "The run stays open: add a fix task under it (`/said:add-task`), build it, then re-run the run's close."
 
-**Nothing shipped.** When the lane's `SAID.mounts:` is `none` (the doc arm's head clause), there is no agent report and no FAIL list: print the verdict `N/A-NOTHING-SHIPPED` in place of the three above. The next step at task scope: "Nothing shipped, nothing to review: the task is ready to close; update status in `docs/features/{FEATURE}.tasks.md` and add a `### Fix` line." At feature scope: "Nothing shipped: the review-ux gate passes as N/A." The reviewer gate records `doc-editorial: N/A -- SAID.mounts: none, nothing shipped`.
+**Nothing shipped.** When the lane's `SAID.mounts:` is `none` (the doc arm's head clause), there is no agent report and no FAIL list: print the verdict `N/A-NOTHING-SHIPPED` in place of the three above. The next step at task scope: "Nothing shipped, nothing to review: the task is ready to close; update status in `docs/features/{FEATURE}.tasks.md` and add a `### Fix` line." At feature scope: "Nothing shipped: the review-ux gate passes as N/A." The reviewer gate records `doc-editorial: N/A -- SAID.mounts: none, nothing shipped`. At run scope: "Nothing shipped: no review-ux report is owed for the run; continue the run's close with `/said:accept <feature-id> fast-track F<NN>`."
 
 ## Step 4: Do NOT auto-fix
 

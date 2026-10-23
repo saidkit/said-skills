@@ -9,7 +9,8 @@ description: >
   `/said:review-qa` covers implementation hygiene (quality gates, `### Fix`
   integrity, Refs conformance) — this skill covers behavioral contract only.
   Triggered ONLY by the explicit command "/said:accept
-  <task-id|feature-id> [--feature-only]". NOT for spec authoring (that's
+  <task-id|feature-id> [--feature-only]", or its run form "/said:accept
+  <feature-id> fast-track F<NN>". NOT for spec authoring (that's
   `/said:architect`, Phase 2). NOT for implementation (that's
   `/said:impl`, Phase 3). NOT for hygiene (that's `/said:review-qa`,
   sibling).
@@ -30,12 +31,22 @@ The operator invokes:
 - `/said:accept <task-id>` — **task-mode**: verifies just that task's `### Acceptance` items + that task's row in spec § Feature Tasks table-status alignment.
 - `/said:accept <feature-id>` — **feature-mode (default)**: verifies spec § Acceptance Criteria + every Done task's `### Acceptance` + spec § Feature Tasks table-status sweep.
 - `/said:accept <feature-id> --feature-only` — feature-mode without task sweep: spec § Acceptance Criteria only.
+- `/said:accept <feature-id> fast-track F<NN>` -- **run-mode**: at a fast-track run's close, the listed ids' `### Acceptance` items and their Feature Tasks rows only (see **Run-mode**).
 
 BLOCK + redirect if:
 
 - Targeted task is `Status: Todo` / `Status: In progress` -> redirect to `/said:impl`.
 - Operator intent is hygiene verification (quality gates / `### Fix` integrity / `Refs:` conformance) -> wrong skill, redirect to `/said:review-qa`.
 - Operator intent is to author a new spec -> redirect to `/said:architect`.
+
+## Run-mode
+
+A fast-track run is a `## Fast-track F<NN>` block in the tasks log whose `closed:` line is empty; `/said:add-task` opens it and owns its grammar. Its listed set is the ids on its `tasks:` line plus every task carrying `**Fast-track:** F<NN>`.
+
+- **Scope:** verify the listed ids' `### Acceptance` items and their Feature Tasks rows only, as task-mode does for each id; the spec's Acceptance Criteria section stays with the feature's Deliver run (feature-mode). BLOCK when the log has no open `## Fast-track F<NN>` block (absent, or its `closed:` filled).
+- **Everything else is task-mode's per id, run once over the set:** the probe index (a run's `review-<checker-id>-<feature-id>-F<NN>.md` verdict replaces a per-task verdict for a listed task and must read `verdict: PASS`), the reviewer-gate probe (Step 0 #5, once), Phase A classification with one plan and one STOP over all listed ids, Phase B execution, the gate-reviewer handover above the threshold. For the Feature Tasks alignment item, run-mode reads the spec's Feature Tasks table rows of the listed ids.
+- **Report:** In run-mode `<id>` is `<feature-id>-F<NN>` everywhere this skill writes it (the Phase A plan, the verbose redirect, the Phase C report): `docs/working/<feature-id>/accept-<feature-id>-F<NN>.md`. It is the run's gate report, never the feature's verdict.
+- **Verdict:** the Phase C rules. MANUAL-PENDING keeps the run open: it is not a PASS, and the run's close holds as an operator question until the operator resolves the manual items and this form re-runs.
 
 ## Common compositions
 
@@ -53,13 +64,15 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 
 1. **Resolve mode + inputs:**
    - **Paths:** resolve `SAID.task-log:` + `SAID.feature-spec:` + `SAID.working:` from the `## Lane` block; no block/key -> HALT (operator declares it), never glob-guess.
+   - A trailing `fast-track F<NN>` selects run-mode: strip it, then the remaining single arg must resolve as feature-mode below does; a task-id before `fast-track F<NN>` BLOCKs (a run is accepted per feature). Check for the open `## Fast-track F<NN>` block first after Paths (**Run-mode**). `--feature-only` with `fast-track F<NN>` BLOCKs.
    - Single arg matching the project's task-id regex — from `SAID.id-shape:` on the `## Lane` block (no key -> HALT) -> task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
    - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) -> feature-mode (e.g., `<FEAT>-NN`, or a suffixed per-lane feature-id like `PROJ-01-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `PROJ-01-FE-07` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
    - `--feature-only` flag -> feature-mode without task sweep.
 2. **Status check:**
    - Task-mode: the named task must be `Status: Done (YYYY-MM-DD)`. Otherwise BLOCK + redirect to `/said:impl`.
+   - Run-mode: only the listed ids must be `Status: Done (YYYY-MM-DD)`; a listed id that is not BLOCKs with a redirect to `/said:impl`. Other tasks of the feature are out of scope.
    - Feature-mode (default): every task with `Status: Todo` / `Status: In progress` listed; if any -> BLOCK with the list; operator confirms in-scope vs out-of-scope or closes them first. (Backlog and N/A statuses pass — they're intentional non-gating per SAID convention.)
-3. **Read spec + tasks file.** Spec read in full only in feature-mode (need § Acceptance Criteria + § Feature Tasks summary table). Tasks file read by-section (`## <task-id>:` anchors -> `### Acceptance` blocks).
+3. **Read spec + tasks file.** Spec read in full only in feature-mode (run-mode reads only its Feature Tasks table rows, **Run-mode**) (need § Acceptance Criteria + § Feature Tasks summary table). Tasks file read by-section (`## <task-id>:` anchors -> `### Acceptance` blocks).
 4. **Index probe artifacts.** Glob `docs/working/<feature-id>/` for recorded probes: `*-wire-*.json`, `*.png` screenshots (Playwright snapshots for a `web` surface; wire captures for `api`/`mcp`/`cli`), and `review-<checker-id>-*.md` (an agent-form Checker's L1 verdict — an editorial verdict for a `doc` surface; never bare `review-*.md`, which would sweep in review-qa's own verdicts). Build a `<task-id> -> [artifact paths]` map for Phase A classification.
 5. **Run the reviewer-gate probe (the skill-invoked half of close enforcement).** Resolve the **effective surface** = the feature's `**Surface:**` field if set, else the lane `SAID.surface:` (Step 0 #3 read the spec). An effective surface of `none` records SKIP, never FAIL, and does not run. Otherwise `accept` **runs the reviewer gate as a recorded probe** -- unconditionally, whatever the declared reviewer set -- before it honors any verdict: `python3 ${CLAUDE_SKILL_DIR}/../status/said_status.py --reviewer-gate --root <lane-root> --surface <effective surface> --reviewers <the lane SAID.reviewers: list, read WHOLE> --workdir <the feature SAID.working: dir>` (reviewer set resolved declaration-first from the lane block) and record its exit code and per-reviewer lines in the Phase C report, verbatim: a deterministic Checker's per-harness rows ride on its reviewer line (from the recompute's own output) -- copy them, never type a row. This is a **recorded probe, not a gate**: a failing set is surfaced (the named reviewer, its reason) but **never blocks the accept** -- the auto-blocking pre-close hook stays deferred, no artifact claims the close is machine-blocked. Phase B then honors the recorded verdict; `accept` never hand-recomputes a Checker itself, and stays read-only w.r.t. code, spec, and tasks.
 6. **Gate reviewer above the threshold.** Read `total_input_tokens` from `context.json` in this session's scratchpad (written by the plugin's statusline script) and the lane's `SAID.gate-reviewer-threshold:`. An absent key uses 150000; a present threshold and current-session `total_input_tokens` are usable only as a positive non-boolean integer; a present invalid threshold means no spawn and the gate runs in main; a missing, null, older-session, string, boolean, zero or negative figure means no spawn and the gate runs in main; a valid figure above the threshold spawns, while equality or below runs in main. Runtime fallback never validates or repairs lane configuration. Never read an older session's file (a `session_id` that is not this session's). Decide once here and write the choice in the Phase A plan header (`gate reviewer: on, <figure> over <threshold>` or `gate reviewer: off`); it holds for the whole run, Phase B included.
@@ -91,9 +104,9 @@ Procedure (above the gate-reviewer threshold, steps 1 and 2 start from the revie
    - `[N/A — <reason>]` -> classify as mechanical, auto-PASS with reason recorded verbatim. No re-litigation (task closure already approved the N/A).
    - `[x]` items -> DO NOT auto-trust the check; still classify + verify the assertion. The `[x]` is a task-claim, not the verdict.
 
-4. **Spec § Feature Tasks table-status alignment** (feature-mode + task-mode for that task's row): mechanical item per row — row's Status column equals task entry's `Status:` line.
+4. **Spec § Feature Tasks table-status alignment** (feature-mode + task-mode for that task's row + run-mode for the listed ids' rows): mechanical item per row — row's Status column equals task entry's `Status:` line.
 
-5. **Emit plan** to `docs/working/<feature-id>/accept-<task-id-or-feature-id>.md`:
+5. **Emit plan** to `docs/working/<feature-id>/accept-<task-id-or-feature-id>.md` (run-mode: `accept-<feature-id>-F<NN>.md`):
 
    ```
    ## Phase A plan — <id> (YYYY-MM-DD)
@@ -168,7 +181,7 @@ Aggregate verdict rules:
 
 Gate effect for `/said:debrief`:
 
-- `/said:debrief` Step 0 preflight reads the most recent `accept-<feature-id>.md` (or per-task reports for tasks closed since the last feature-mode run).
+- `/said:debrief` Step 0 preflight reads the most recent `accept-<feature-id>.md` (or per-task reports for tasks closed since the last feature-mode run). A `-F<NN>` run report is the run's close evidence, never the feature verdict; debrief does not read it.
 - If verdict is FAIL -> halt `/said:debrief` with redirect: "Resolve `/said:accept` failures first."
 - If verdict is MANUAL-PENDING -> surface to operator at debrief preflight; operator confirms inline before debrief proceeds.
 

@@ -13,7 +13,8 @@ description: >
   Sibling skill `/said:accept` covers behavioral contract (AC items) —
   this skill covers hygiene only.
   Triggered ONLY by the explicit command "/said:review-qa
-  <task-id|feature-id>". NOT for spec authoring (`/said:architect`,
+  <task-id|feature-id>", or its run form "/said:review-qa <feature-id>
+  fast-track F<NN>". NOT for spec authoring (`/said:architect`,
   Phase 2). NOT for implementation (`/said:impl`, Phase 3). NOT for AC
   verification (`/said:accept`, sibling).
 ---
@@ -30,12 +31,22 @@ This skill verifies implementation hygiene at task or feature close: quality gat
 
 - `/said:review-qa <task-id>` — **task-mode**: quality gates + Fix integrity for that task's `### Fix` claims + Refs conformance for that task's `Refs:` line.
 - `/said:review-qa <feature-id>` — **feature-mode**: quality gates (once) + Fix integrity sweep across every Done task + Refs conformance sweep.
+- `/said:review-qa <feature-id> fast-track F<NN>` -- **run-mode**: feature-mode narrowed to the run's listed set, at a fast-track run's close (see **Run-mode**).
 
 BLOCK + redirect if:
 
 - Targeted task is `Status: Todo` / `Status: In progress` -> redirect to `/said:impl`.
 - Operator intent is AC verification -> wrong skill, redirect to `/said:accept`.
 - Operator intent is spec authoring -> redirect to `/said:architect`.
+
+## Run-mode
+
+A fast-track run is a `## Fast-track F<NN>` block in the tasks log whose `closed:` line is empty; `/said:add-task` opens it and owns its grammar (**Fast-track runs** there). Its listed set is the ids on its `tasks:` line plus every task carrying `**Fast-track:** F<NN>`.
+
+- **What runs:** run quality gates (once) + Fix integrity + Refs conformance for the listed ids only; every other step is feature-mode's, except Step 0 #1-#2 (the run form's parse and status check). BLOCK when the log has no open `## Fast-track F<NN>` block (absent, or its `closed:` filled).
+- **Fix integrity adds two run lines per listed task:** the deferral line `fast-track F<NN>: review-ux, code review, review-qa, accept deferred to its close`, written by `impl`, compared byte for byte; and the line beginning `fast-track F<NN> code review:`, which `/said:said`'s run close (or the operator driving the close) writes into the task's `### Fix` after the task's code-review group is reviewed and before this gate runs. A missing or altered line is a FAIL for that task; a task in no code-review group has no such line: FAIL (the run stays open; the run close is re-issued with the task in a group, then this gate re-runs). Plan one row per task for them, `fix-claim/<task-id>/run-lines`.
+- **Semantic rows:** discharge a row a declared reviewer covers by the run's verdict, `docs/working/<feature-id>/review-<checker-id>-<feature-id>-F<NN>.md` (`verdict: PASS`), in place of the per-task one; absent or not `verdict: PASS`, the row reads as it does for a missing per-task verdict.
+- **Report:** In run-mode `<id>` is `<feature-id>-F<NN>` everywhere this skill writes it (the Phase A plan, the `.full.md` redirect, the Phase C report): `docs/working/<feature-id>/review-qa-<feature-id>-F<NN>.md`. It is the run's gate report, never the feature's verdict; the feature's Deliver row runs feature-mode.
 
 ## Common compositions
 
@@ -52,11 +63,13 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 ## Step 0 — Preflight
 
 1. **Resolve mode + inputs:**
+   - A trailing `fast-track F<NN>` selects run-mode: strip it, then the remaining single arg must resolve as feature-mode below does; a task-id before `fast-track F<NN>` BLOCKs (a run is closed per feature). Check for the open `## Fast-track F<NN>` block before anything else (**Run-mode**).
    - **Paths:** resolve `SAID.task-log:` + `SAID.feature-spec:` + `SAID.working:` from the `## Lane` block; no block/key -> HALT (operator declares it), never glob-guess.
    - Single arg matching project's task-id regex -> task-mode. Derive feature-id from prefix; locate `## <task-id>:` anchor in `<feature>.tasks.md`.
    - Single arg matching `^[A-Z]+-\d+(-[A-Za-z0-9]+)*$` **and resolving to an existing `docs/features/<feature-id>.tasks.md`** (bare or slug-suffixed) -> feature-mode (bare or suffixed per-lane feature-id, e.g. `PROJ-01-BE`; task-mode above is matched first, so canonical task-ids are unaffected). Also resolve `docs/features/<feature-id>.md`. If the shape matches but no such feature log exists — e.g. a legacy task-id like `PROJ-01-FE-07` — it is not a feature: BLOCK + redirect to `/said:impl`, mirroring `impl` Step 0's tasks-file guard.
 2. **Status check:**
    - Task-mode: the named task must be `Status: Done (YYYY-MM-DD)`. Otherwise BLOCK + redirect to `/said:impl`.
+   - Run-mode: only the listed ids must be `Status: Done (YYYY-MM-DD)`; a listed id that is not BLOCKs with a redirect to `/said:impl`. Other tasks of the feature are out of scope.
    - Feature-mode: any task with `Status: Todo` / `Status: In progress` -> BLOCK with list; operator confirms in-scope-vs-out-of-scope or closes first. (Backlog passes — intentional non-gating per SAID convention; matches `/said:debrief` preflight.)
 3. **Resolve project quality-gate commands.** Same chain as `/said:impl` Step 0 #8 (first-match wins):
    - **Primary** — the `## Lane` `SAID.commands:` key (in `CLAUDE.md`): the umbrella target (`pre-commit`, `qa`, `check`, `all`).
@@ -73,7 +86,7 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 
 5. **Gate reviewer above the threshold.** Read `total_input_tokens` from `context.json` in this session's scratchpad (written by the plugin's statusline script) and the lane's `SAID.gate-reviewer-threshold:`. An absent key uses 150000; a present threshold and current-session `total_input_tokens` are usable only as a positive non-boolean integer; a present invalid threshold means no spawn and the gate runs in main; a missing, null, older-session, string, boolean, zero or negative figure means no spawn and the gate runs in main; a valid figure above the threshold spawns, while equality or below runs in main. Runtime fallback never validates or repairs lane configuration. Never read an older session's file (a `session_id` that is not this session's). Decide once here and write the choice in the Phase A plan header (`gate reviewer: on, <figure> over <threshold>`, or `gate reviewer: off`); it holds for the whole run, Phase B included.
    - **Handed over (above the threshold):** the plugin's `said:gate-reviewer` agent reads Phase A's parsing of the `### Fix` claims and the `Refs:` cites. For each Refs cite item, include `docs/qa/feature-qa-checklist.md` read whole as an exact named manifest entry; it is the mapping corpus for `rule fires` or `no mapping`. In Phase B hand over only the semantic rows no declared reviewer covers. Brief it with gate `review-qa`, the step, the exact closed readings (`claim` or `no claim` for a Fix claim; `rule fires` or `no mapping` for a cite; `satisfied`, `not satisfied` or `unclear` for a semantic row), the lane root, exact explicitly authorized files outside that root, exact named files or glob results, main's vetted manifest, blocked inputs, item list, and `rules: none`. A named directory does not authorize a sweep.
-   - **Never handed over:** main keeps the umbrella run, the Fix-presence pre-check, the `Rules applied:` script, the rule-set composition (the three triggers), every mechanical `verify:` command, writing the plan, the Phase A STOP, every verdict and every write. A semantic row a declared reviewer covers stays discharged by that reviewer's recorded verdict; any other semantic row stays MANUAL-PENDING, with evidence that main authors after verification.
+   - **Never handed over:** main keeps the umbrella run, the Fix-presence pre-check, the two run-line checks of run-mode, the `Rules applied:` script, the rule-set composition (the three triggers), every mechanical `verify:` command, writing the plan, the Phase A STOP, every verdict and every write. A semantic row a declared reviewer covers stays discharged by that reviewer's recorded verdict; any other semantic row stays MANUAL-PENDING, with evidence that main authors after verification.
    - **Main's item list:** main enumerates the items itself and makes every nonblank, non-comment Fix-block line one stable candidate item with the allowed readings `claim` or `no claim`; this makes claim detection the reviewer's classification rather than main's prefilter. Main also assigns one stable item per Refs cite, and Phase B assigns one per semantic row. Multiple items may share the same complete bounded source. Each item has a unique item id from the closed safe grammar `[A-Za-z0-9._/-]+` and names its exact allowed reading subset. Any listed item without a row is read in main.
    - **Bounded verification:** for a negative reading, open the complete bounded item before recording or dropping it: the complete Fix block containing the claim, the complete Refs cite item, or the complete semantic row. Opening only the cited lines is insufficient.
    - **Path authorization:** main canonically resolves every candidate, verifies regular file status, and builds a main-vetted manifest containing each canonical target and a unique citation alias from the closed safe grammar `[A-Za-z0-9._/-]+`. Include only a target under the lane root or an explicitly authorized regular file, including an authorized cross-lane `..` path. For each rejected candidate, main keeps the raw candidate and gives `blocked inputs` a unique blocked id from the same closed safe grammar plus the truthful reason; the reviewer emits only that id. The reviewer exact-matches the manifest before reading; a named directory never authorizes an unnamed sweep. Path spelling alone, including absolute or `~`, neither permits nor refuses the target.
@@ -145,7 +158,7 @@ Procedure:
    - **Quality gate sub-claim** (e.g., "tsc clean"): already covered by umbrella above; mark per-claim verdict from umbrella result.
    - **Rules applied — once per Done task in scope, regardless of whether a line parsed** (it is not a claim re-check; an absent line is exactly the case it grades): run `<skill-dir>/earned-rules.py check --claude-md <lane-root>/CLAUDE.md --task-file <tasks log> --task-id <id> --adr-date 2026-09-08`; the verdict is its first word (PASS / WARN / FAIL) with its reason as evidence.
 
-3. **Rule-set assertions.** For each rule in the composed rule set (per Phase A § 2), run its `verify:` action. (Above the gate-reviewer threshold, the reading of a semantic row no declared reviewer covers comes from the reviewer, Step 0 #5.) A **semantic** row on a lane whose declared reviewer (`SAID.reviewers:`) covers it is **discharged by that reviewer's recorded verdict for the task** (`docs/working/<feature-id>/review-<checker-id>-<task>.md`, `verdict: PASS`) — never left MANUAL-PENDING to the operator on such a lane; the row that proves the verdict exists is mechanical, the rows that read as its content are discharged together. PASS / FAIL based on assertion's exit code or expected condition. Some `verify:` actions are mechanical bash; some are semantic (read-and-assert) and require operator review on output -> MANUAL-PENDING; some carry default-SOFT-PASS semantics (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`) and fire only when conditions warrant.
+3. **Rule-set assertions.** For each rule in the composed rule set (per Phase A § 2), run its `verify:` action. (Above the gate-reviewer threshold, the reading of a semantic row no declared reviewer covers comes from the reviewer, Step 0 #5.) A **semantic** row on a lane whose declared reviewer (`SAID.reviewers:`) covers it is **discharged by that reviewer's recorded verdict for the task** (`docs/working/<feature-id>/review-<checker-id>-<task>.md`, `verdict: PASS`; in run-mode the run's verdict, **Run-mode**) — never left MANUAL-PENDING to the operator on such a lane; the row that proves the verdict exists is mechanical, the rows that read as its content are discharged together. PASS / FAIL based on assertion's exit code or expected condition. Some `verify:` actions are mechanical bash; some are semantic (read-and-assert) and require operator review on output -> MANUAL-PENDING; some carry default-SOFT-PASS semantics (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`) and fire only when conditions warrant.
 
 4. **Refs without mapping:** spec / project-doc cites with no rule match -> WARN. Operator manually verifies. Never auto-PASS.
 

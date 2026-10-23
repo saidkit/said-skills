@@ -87,7 +87,7 @@ Procedure: `Read ${CLAUDE_SKILL_DIR}/references/phase-b.md` (Contract rule 1) an
 
 ## Phase C — Verify and close
 
-> **Stance: read the task body cold. Run the parity check `per profile.parity`. Run the quality gate `per profile.gate`. Invoke `/said:review-ux` for a lane with an agent-form Checker. Run the code-review `per profile.code-review`. Run the close-of-task 5-step. Verify the close line, then flip Status. Hand off to operator for commit.**
+> **Stance: read the task body cold. Run the parity check `per profile.parity`. Run the quality gate `per profile.gate`. Invoke `/said:review-ux` for a lane with an agent-form Checker. Run the code-review `per profile.code-review`. Run the close-of-task 5-step. Verify the close line, then flip Status. Hand off to operator for commit.** A task listed in an open fast-track run defers review-ux, the code review and the hand-off to the run's close (`references/phase-c.md`, **Fast-track run**).
 
 Procedure: `Read ${CLAUDE_SKILL_DIR}/references/phase-c.md` (Contract rule 1) and follow it.
 

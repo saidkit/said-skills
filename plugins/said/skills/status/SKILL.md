@@ -92,7 +92,9 @@ Per registry feature-id, glob `<id>*` so sub-phased specs (`<id>-<slug>.md`) and
 Denominator = `Done + Todo` (Canceled + Backlog shown but excluded from the bar). If a `## Summary
 Table` exists, cross-check its rows vs the parsed counts; on mismatch emit a one-line **data-integrity** note — parsed `Status:` lines win, the table is a convenience index that can go stale.
 
-**Gate sub-ticks** (meaningful at Deliver/Closed), from working-dir artifacts: `review-qa*.md`->qa, `review-ux*.md`->ux, `accept*.md`->accept, `debrief.md`->debrief-started, `## Debrief close` footer->debrief-done. Render `✓` present, `○` pending, `–` n/a (`ux –` for a no-UI feature — absence of a UX gate is not a failure).
+**Gate sub-ticks** (meaningful at Deliver/Closed), from working-dir artifacts, a run's `-F<NN>.md` report excluded: `review-qa*.md`->qa, `review-ux*.md`->ux, `accept*.md`->accept, `debrief.md`->debrief-started, `## Debrief close` footer->debrief-done. Render `✓` present, `○` pending, `–` n/a (`ux –` for a no-UI feature — absence of a UX gate is not a failure).
+
+**Fast-track runs.** A `## Fast-track F<NN>` block in the tasks log is a run, never a task: it matches no task heading and changes no count. Its listed set is the ids on its `tasks:` line plus every task carrying `**Fast-track:** F<NN>`; it is open while its `closed:` line is empty. For each open run the deep-dive prints `fast-track open: F<NN>, <n> tasks`, and every roster, `--stale` included, prints `<feature-id> fast-track open: F<NN>, <n> tasks`: an open run is always an attention item. Only tokens shaped like a task id (`PROJ-01-03`) on the `tasks:` line count. A run's reports (names ending `-F<NN>.md`) never tick a feature-level gate, never raise the accept wait and never move the `Next` action.
 
 **Dates.** `started` = min `(YYYY-MM-DD)` across Status lines, `last task-date` = max, `git last-activity` = `git log -1 --format=%cd --date=short -- <id>*.md <id>*.tasks.md <working>/<id>/`.
 `idle` = today − max(last task-date, git last-activity), `age` = today − started.

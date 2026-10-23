@@ -12,7 +12,10 @@ description: >
   the legal lane set is the declared `SAID.lanes:` registry (LOAD-WHOLE), read at
   Step 0 — never derived from example IDs.
   Triggered ONLY by the explicit command "/said:add-task <feature-id>
-  [bug] [short] [auto] [lane=<LANE>] [priority=High|Medium|Low]". NOT for INITIAL spec
+  [bug] [short] [auto] [lane=<LANE>] [priority=High|Medium|Low]", or its
+  fast-track forms "/said:add-task <feature-id> fast-track "<task ids>""
+  (open a run) and "/said:add-task <feature-id> fast-track F<NN> closed"
+  (record a run's close). NOT for INITIAL spec
   + tasks creation — that's `/said:architect`. NOT for implementation
   — that's `/said:impl`.
 ---
@@ -38,12 +41,14 @@ The user invokes:
 - `/said:add-task <feature-id> short` — minimal-shape task. Q&A trims to Title + Problem (+ Root cause for bugs); Approach + Acceptance prefilled from the loaded rule registry; operator edits or accepts defaults. Suitable for routine bug fixes / polish.
 - `/said:add-task <feature-id> auto` — skill runs the default flow but stops ONLY when operator input or decision is required (Step 1 Q&A input). It gains NO spec-write: a Step 3 Gap/Contradicts is recorded-and-stopped (redirect to `/said:architect` propagate-new-info), never auto-written.
 - Composition `short auto bug` — typical routine-bug workflow: trimmed Q&A, usually Covered for bugs (no Gap flag), no spec-write path.
+- `/said:add-task <feature-id> fast-track "<task ids>"` -- open a fast-track run over the listed tasks; appends a `## Fast-track F<NN>` block, no task entry (see **Fast-track runs**).
+- `/said:add-task <feature-id> fast-track F<NN> closed` -- record run `F<NN>`'s close: writes its `closed:` line (see **Fast-track runs**).
 
 Flags compose: `/said:add-task <feature-id> bug lane=<LANE> priority=High` is valid. Operator may type `<feature-id>` in any case; the skill normalizes to UPPERCASE (canonical grammar requires uppercase IDs in docs / tasks files; lowercase is reserved for commit-msg scopes only). Symmetric with `/said:impl`.
 
 If `docs/features/<feature-id>.tasks.md` doesn't exist, this is the WRONG skill. Redirect: "No tasks file at `docs/features/<feature-id>.tasks.md` — this is an INITIAL Phase 2 case. Use `/said:architect` to author the spec + initial tasks log first."
 
-If the operator's request is to MODIFY an existing task (rename, fix typo, update Status) — this is the WRONG skill. Tasks are append-only per `template-tasks.md`. Redirect: "Existing task modification violates the append-only discipline. Status updates are the one exception — change only the Status: line and add `### Fix` per close-of-task review. For substantive changes, append a new task ID."
+If the operator's request is to MODIFY an existing task (rename, fix typo, update Status) -- this is the WRONG skill. Tasks are append-only per `template-tasks.md`. Redirect: "Existing task modification violates the append-only discipline. Status updates are one exception -- change only the Status: line and add `### Fix` per close-of-task review; the `closed:` line of a fast-track block is the other (the `fast-track F<NN> closed` form). For substantive changes, append a new task ID."
 
 ## Step 0 — Preflight
 
@@ -62,6 +67,7 @@ Resolve inputs and ground in existing context:
    - **Compute task prefix:** strip the dash from `<feature-id>` (e.g., `<FEAT>-NN` -> `<FEAT>NN`).
    - **Single-lane mode (no `lane=` flag):** scan for headings matching `^## <PREFIX>-(\d+):`. Take max NN; new ID = `<PREFIX>-<NN+1>` zero-padded to 2 digits. If no prior single-lane entries exist, start at `01`.
    - **Per-lane mode (`lane=<LANE>`):** scan for headings matching `^## <PREFIX>-<LANE>-(\d+):` (filtered to THIS lane only). Take max NN; new ID = `<PREFIX>-<LANE>-<NN+1>` zero-padded to 2 digits. **Per-lane counter** — each `(feature, lane)` pair has its own monotonic stream, starting at `01` independently.
+   - **A `## Fast-track F<NN>` heading never enters the task counter**: it matches no task heading regex.
    - **Legacy IDs do NOT contribute.** Any task heading not matching the canonical regex (e.g., pre-migration entries in projects that haven't run a one-time task-id migration) is excluded from the counter scan. Append-only — never fill gaps from deleted tasks.
 6. **Skim companion spec — capture coverage anchors.** Identify which section(s) govern the new task's scope (Per-piece scope / Acceptance Criteria / Implementation pointers / Boundaries — whichever the spec uses). Capture 1–2 lines per relevant section for Step 3 classification. Don't full-read.
 7. **Read `docs/features/template-tasks.md`** in full — for authoring discipline AND the id-shape stencil. **LOAD-WHOLE the `SAID.lanes:` registry** (one key line of `TOKEN=root` pairs in the multi-lane root's `## Lane` block; take its rows from `python3 ${CLAUDE_SKILL_DIR}/../status/said_status.py --registry --root <root>`, `<root>` being the directory whose `CLAUDE.md` declares the registry, never by reading the bracket line by eye) and echo its token+count before use; it is the source of the legal lane set; never parse example task IDs to derive it. If it prints `refused:`, HALT with that reason and point the operator at `/said:setup`; never fall back to reading the line or to a glob. Validate the step-4 `lane=` flag now against the declared lanes: if `<LANE>` is not declared, BLOCK per step 4. If the project declares a single lane (no `SAID.lanes:` registry), reject any `lane=` flag.
@@ -139,6 +145,7 @@ Before writing, validate the answers against template-tasks.md discipline. Rewri
   Typical task ends with 5–10 Acceptance bullets total. Bug tasks may be even leaner (Problem + Fix + Gotchas per template-tasks.md "depth varies").
 - **Refs: empty by default.** Only fill if the task creates or edits an ADR / UX-spec / feature-spec. Reading list ≠ Refs. Refs is the write-set; Reading list (+ Approach citations) is the read-set.
 - **Blocked-on question (optional field).** When the operator's answer names an operator question this task depends on (`Blocked-on question: <id>`), place `**Blocked-on question:** <id>` as a field after `**Refs:**` (a field, never a `###` section); `none` -> omit it. The id is engine-minted (a resolved §D id, else `Q-<n>`), explicit and never inferred from prose. A blocked task is held until it is lifted (`template-tasks.md`). The hold is lifted by one line in the log's `## Lifted holds` section, `- <id> lifted-by: user@WR-<seconds> -- "<verbatim quote>" -- <date> [supersedes: <prior>]`, that cites the operator's answer as a ruling recorded with the `ruled` skill in the work's `rulings.md` (example: `- Q-1 lifted-by: user@WR-1790160000 -- "use the Postgres advisory lock" -- 2026-09-23`). `user` is a fixed role word (the role of the cited answer); the person's name belongs to the ruling.
+- **Fast-track field.** When the feature has an open run (a `## Fast-track F<NN>` block with an empty `closed:`), the new task joins it: place `**Fast-track:** F<NN>` after `**Refs:**` (after `**Blocked-on question:**` when both are present), a field, never a `###` section. A feature with no open run gets no field.
 - **Status: `Todo (YYYY-MM-DD)`** with today's creation date.
 - **Fix / Deviations / Gotchas: HTML-comment placeholders.** Phase 3 close-of-task review fills them.
 
@@ -171,6 +178,7 @@ Use the canonical section order from template-tasks.md:
 **Priority:** <High|Medium|Low>
 **Refs:** <paths or empty>
 [optional] **Blocked-on question:** <id>
+[optional] **Fast-track:** F<NN>
 
 ### Problem
 <problem text>
@@ -203,7 +211,39 @@ Use the canonical section order from template-tasks.md:
 
 Insert a `---` separator before the new task block (matching the calibration target's task-separator pattern).
 
+## Fast-track runs
+
+A fast-track run defers a named set of tasks' per-task Deliver gates (review-ux, the code review, review-qa, accept) to one close over the set. Its switch is a recorded, operator-confirmed skip of per-task gates, the same class `debrief` records as a Gate-skip line: the block records the operator's words; there is no transcript check and no ruling lookup. Both forms run in the main context only, like every write to the log. Of the preflight, the fast-track forms run Step 0 items 1-3 and 5 (feature id, tasks file, companion spec, and item 5's read of the log in full, without its task-id computation); they parse no other flag and read no lane registry. Task ids given to the open form are normalized to UPPERCASE, as the feature id is.
+
+**Open: `fast-track "<task ids>"`.** Skip Steps 1-3 (no task entry is authored). Append, after a `---` separator:
+
+```
+## Fast-track F01
+feature: PROJ-01
+opened: 2026-01-15, HEAD 1a2b3c4
+operator: "fast-track 03 and 04, one close for both" (2026-01-15; ruling WR-1790160000)
+tasks: PROJ-01-03, PROJ-01-04
+closed:
+```
+
+- The fields are `feature:`, `opened:`, `operator:`, `tasks:` and `closed:`, in that order. `opened:` is the date and the HEAD the run opened on (`<date>, HEAD <sha>`, read with `git rev-parse --short HEAD`; the sha is the base the run's code review diffs from). There is no `dirty` at open: work already uncommitted at open falls inside the run's diff and is reviewed with it. When HEAD cannot be read (not a git tree, no commit yet), refuse the open and write nothing. `operator:` is the operator's words quoted with their date, typed in any session and relayed verbatim; append `; ruling <id>` only when a ruling id exists. `closed:` is empty at open.
+- Run ids are `F01`, `F02` per feature: next = the highest `## Fast-track F<NN>` in the log + 1, two digits, never gap-filled.
+- Refuse, write nothing and name the reason when: a run of the feature is already open (a block with an empty `closed:`); an id is already listed in a run (its `tasks:` line or a task's `**Fast-track:**` field); an id has no `## <id>:` heading in the log; an id is already at `Status: Done`. An id listed in a closed run is never listed again: work on it after its close is a new task.
+- Only the operator's words open a run. A worker or subagent proposes a run in one line and opens nothing. Off is never implied by a count or by every task being Done: a run ends only with its close.
+
+**Membership.** A run's listed set is the ids on its `tasks:` line plus every task carrying `**Fast-track:** F<NN>`. The `tasks:` line is never rewritten; a task added while the run is open joins through its own field (Step 2).
+
+**Close: `fast-track F<NN> closed`.** Refuse when the log has no `## Fast-track F<NN>` block, and when the run's `closed:` is already filled. Then, before reading any report, refuse when any task in the run's listed set is not `Status: Done`: name the ids and write nothing. The required reports are `review-qa-<feature>-F<NN>.md`, `accept-<feature>-F<NN>.md`, and one `review-<checker>-<feature>-F<NN>.md` for each Checker in `SAID.reviewers:` (read WHOLE) that `review-ux` runs, an agent-form Checker; a lane whose list has none (empty, or only an oracle Checker the reviewer gate recomputes) requires the two, and a `doc-editorial` Checker on a lane whose `SAID.mounts:` is `none` is not required (it runs as N/A and writes no file). Read each in the feature's working folder: a missing required report refuses, and a report reads PASS only when its verdict line says PASS (`Verdict:` in a gate report, the `verdict:` header in a Checker verdict; MANUAL-PENDING is not PASS). The form refuses unless every named report reads PASS. On PASS, write the one `closed:` line in place, the only edit to the block:
+
+```
+closed: 2026-01-16, HEAD 1a2b3c4, reports review-qa-PROJ-01-F01.md, accept-PROJ-01-F01.md
+```
+
+Record the date, HEAD, plus `dirty` after the sha when the tree has uncommitted changes (`HEAD 1a2b3c4 dirty`), and the names of exactly the reports read. The gates that wrote the reports stay read-only; this skill is the log's one writer.
+
 ## Step Final — Exit
+
+For a fast-track form, report the run id and either the ids listed (open) or the `closed:` line written (close), or the refusal and its reason; nothing else below applies to it. When a fast-track reply says what the close will need, name exactly the close form's required report set above; an oracle Checker such as `cli-gate` writes none.
 
 Report to operator:
 
@@ -226,7 +266,7 @@ Suggested next step: "Task `<new-task-id>` appended. Run `/said:impl <new-task-i
 - **Don't duplicate spec's Context-to-load in Reading list.** Per-task delta only.
 - **Don't begin implementation.** This skill writes the task entry; that's the entire output. NEVER spawn coding agents; NEVER invoke `/said:impl` automatically (the operator triggers it after this skill exits); NEVER begin code edits.
 - **Don't run on features without an existing tasks file.** Redirect to `/said:architect` for INITIAL spec + tasks creation.
-- **Don't modify or reorder existing tasks.** Append-only per `template-tasks.md`. The only exception (per template-tasks.md) is Status updates with `### Fix` — that's close-of-task review territory, not this skill.
+- **Don't modify or reorder existing tasks.** Append-only per `template-tasks.md`. The exceptions (per template-tasks.md) are Status updates with `### Fix`, which are close-of-task review territory, not this skill, and the `closed:` line of a fast-track block, which only the `fast-track F<NN> closed` form writes.
 - **Don't fill task-ID gaps.** Per-lane monotonic counter — the highest existing NN for THIS `(feature, lane)` pair gets `+1` regardless of deleted-task gaps below. Append-only matches git-log sequencing.
 - **Don't cross-pollinate counters across lanes.** Each `(feature, lane)` pair has its own independent counter — the next ID for lane-A doesn't increment based on lane-B's counter. Different lanes own different task streams.
 - **Don't mix legacy IDs into the counter scan.** Task headings not matching the canonical regex live in a separate namespace; the canonical counter starts fresh at `01` regardless of how many legacy entries exist. After migration (if applicable), all IDs share the canonical shape and this anti-pattern dissolves.

@@ -32,6 +32,10 @@ DATE_RE = re.compile(r"\((\d{4}-\d{2}-\d{2})\)")
 HEADER_RE = re.compile(r"^##\s+([A-Z]+-?\d+(?:-[A-Za-z0-9]+)+)\s*[:：]?\s*(.*?)\s*$")
 FOOTER_RE = re.compile(r"^##\s+Debrief close\b", re.I)
 IDDIR_RE = re.compile(r"^([A-Z]+)-(\d+)$")
+RUN_RE = re.compile(r"^##\s+Fast-track\s+(F\d{2,})\s*$")  # a fast-track run block; never a task heading
+RUN_FIELD_RE = re.compile(r"^\s*(?:[-*+]\s+)?\*\*Fast-track:\*\*\s*(F\d{2,})\b")
+RUN_REPORT_RE = re.compile(r"-F\d{2,}\.md$")  # a run's report, never a feature-level gate
+TASK_ID_RE = re.compile(r"[A-Z]+-?\d+(?:-[A-Za-z0-9]+)+")  # HEADER_RE's id: a `tasks:` token counts only if it is one
 
 # attention-first ordering; staleness thresholds (days idle) per phase
 PHASE_RANK = {"Implement": 0, "Deliver": 1, "Architect": 2, "Scope": 3, "Closed": 4}
@@ -144,6 +148,54 @@ def parse_tasks(paths):
             "todo_items": todo_items, "footer": footer, "integrity": integrity}
 
 
+def parse_runs(paths):
+    """Fast-track run blocks: [{id, open, tasks}] in log order. The listed set is the block's `tasks:`
+    ids plus every task carrying `**Fast-track:** F<NN>`; a run is open while its `closed:` is empty."""
+    runs, field_ids = {}, {}
+    order = []
+    for path in sorted(paths):
+        try:
+            lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
+        except OSError:
+            continue
+        cur_task, cur_run = None, None
+        for ln in lines:
+            r = RUN_RE.match(ln)
+            if r:
+                cur_run, cur_task = r.group(1), None
+                if cur_run not in runs:
+                    runs[cur_run] = {"id": cur_run, "open": True, "tasks": []}
+                    order.append(cur_run)
+                continue
+            h = HEADER_RE.match(ln)
+            if h or (ln.startswith("## ") and not r):
+                cur_run, cur_task = None, (h.group(1) if h else None)
+                continue
+            if cur_run:
+                k, _, v = ln.partition(":")
+                k, v = k.strip(), v.strip()
+                if k == "tasks":
+                    runs[cur_run]["tasks"] += [x for x in TASK_ID_RE.findall(v) if x not in runs[cur_run]["tasks"]]
+                elif k == "closed":
+                    runs[cur_run]["open"] = not v
+                continue
+            f = RUN_FIELD_RE.match(ln)
+            if f and cur_task:
+                field_ids.setdefault(f.group(1), []).append(cur_task)
+    out = []
+    for rid in order:
+        run = runs[rid]
+        for t in field_ids.get(rid, []):
+            if t not in run["tasks"]:
+                run["tasks"].append(t)
+        out.append(run)
+    return out
+
+
+def run_line(run):
+    return "fast-track open: %s, %d tasks" % (run["id"], len(run["tasks"]))
+
+
 _SECTION_RE = re.compile(r"^###+\s+(.+?)\s*$")
 
 
@@ -197,8 +249,8 @@ def feature_tasks(paths):
 
 def gate_ticks(workdir):
     """Presence of the working-dir gate artifacts."""
-    def has(pat):
-        return bool(glob.glob(os.path.join(workdir, pat)))
+    def has(pat):  # a run's `-F<NN>` report never ticks a feature-level gate
+        return any(not RUN_REPORT_RE.search(p) for p in glob.glob(os.path.join(workdir, pat)))
     return {"qa": has("review-qa*.md"), "ux": has("review-ux*.md"),
             "accept": has("accept*.md"), "debrief_started": os.path.isfile(os.path.join(workdir, "debrief.md"))}
 
@@ -319,7 +371,8 @@ def waiting_reason(workdir):
     dir. A run-engine hold recorded outside the lane's working dir is out of scope
     -- operator-visible, not analyzer-visible. Returns a short reason or None."""
     try:
-        accepts = sorted(glob.glob(os.path.join(workdir, "accept-*.md")), key=os.path.getmtime)
+        accepts = sorted((p for p in glob.glob(os.path.join(workdir, "accept-*.md")) if not RUN_REPORT_RE.search(p)),
+                         key=os.path.getmtime)
     except OSError:
         return None
     if not accepts:
@@ -520,6 +573,7 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
             "age_days": age, "idle_days": idle, "stale": stale, "threshold": threshold,
             "next": next_action(fid, phase, relpath(workdir, root), gates, sub),
             "integrity": t["integrity"],
+            "fast_track_open": [r for r in parse_runs(tasks) if r["open"]],
             "waiting": (waiting_reason(workdir) if os.path.isdir(workdir) else None) or waiting_on_question(tasks, os.path.join(workdir, "rulings.md"), root),
             "completeness_note": (completeness_note(workdir) if os.path.isdir(workdir) else None),
             # `paths` stay absolute — they are read from. `paths_rel` is the display form.
@@ -639,6 +693,11 @@ def _lane_tail(next_from, legacy_prefixes, prefix, max_next):
     return tail
 
 
+def run_lines(lr, prefix):
+    """One line per open fast-track run in the lane, stale or not: an open run is always an attention item."""
+    return ["%s%s %s" % (prefix, f["id"], run_line(r)) for f in lr["features"] for r in f.get("fast_track_open") or []]
+
+
 def render_roster(data, stale_only=False):
     def shown(lr):
         return [f for f in lr["features"] if (not stale_only or f["stale"])]
@@ -658,8 +717,10 @@ def render_roster(data, stale_only=False):
         rows = shown(lr)
         for f in rows:
             lines.append(_row(f, idw, phw))
-        if stale_only and not rows:
+        runs = run_lines(lr, "")
+        if stale_only and not rows and not runs:
             lines.append("(nothing stale)")
+        lines += runs
         tail = tail_for(lr, rows, "", 3)
         if tail:
             lines.append("")
@@ -670,13 +731,15 @@ def render_roster(data, stale_only=False):
         any_shown = False
         for lr in data["lanes"]:
             rows = shown(lr)
-            if stale_only and not rows:  # a clean lane is not an attention item
+            runs = run_lines(lr, "  ")
+            if stale_only and not rows and not runs:  # a clean lane is not an attention item
                 continue
             any_shown = True
             hint = lr["root"] if lr["root"] not in (".", "") else lr["docs_dir"]
             lines.append("lane: %s  (%s)" % (lr["name"], hint))
             for f in rows:
                 lines.append("  " + _row(f, idw, phw))
+            lines += runs
             lines += tail_for(lr, rows, "  ", 2)
             lines.append("")
         while lines and lines[-1] == "":
@@ -710,6 +773,8 @@ def _feature_block(f, lane_label=None):
         ("%d%%" % round(100 * f["done"] / f["denominator"])) if f["denominator"] else "—"))
     for it in f["todo_items"]:
         out.append("  %s, %s" % (it["id"], it["title"] or ""))
+    for run in f.get("fast_track_open") or []:
+        out.append(run_line(run))
     dl = "Dates   started %s, last activity %s, age %s, %s" % (
         f["started"] or "—", f["last_activity"] or "—",
         ("%dd" % f["age_days"]) if f["age_days"] is not None else "—",
