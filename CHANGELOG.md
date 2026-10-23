@@ -2,7 +2,7 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
-## [Unreleased]
+## [0.23.0] — 2026-10-23
 
 Fast-track runs: on your word, a named set of a feature's tasks defers its per-task review-ux, code review, review-qa and accept to one close over the set, recorded in the tasks log where every session reads it.
 
@@ -13,6 +13,9 @@ Fast-track runs: on your word, a named set of a feature's tasks defers its per-t
 - **Added:** `said:status` prints `fast-track open: F<NN>, <n> tasks` for a feature's open run in the deep-dive and `<feature-id> fast-track open: ...` in every roster, `--stale` included, so the re-anchor after `/clear` shows it. A run's `-F<NN>` reports never tick a feature-level gate, never raise the accept wait and never move the `Next` action.
 - **Changed:** `debrief` blocks while a fast-track run is open (a `## Fast-track F<NN>` block with an empty `closed:` line) and redirects to that run's close, and its Phase-3.5 gate check reads feature-level reports only, never a run's `-F<NN>` report.
 - **Migration:** none required. A feature with no `## Fast-track` block behaves as before.
+
+- **Added:** `said:gate-reviewer`, a read-only reader for one step of `review-qa`, `accept` or `debrief`. Above the optional lane key `SAID.gate-reviewer-threshold: <tokens>` (read at the start of each gate from the same `context.json` the statusline writes) the gate hands its reading and classifying step to the reviewer, which proposes rows with file:line evidence; the gate opens the cited lines and keeps every command, pause, verdict and write. Debrief's A.1-A.4 inventory is proposed the same way; main scans, keeps A.5, A.6 and every mark. The handoff is bounded: closed readings and envelope, a main-vetted manifest, encoded excerpts, a runtime fallback when the reviewer is unavailable. `setup` knows the key (schema row, README paragraph).
+- **Changed:** the context checkpoint in `said` and `flow` names a threshold no fresh session can meet: when `SAID.context-checkpoint` is below the session's own first reading plus said's load (read from the session's transcript by the bundled `first_reading.py`), the stop says the sum is at least that number and that only raising the key ends the stop, instead of asking for another `/clear`. `setup` reports a checkpoint value below the schema floor as one ADVISORY.
 
 ## [0.22.1] — 2026-10-20
 
