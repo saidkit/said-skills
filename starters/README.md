@@ -43,7 +43,7 @@ A `work` lane (knowledge work, no code: `said-work`) declares `SAID.surface: non
 | `said-lane-doc`| Document lane (doc surface) | reference | -    |
 | `said-saas`    | Next.js + Supabase for SaaS | roadmap   | -    |
 | `said-ts`      | TS services / Bun / MCP     | reference | TBD  |
-| `said-python`  | Python (FastAPI) / MCP      | reference | TBD  |
+| `said-py`      | Python (FastAPI) / MCP      | reference | TBD  |
 | `said-go`      | Go services / MCP           | reference | TBD  |
 | `said-web`     | React + Vite + TS           | reference | TBD  |
 | `said-rust-dx` | Rust Apps (Dioxus)          | roadmap   | -    |
