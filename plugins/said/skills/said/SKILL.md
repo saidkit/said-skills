@@ -83,7 +83,7 @@ Derive the phase, every time, from the feature's own artifacts (rooted at the fe
 
 | Fact | Probe |
 |---|---|
-| **Lane count** (route guard) | Declaration-first: where the root declares a `SAID.lanes:` registry, count the lanes its rows name (`python3 ${CLAUDE_SKILL_DIR}/../status/said_status.py --registry --root <root>`; echo the count; on `refused:` HALT with that reason and point the operator at `/said:setup`) that carry this feature's SAID artifacts; else count trees whose `CLAUDE.md` declares a `## Lane` carrying this feature's SAID artifacts; glob fallback `*/docs/features/<feature>*.tasks.md` + `*/docs/working/<feature>/`. **≥ 2 -> BLOCK, redirect to `flow!`.** |
+| **Lane count** (route guard) | Declaration-first: where the root declares a `SAID.lanes:` registry, count the lanes its rows name (`python3 ${CLAUDE_SKILL_DIR}/../board/said_status.py --registry --root <root>`; echo the count; on `refused:` HALT with that reason and point the operator at `/said:setup`) that carry this feature's SAID artifacts; else count trees whose `CLAUDE.md` declares a `## Lane` carrying this feature's SAID artifacts; glob fallback `*/docs/features/<feature>*.tasks.md` + `*/docs/working/<feature>/`. **≥ 2 -> BLOCK, redirect to `flow!`.** |
 | **Feature-id** | the arg, normalized UPPERCASE; the tasks-file stem minus `.tasks` once one exists |
 | **Phase** | no `scope.md` -> **Scope**, `scope.md`, no spec -> **Architect**, spec + `Status: Todo` > 0 -> **Implement**, spec, `Todo == 0`, **no** `## Debrief close` footer -> **Deliver**, footer present and no open fast-track run -> **Closed** |
 | **Work remaining** | count `Status: Todo` in `docs/features/<id>.tasks.md` (bare or slug-suffixed) |

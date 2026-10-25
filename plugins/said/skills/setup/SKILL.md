@@ -11,7 +11,7 @@ description: >
   are the axes current, why does `impl` HALT on this lane, is the `## Earned rules` heading
   present, do the declared reviewers resolve, is the `## Lane` block stale or malformed, is the
   context checkpoint inactive. NOT creating a lane or scaffolding one from scratch; NOT
-  `said:status` (reports where a FEATURE sits in the phase chain); NOT `said:review-qa`
+  `said:board` (reports where a FEATURE sits in the phase chain); NOT `said:review-qa`
   (implementation-hygiene gate). This skill governs exactly two things: lane CONFIGURATION and the
   statusline install; no other `settings.json` key.
 ---
@@ -54,7 +54,7 @@ path resolves from it. Resolve, and state what resolved:
 - Single lane , the lane root is the current repo root (its `CLAUDE.md` carries the `## Lane`
   block).
 - Multi-lane , take the registry rows WHOLE from
-  `python3 ${CLAUDE_SKILL_DIR}/../status/said_status.py --registry --root <root>`
+  `python3 ${CLAUDE_SKILL_DIR}/../board/said_status.py --registry --root <root>`
   (echo its count; on `refused:` report it, select no row); `--lane <name>` selects one row, else
   default to the lane whose root is the current directory. Pass the selected lane's root to the checker.
 
@@ -141,5 +141,5 @@ After a `--fix` pass, re-run the checker and show the updated ledger.
 - **Do not guess a discretionary value.** A choice the schema cannot settle is a proposal, never a
   silent write.
 - **Do not run as an always-on gate.** This is a doctor the operator invokes, not a cycle step.
-- **Do not confuse the surface with `said:status`.** That skill reports a FEATURE's phase; this one
+- **Do not confuse the surface with `said:board`.** That skill reports a FEATURE's phase; this one
   reports whether the LANE is well-formed.

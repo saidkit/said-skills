@@ -8,7 +8,7 @@ is present, so said:setup renders findings deterministically rather than by
 judgement, and the same oracle backs the eval's negative control.
 
 Reviewer resolvability reuses the canonical Checker resolver shipped beside this
-file (../status/said_status.py: index_checkers / resolve_checkers_dir), rather
+file (../board/said_status.py: index_checkers / resolve_checkers_dir), rather
 than re-implementing it. The lane-block parse lives here: one block locator (a
 heading that is exactly "## Lane", outside code fences) and one value read (a
 key's value is the rest of its own line; an empty value is no value).
@@ -24,7 +24,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Reuse the canonical Checker resolver from the sibling status skill (same plugin).
-sys.path.insert(0, os.path.join(HERE, "..", "status"))
+sys.path.insert(0, os.path.join(HERE, "..", "board"))
 try:
     import said_status  # noqa: E402
 except Exception:  # pragma: no cover - resolver optional; reviewers check degrades to a note
@@ -241,7 +241,7 @@ def check_registry(key, text, lines, span, claude_md):
     reader = said_status is not None and hasattr(said_status, "read_registry_text")
     if not reader:
         declared = any(key_re.match(ln) for n, ln in unfenced(lines) if n in inside)
-        return stray + ([("unresolvable", "ADVISORY", "reader unavailable (../status/said_status.py not importable); "
+        return stray + ([("unresolvable", "ADVISORY", "reader unavailable (../board/said_status.py not importable); "
                           "the registry line was not checked")] if declared else []), not (declared or stray)
     if said_status.locate_lane_registry(text) is None:
         return stray, not stray  # a line outside the block is the registry misplaced, not absent
@@ -590,7 +590,7 @@ def check_lane(lane_root, schema, claude_md=None):
         idx = resolve_reviewers(lane_root, docs_root)
         if idx is None:
             findings.append({"item": "SAID.reviewers", "verdict": "unresolvable", "severity": "ADVISORY",
-                             "remediation": "resolver unavailable (../status/said_status.py not importable); reviewer resolvability not checked"})
+                             "remediation": "resolver unavailable (../board/said_status.py not importable); reviewer resolvability not checked"})
         else:
             for cid in reviewers:
                 meta = idx.get(cid)

@@ -211,4 +211,14 @@
   document.body.setAttribute('data-view',sv);
   document.querySelectorAll('.vtoggle .btn').forEach(function(b){b.classList.toggle('btn-active',b.getAttribute('data-view')===sv);});
   restoreLane();
+  // A feature named in the URL fragment (`#PROJ-01`) opens its deep-dive once the list has loaded:
+  // the id regex gates the lookup, the row's own click opens it, and an unknown id does nothing.
+  (function(){var id='';try{id=decodeURIComponent((location.hash||'').slice(1));}catch(e){return;}
+    if(!/^[A-Za-z]+-\d+(?:-[A-Za-z0-9]+)*$/.test(id))return;
+    // a swap of the hidden view, or of the default lane before the stored one, cannot hold the row yet:
+    // keep listening until the row is found, at most a few list swaps
+    var n=0;function onSwap(e){var t=e.target;if(!t||(t.id!=='roster'&&t.id!=='kanban'))return;
+      var el=byId(id);if(el){document.removeEventListener('htmx:afterSwap',onSwap);el.click();return;}
+      if(++n>=4)document.removeEventListener('htmx:afterSwap',onSwap);}
+    document.addEventListener('htmx:afterSwap',onSwap);})();
 })();

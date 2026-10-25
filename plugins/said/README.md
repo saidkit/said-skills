@@ -14,7 +14,7 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 | **3.5 — Gates** | `said:review-qa` (hygiene), `said:accept` (acceptance contract) | pass/fail reports |
 | **4 — Debrief** | `said:debrief` | retrospective + backports + shipping reports |
 | **Helper** | `said:triage` | read-only root-cause investigation |
-| **Observe** | `said:status` (terminal), `said:board` (local web dashboard) | read-only status board — where every feature sits in the phase chain, what's stalled, and the exact command that advances it |
+| **Observe** | `said:board` (web page by default, `--cli` terminal, `--json` data) | read-only board — where every feature sits in the phase chain, what's stalled or waiting, and the exact command that advances it |
 | **Recall** | `said:retrieval` | precedent/decision-record search: what the project already decided (`CLAUDE.md`, memory, ADRs, working dirs, probes), before you propose a default |
 | **Orchestrate** | `said:said` (single feature), `said:flow` (multi-lane) | drive a feature through the whole chain in one session to a printed `goal: done` signal — invoked by the `said!` / `flow!` operator macros; `said:said` can **fan out** write-disjoint tasks to concurrent `said:impl <task> arm` builders, then `said:impl <task> close` serially in main (opt-in) |
 

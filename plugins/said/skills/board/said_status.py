@@ -6,7 +6,7 @@ Read-only. Reconstructs every feature's position in the SAID phase chain
 artifacts, and emits either JSON (a stable data interface) or a rendered
 terminal roster / single-feature deep-dive. Stores nothing.
 
-Backs the /said-status (-> plugin /said:status) skill; see SKILL.md for the
+Backs the said:board skill's --cli and --json surfaces and its web page; see SKILL.md for the
 prose contract this implements. Stdlib only, Python 3.8+.
 
 Agnostic by construction: paths, issued id-prefixes, and lanes come from flags
@@ -247,11 +247,34 @@ def feature_tasks(paths):
     return tasks
 
 
-def gate_ticks(workdir):
-    """Presence of the working-dir gate artifacts."""
+def lane_reviewers(root):
+    """The lane's declared Checkers, read WHOLE from the `SAID.reviewers:` key of the `## Lane` block of
+    <root>/CLAUDE.md (never from prose or a fence elsewhere in the file): `[a, b]`, a bare `a`, quoted ids
+    and a trailing ` # comment` -> ["a", "b"]; no file, no block, no key, or `[]` -> []."""
+    try:
+        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8") as fh:
+            block = lane_block_lines(fh.read())
+    except (OSError, UnicodeDecodeError):
+        return []
+    for line in block or []:
+        m = re.match(r"^\s*[-*]?\s*SAID\.reviewers:\s*(.*?)\s*$", line)
+        if m:
+            v = re.sub(r"\s+#.*$", "", m.group(1)).strip()
+            if v.startswith("[") and v.endswith("]"):
+                v = v[1:-1]
+            return [x.strip().strip("\"'") for x in v.split(",") if x.strip().strip("\"'")]
+    return []
+
+
+def gate_ticks(workdir, reviewers=(), fid=None):
+    """Presence of the working-dir gate artifacts. The review gate ticks from a `review-ux*` report or
+    from a verdict file `review-<checker-id>-<feature-id>*.md` of any Checker the lane declares in
+    `SAID.reviewers:` (the feature id after the Checker id, so `cli` never ticks from a `cli-gate` file)."""
     def has(pat):  # a run's `-F<NN>` report never ticks a feature-level gate
         return any(not RUN_REPORT_RE.search(p) for p in glob.glob(os.path.join(workdir, pat)))
-    return {"qa": has("review-qa*.md"), "ux": has("review-ux*.md"),
+    ux = has("review-ux*.md") or bool(fid) and any(
+        has("review-%s-%s*.md" % (glob.escape(cid), glob.escape(fid))) for cid in reviewers)
+    return {"qa": has("review-qa*.md"), "ux": ux,
             "accept": has("accept*.md"), "debrief_started": os.path.isfile(os.path.join(workdir, "debrief.md"))}
 
 
@@ -389,7 +412,15 @@ def waiting_reason(workdir):
     # it via debrief's Phase-3.5 gate. So the axis surfaces the one signal it can trust.
     # anchored to the report's own verdict bullet: a recorded probe line (which can carry builder-authored
     # recompute rows) never reads as the verdict
-    if re.search(r"^\s*[-*]?\s*Verdict:\s*MANUAL-PENDING\s*$", txt, re.M):   # a held operator question
+    # the file is append-only: a re-run appends a new verdict, so only its LAST verdict line is current
+    # a Verdict line inside a code fence is an example of the form, never a verdict
+    unfenced, fence = [], None
+    for ln in txt.splitlines():
+        marker, fence = fence_step(fence, ln)   # the lane block's own fence rule
+        if not (marker or fence):
+            unfenced.append(ln)
+    verdicts = re.findall(r"^\s*[-*]?\s*Verdict:\s*(\S.*?)\s*$", "\n".join(unfenced), re.M)
+    if verdicts and verdicts[-1] == "MANUAL-PENDING":   # a held operator question
         return "accept MANUAL-PENDING"
     return None
 
@@ -531,6 +562,7 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
 
     # --- per-feature reconstruction ---------------------------------------
     out = []
+    reviewers = lane_reviewers(root)
     for fid in active:
         workdir = os.path.join(work_root, fid)
         specs = [q for q in glob.glob(os.path.join(feats_dir, fid + "*.md")) if not q.endswith(".tasks.md")]
@@ -542,7 +574,7 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
                                               "dates": [], "todo_items": [], "footer": False, "integrity": None}
         c = t["counts"]
         phase, sub = classify(bool(specs), bool(tasks), c["Todo"], t["footer"], scope, dir_content)
-        gates = gate_ticks(workdir) if os.path.isdir(workdir) else {"qa": False, "ux": False, "accept": False, "debrief_started": False}
+        gates = gate_ticks(workdir, reviewers, fid) if os.path.isdir(workdir) else {"qa": False, "ux": False, "accept": False, "debrief_started": False}
 
         started = t["dates"][0] if t["dates"] else None
         last_task = t["dates"][-1] if t["dates"] else None

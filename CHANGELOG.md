@@ -2,6 +2,20 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [Unreleased]
+
+One observe skill: `said:status` is folded into `said:board`. `/said:board` opens the web page; `/said:board --cli` prints the terminal board it replaces, and `/said:board --json` its data.
+
+**Breaking.** `/said:status` no longer exists, with no alias and no stub: use `/said:board --cli` (with `<feature-id>`, `--lanes` or `--stale` as before), or `/said:board --json`. The analyzer, completeness and recompute scripts moved from `skills/status/` to `skills/board/` under their own names.
+
+- **Changed (breaking):** `said:board` is the one read-only observe skill. The web page is its default surface, `--cli` the terminal board, `--json` the data layer; `/said:board <feature-id>` opens the web board on that feature's deep-dive (the page reads `#<feature-id>` from its URL). The board skill no longer depends on a second skill.
+- **Changed (breaking):** `said_status.py`, `said_completeness.py` and `gate_recompute.sh` live in `skills/board/`. The `cli-gate` Checker's recompute, the re-anchor hook, `setup` and every skill that runs the analyzer use the new path; the re-anchor hook now prints `/said:board --cli`.
+- **Changed:** the web server is a shell plus one module per board (the features board in `boards/features.py`); every route and its response are unchanged.
+- **Fixed:** a feature's review gate ticks from a verdict file `review-<checker-id>-<feature-id>*.md` of any Checker the lane declares in `SAID.reviewers:` (read whole from the lane's `## Lane` block), so a `cli-gate` verdict now ticks it; presence only, as before.
+- **Fixed:** the accept wait reads the accept file's last `Verdict:` line outside a code fence, so an earlier `MANUAL-PENDING` followed by a later verdict no longer shows as waiting.
+- **Fixed:** a Deliver-phase feature gets the Deliver colour on the web board (column accent, row stripe and phase pill).
+- **Migration:** update the plugin, then repoint anything that runs a bundled script by path: `skills/status/said_status.py` -> `skills/board/said_status.py`; `skills/status/said_completeness.py` -> `skills/board/said_completeness.py` (for example the `said-recompute:` line of the completeness Checker in a lane's surface rules); `skills/status/gate_recompute.sh` -> `skills/board/gate_recompute.sh`; a `SAID_STATUS` override of the re-anchor hook that names the old path; a permission rule in your settings that names `said:status` or an old script path. Replace `/said:status` with `/said:board --cli` in your own notes and lane instructions.
+
 ## [0.23.0] — 2026-10-23
 
 Fast-track runs: on your word, a named set of a feature's tasks defers its per-task review-ux, code review, review-qa and accept to one close over the set, recorded in the tasks log where every session reads it.

@@ -20,7 +20,7 @@ cwd=$(field 'd.get("cwd","")')
   "$cwd/CLAUDE.md" 2>/dev/null || exit 0
 cd "$cwd" 2>/dev/null
 
-status="${SAID_STATUS:-$here/../skills/status/said_status.py}"
+status="${SAID_STATUS:-$here/../skills/board/said_status.py}"
 if [ -z "${SCRATCH_ROOT:-}" ]; then
   if [ -d /private/tmp ]; then SCRATCH_ROOT="/private/tmp/claude-$(id -u)"; else SCRATCH_ROOT="/tmp/claude-$(id -u)"; fi
 fi
@@ -70,7 +70,7 @@ if feature and not found(out):
             out, shown = "Feature %s resolves in lane %s (%s):\n%s" % (feature, token, root, o), token
             break
 if out is None:
-    print("(status unavailable) -- run /said:status to reconstruct.", flush=True)
+    print("(status unavailable) -- run /said:board --cli to reconstruct.", flush=True)
 else:
     print("\n".join(out.splitlines()[:60 if feature else 40]), flush=True)
 extra = []
@@ -89,11 +89,11 @@ for token, root, path, r in lanes:
 for line in extra[:8]:
     print(line)
 if len(extra) > 8:
-    print("+%d more lanes on a feature branch of their own (run /said:status in the lane)" % (len(extra) - 8))
+    print("+%d more lanes on a feature branch of their own (run /said:board --cli in the lane)" % (len(extra) - 8))
 PY
-  [ $? -eq 0 ] || echo "(status unavailable) -- run /said:status to reconstruct."
+  [ $? -eq 0 ] || echo "(status unavailable) -- run /said:board --cli to reconstruct."
 else
-  echo "(status script not found; set SAID_STATUS) -- run /said:status to reconstruct."
+  echo "(status script not found; set SAID_STATUS) -- run /said:board --cli to reconstruct."
 fi
 
 # Open run protocols: live leaves only -- a think-<id>.md whose Closed: header is "no", whose Gate log carries

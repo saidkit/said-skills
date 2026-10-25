@@ -130,7 +130,7 @@ said-checker:   completeness
 said-governs:   surface=<your surface>
 said-capture:   process-spawn
 said-judge:     oracle
-said-recompute: python3 "$SAID_PLUGIN_ROOT/skills/status/said_completeness.py"
+said-recompute: python3 "$SAID_PLUGIN_ROOT/skills/board/said_completeness.py"
 ```
 
 Adapt that block into your `docs/ux/feature-ux-rules.md`, instantiating `said-governs: surface=` to your medium (a left-in `<...>` is a config-error gate FAIL). `said-capture: process-spawn` means an oracle-tier container is verified by executing a read-only probe **when your capture manifest supplies a per-unit `cmd:`** -- for a **cli** lane that probe is the command's own `--help` (nothing extra to wire); for a **web** lane it is a DOM/route probe your lane supplies under its own cycle. **Absent a probe `cmd:`, the container falls to declared-evidence honestly** (read from the manifest's `built:` lines, reported as such) -- so the block applies one-shot on any surface and auto-strengthens to the oracle tier once you add a probe. Naming `completeness` in `SAID.reviewers:` WITHOUT this block makes the gate a BLOCKER.
@@ -156,7 +156,7 @@ It ledgers your `## Lane` block + required sections against the current axis set
 /said:scope-grill a tiny throwaway feature
 ```
 
-Confirm it writes `docs/working/<feature>/scope.md` in your layout. If it asks for paths you haven't bound, fill them into your `## Lane` block (Step 3) and retry. Then `/said:status` should show the feature in the Scope phase.
+Confirm it writes `docs/working/<feature>/scope.md` in your layout. If it asks for paths you haven't bound, fill them into your `## Lane` block (Step 3) and retry. Then `/said:board --cli` should show the feature in the Scope phase.
 
 ## What ships generic vs what you own
 

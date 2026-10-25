@@ -45,7 +45,7 @@ body[data-view="kanban"] #kanbanwrap{display:flex}
 .kanban{flex:1;display:flex;gap:14px;overflow-x:auto;padding:16px 18px;align-items:stretch}
 .kcol{flex:1 1 0;min-width:212px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:12px;max-height:100%}
 .kcol[data-phase="Scope"]{--kc:var(--ph-scope)}.kcol[data-phase="Architect"]{--kc:var(--ph-architect)}
-.kcol[data-phase="Implement"]{--kc:var(--ph-implement)}.kcol[data-phase="Delivery"]{--kc:var(--ph-delivery)}
+.kcol[data-phase="Implement"]{--kc:var(--ph-implement)}.kcol[data-phase="Deliver"]{--kc:var(--ph-delivery)}
 .kcol[data-phase="Closed"]{--kc:var(--ph-closed)}
 .kcol-h{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--border);
   border-top:3px solid var(--kc,var(--border));border-radius:12px 12px 0 0}
@@ -83,7 +83,7 @@ body.drawer-open #backdrop{opacity:1;visibility:visible}
 .row:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 3px 10px rgba(16,24,40,.08)}
 .row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .row.selected{border-color:var(--accent);box-shadow:0 0 0 1.5px var(--accent)}
-.row[data-phase="Implement"]{--bd:var(--ph-implement)} .row[data-phase="Delivery"]{--bd:var(--ph-delivery)}
+.row[data-phase="Implement"]{--bd:var(--ph-implement)} .row[data-phase="Deliver"]{--bd:var(--ph-delivery)}
 .row[data-phase="Architect"]{--bd:var(--ph-architect)} .row[data-phase="Scope"]{--bd:var(--ph-scope)}
 .row[data-phase="Closed"]{--bd:var(--ph-closed)}
 .rid{font-weight:650;font-size:13px}.rid.big{font-size:22px;font-weight:750}
@@ -191,7 +191,7 @@ footer a{color:var(--accent);text-decoration:none}
 .ph[data-phase="Scope"]{--pc:var(--ph-scope)}
 .ph[data-phase="Architect"]{--pc:var(--ph-architect)}
 .ph[data-phase="Implement"]{--pc:var(--ph-implement);background:var(--ph-implement);color:var(--paper);border-color:var(--ph-implement)}
-.ph[data-phase="Delivery"]{--pc:var(--ph-delivery)}
+.ph[data-phase="Deliver"]{--pc:var(--ph-delivery)}
 .ph[data-phase="Closed"]{--pc:var(--ph-closed)}
 .d-head .ph{font-size:11px;padding:5px 10px}
 /* Task status — bold, and colour-matched to its own dot so label and dot never disagree.

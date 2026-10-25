@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """serve.py — said:board local web dashboard.
 
-Read-only, loopback-only, stdlib-only server. Reuses the sibling said-status
-analyzer's deterministic core and serves it as a live local page. The HTML shell
+Read-only, loopback-only, stdlib-only server. Reuses the analyzer beside it
+(said_status.py), its deterministic core, and serves it as a live local page. The HTML shell
 loads **htmx** and **daisyUI** from a CDN (no pip, no node_modules, no build);
 htmx drives the auto-refresh + deep-dive, daisyUI provides components + themes.
 See REQUIREMENTS.md for the contract.
@@ -37,18 +37,14 @@ from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-# --- reuse the analyzer skill (one deterministic core) — resolve by role, not path ----------
-# sibling is named `status` in the said plugin, `said-status` in the project-local prototype.
+# --- the analyzer beside this file (one deterministic core: the web numbers are the terminal numbers) ---
 _BASE = os.path.dirname(os.path.abspath(__file__))
-for _sib in ("status", "said-status"):
-    _p = os.path.normpath(os.path.join(_BASE, "..", _sib))
-    if os.path.isfile(os.path.join(_p, "said_status.py")):
-        sys.path.insert(0, _p)
-        break
+if _BASE not in sys.path:
+    sys.path.insert(0, _BASE)
 try:
     import said_status
 except Exception as exc:  # pragma: no cover
-    sys.stderr.write("said-board: cannot import the analyzer skill (status/said-status) beside %s (%s)\n" % (_BASE, exc))
+    sys.stderr.write("said-board: cannot import the analyzer said_status.py beside %s (%s)\n" % (_BASE, exc))
     sys.exit(2)
 
 ID_RE = re.compile(r"^[A-Za-z]+-\d+(?:-[A-Za-z0-9]+)*$")
@@ -310,8 +306,6 @@ def get_data(stale_days=None, fresh=False):
 
 # --- the boards: one module per thing; they import the shell's helpers by name -----------------------
 sys.modules.setdefault("serve", sys.modules[__name__])  # run as a script, the shell is still `serve` to its boards
-if _BASE not in sys.path:
-    sys.path.insert(0, _BASE)
 from boards.features import render_feature, render_kanban, render_roster  # noqa: E402
 
 
