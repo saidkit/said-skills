@@ -28,13 +28,11 @@ The engine runs without a starter — you just fill the binding yourself (the [a
 | -------------- | --------------------------- | --------- | ------------------------------------- |
 | `said-next`    | Next.js / TS                | reference | https://github.com/saidkit/said-next  |
 | `said-ts`      | TS services / Bun / MCP     | reference | https://github.com/saidkit/said-ts    |
-| `said-python`  | Python (FastAPI) / MCP      | reference | TBD                                   |
-| `said-go`      | Go services / MCP           | reference | TBD                                   |
-| `said-web`     | React + Vite + TS           | reference | TBD                                   |
+| `said-py`      | Python (FastAPI) / MCP      | reference | https://github.com/saidkit/said-py    |
+| `said-go`      | Go services / MCP           | reference | https://github.com/saidkit/said-go    |
+| `said-swift`   | Native iOS / OSX apps       | roadmap   | https://github.com/saidkit/said-swift |
+| `said-web`     | React + Vite + TS           | reference | -                                     |
 | `said-saas`    | Next.js + Supabase for SaaS | roadmap   | -                                     |
-| `said-flg`     | Flutter/LiquidGlass         | roadmap   | -                                     |
-| `said-fda`     | Flutter/Desktop App         | roadmap   | -                                     |
-| `said-swift`   | Native iOS / OSX apps       | roadmap   | -                                     |
 | `said-kotlin`  | Native Android apps         | roadmap   | -                                     |
 
 ## Install
