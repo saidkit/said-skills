@@ -62,20 +62,20 @@ Never hardcode paths or id shapes. Resolve in this order, and state what resolve
 ```bash
 python3 <skill-dir>/said_status.py \
   --root <repo-root> --docs-dir <docs>/features --working-dir <working> \
-  [--prefixes PROJ,LEGACY] [--legacy-prefixes LEGACY] [--today YYYY-MM-DD] \
+  [--prefixes PROJ,LEGACY (without --lane)] [--legacy-prefixes LEGACY] [--today YYYY-MM-DD] \
   [--lane NAME[:root=...;docs=...;working=...;prefixes=...;legacy=...]]... [--project <label>] \
   [<feature-id>] [--stale] [--json]
 ```
 
 - No `<feature-id>` -> roster, `<feature-id>` -> deep-dive, `--stale` -> attention filter, one `--lane` per lane -> cross-lane board, `--json` -> the data layer (reason over it; don't re-derive by eye).
-- **Omit `--prefixes` / `--legacy-prefixes`** and the script infers the active set (a prefix is active if any id has a spec or `scope.md`); pass them when `CLAUDE.md` states the issued set, to be exact. `--today` makes a run reproducible; omit it for the real date.
+- **Omit `--prefixes` / `--legacy-prefixes`** and the script infers the active set (a prefix is active if any id has a spec or `scope.md`); pass them when `CLAUDE.md` states the issued set, to be exact. With `--lane`, a top-level `--prefixes` is ignored: each lane infers its set unless it gives `;prefixes=`, and `--legacy-prefixes` still applies to every lane unless it gives `;legacy=`. `--today` makes a run reproducible; omit it for the real date.
 - **Show the text output verbatim** — columns are deterministically aligned; re-typing reintroduces the drift the script exists to remove.
 - **No `python3`?** Execute the reconstruction contract below by hand with grep/git, and say so.
 
 **The web page (default)** — launch or stop the server:
 
 ```bash
-python3 <skill-dir>/serve.py --root <repo-root> [--prefixes PROJ,LEGACY] \
+python3 <skill-dir>/serve.py --root <repo-root> [--prefixes PROJ,LEGACY (without --lane)] \
   [--legacy-prefixes LEGACY] [--lane NAME:...]... [--today YYYY-MM-DD] [--stale-days N] \
   [--port <n>] [--no-open] [--connect http://localhost:3000] [--todo-file docs/todo.md]
 python3 <skill-dir>/serve.py stop [--port <n>]
@@ -112,7 +112,7 @@ Per registry feature-id, glob `<id>*` so sub-phased specs (`<id>-<slug>.md`) and
 Denominator = `Done + Todo` (Canceled + Backlog shown but excluded from the bar). If a `## Summary
 Table` exists, cross-check its rows vs the parsed counts; on mismatch emit a one-line **data-integrity** note — parsed `Status:` lines win, the table is a convenience index that can go stale.
 
-**Gate sub-ticks** (meaningful at Deliver/Closed), from working-dir artifacts, a run's `-F<NN>.md` report excluded: `review-qa*.md`->qa, `review-ux*.md` or `review-<checker-id>-<id>*.md` of a Checker the lane's `## Lane` block declares in `SAID.reviewers:`->ux (any verdict, PASS or FAIL: presence only; validation is the reviewer gate's), `accept*.md`->accept, `debrief.md`->debrief-started, `## Debrief close` footer->debrief-done. Render `✓` present, `○` pending, `–` n/a (`ux –` for a no-UI feature — absence of a UX gate is not a failure).
+**Gate sub-ticks** (meaningful at Deliver/Closed), from working-dir artifacts, a run's `-F<NN>.md` report excluded: `review-qa*.md`->qa; ->ux: `review-ux*.md`, or, when the lane's `## Lane` block declares Checkers in `SAID.reviewers:`, a `review-<checker-id>-<feature-id>*.md` for every one (the feature id right after the exact Checker id, so `cli` never ticks from a `cli-gate` file; one declared Checker's file alone does not tick; any verdict, PASS or FAIL: presence only; validation is the reviewer gate's), `accept*.md`->accept, `debrief.md`->debrief-started, `## Debrief close` footer->debrief-done. Render `✓` present, `○` pending, `–` n/a (`ux –` for a no-UI feature — absence of a UX gate is not a failure).
 
 **Waiting on an operator question.** A separate axis from the gate ticks: a tick shows only that a file is present, never that it passed. A feature waits on one of two derived sources, the first that applies:
 1. The accept file: the newest `accept-*.md` in `<working>/<id>/` by modification time (a run's `-F<NN>` report excluded) whose last `Verdict:` line, bulleted (`- Verdict: ...`) or not, outside a code fence, reads exactly `MANUAL-PENDING` -> reason `accept MANUAL-PENDING`. The `accept` tick stays present; the wait says it has not passed.

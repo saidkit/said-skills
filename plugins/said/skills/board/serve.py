@@ -405,7 +405,11 @@ def page():
                 '<circle cx="11" cy="3.9" r="1.35" fill="currentColor" stroke="none"/></svg>')
     # One lane at a time: a select drives ?lane=. Always rendered (a one-option select on a
     # single-lane repo); the client persists the choice and defaults to the first declared lane.
-    lane_opts = "".join('<option value="%s">%s</option>' % (esc(L["name"]), esc(L["name"])) for L in lanes)
+    # each option names the feature ids its lane shows, so a #<feature-id> link selects the lane that holds
+    # that exact id (a file read, no git)
+    lane_opts = "".join('<option value="%s" data-ids="%s">%s</option>' % (
+        esc(L["name"]), esc(",".join(said_status.lane_ids(L))), esc(L["name"]))
+        for L in lanes)
     lane_select = ('<select id="laneSelect" class="select select-xs laneSel" onchange="setLane(this)" '
                    'aria-label="Lane">%s</select>') % lane_opts
     # --- the embed (opt-in). Every one of these strings is "" unless --connect is on. ---

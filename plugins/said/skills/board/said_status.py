@@ -268,11 +268,12 @@ def lane_reviewers(root):
 
 def gate_ticks(workdir, reviewers=(), fid=None):
     """Presence of the working-dir gate artifacts. The review gate ticks from a `review-ux*` report or
-    from a verdict file `review-<checker-id>-<feature-id>*.md` of any Checker the lane declares in
-    `SAID.reviewers:` (the feature id after the Checker id, so `cli` never ticks from a `cli-gate` file)."""
+    when EVERY Checker the lane declares in `SAID.reviewers:` has a verdict file
+    `review-<checker-id>-<feature-id>*.md` (the feature id after the Checker id, so `cli` never ticks
+    from a `cli-gate` file); one declared Checker's file alone does not tick."""
     def has(pat):  # a run's `-F<NN>` report never ticks a feature-level gate
         return any(not RUN_REPORT_RE.search(p) for p in glob.glob(os.path.join(workdir, pat)))
-    ux = has("review-ux*.md") or bool(fid) and any(
+    ux = has("review-ux*.md") or bool(fid) and bool(reviewers) and all(
         has("review-%s-%s*.md" % (glob.escape(cid), glob.escape(fid))) for cid in reviewers)
     return {"qa": has("review-qa*.md"), "ux": ux,
             "accept": has("accept*.md"), "debrief_started": os.path.isfile(os.path.join(workdir, "debrief.md"))}
@@ -520,10 +521,11 @@ def waiting_on_question(tasks_paths, rulings_path=None, root=None):
     return None
 
 
-def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, today, stale_days):
+def lane_registry(root, docs_dir, work_dir, prefixes, legacy_prefixes):
+    """The lane's feature ids, split into the ones it shows (active) and the collapsed ones.
+    File reads only (no git), so a page can ask it cheaply."""
     feats_dir = os.path.join(root, docs_dir)
     work_root = os.path.join(root, work_dir)
-    git_available = sh(["git", "-C", root, "rev-parse", "--is-inside-work-tree"]) == "true"
 
     # --- registry: specs UNION working dirs -------------------------------
     ids = {}
@@ -559,6 +561,24 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
             legacy_seen.add(pfx)
             continue
         active.append(fid)
+    return {"active": active, "legacy_seen": legacy_seen}
+
+
+def lane_ids(lane):
+    """The feature ids a lane's page shows, the ones analyze_lane lists (collapsed ids are in no lane)."""
+    reg = lane_registry(lane["root"], lane["docs_dir"], lane["work_dir"], lane.get("prefixes"), lane.get("legacy_prefixes"))
+    return sorted(reg["active"])
+
+
+def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, today, stale_days):
+    feats_dir = os.path.join(root, docs_dir)
+    work_root = os.path.join(root, work_dir)
+    git_available = sh(["git", "-C", root, "rev-parse", "--is-inside-work-tree"]) == "true"
+    reg = lane_registry(root, docs_dir, work_dir, prefixes, legacy_prefixes)
+    active, legacy_seen = reg["active"], reg["legacy_seen"]
+
+    def has_scope(fid):
+        return os.path.isfile(os.path.join(work_root, fid, "scope.md"))
 
     # --- per-feature reconstruction ---------------------------------------
     out = []
@@ -632,6 +652,7 @@ def parse_lane_arg(arg, defaults):
     registry reader printed for that root resolves from any working directory."""
     name, _, rest = arg.partition(":")
     spec = dict(defaults)
+    spec["prefixes"] = None  # a lane infers its prefixes unless it declares them; a top-level --prefixes is not inherited
     spec["name"] = name.strip() or defaults.get("name")
     for pair in rest.split(";"):
         if "=" not in pair:

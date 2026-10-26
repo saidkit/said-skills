@@ -215,10 +215,17 @@
   // the id regex gates the lookup, the row's own click opens it, and an unknown id does nothing.
   (function(){var id='';try{id=decodeURIComponent((location.hash||'').slice(1));}catch(e){return;}
     if(!/^[A-Za-z]+-\d+(?:-[A-Za-z0-9]+)*$/.test(id))return;
+    // on a multi-lane board, select the lane that holds this exact id first (a lane switch re-loads the lists);
+    // the selected lane is kept when it holds the id, and an id no lane holds leaves the lane alone
+    var ls=$('laneSelect'),holds=function(o){return (o.getAttribute('data-ids')||'').split(',').indexOf(id)>=0;};
+    if(ls&&ls.selectedIndex>=0&&!holds(ls.options[ls.selectedIndex]))for(var i=0;i<ls.options.length;i++){var o=ls.options[i];
+      if(holds(o)){ls.value=o.value;setLane(ls);break;}}
     // a swap of the hidden view, or of the default lane before the stored one, cannot hold the row yet:
-    // keep listening until the row is found, at most a few list swaps
+    // keep listening until the row is found, at most a few list swaps; click once htmx has settled the swap
+    // (on afterSwap the row's hx-get is not bound yet, so its click selects without loading the deep-dive)
+    // the settled swap must be the one holding the row: another list's settle can land before the row's own
     var n=0;function onSwap(e){var t=e.target;if(!t||(t.id!=='roster'&&t.id!=='kanban'))return;
-      var el=byId(id);if(el){document.removeEventListener('htmx:afterSwap',onSwap);el.click();return;}
-      if(++n>=4)document.removeEventListener('htmx:afterSwap',onSwap);}
-    document.addEventListener('htmx:afterSwap',onSwap);})();
+      var el=byId(id);if(el&&t.contains(el)){document.removeEventListener('htmx:afterSettle',onSwap);el.click();return;}
+      if(++n>=4)document.removeEventListener('htmx:afterSettle',onSwap);}
+    document.addEventListener('htmx:afterSettle',onSwap);})();
 })();
