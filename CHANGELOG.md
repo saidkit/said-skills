@@ -2,7 +2,7 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
-## [Unreleased]
+## [0.24.0] - 2026-10-26
 
 One observe skill: `said:status` is folded into `said:board`. `/said:board` opens the web page; `/said:board --cli` prints the terminal board it replaces, and `/said:board --json` its data.
 
