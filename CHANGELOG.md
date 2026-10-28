@@ -2,7 +2,9 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
-## Unreleased
+## [Unreleased]
+
+## [0.25.0] - 2026-10-28
 
 One gate verdict per feature: the full harness recompute runs once, at `review-qa`, and every later gate reads its record.
 
