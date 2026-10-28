@@ -81,63 +81,20 @@
   function inDrawer(){var d=$('drawer');return drawerOpen()&&!!(d&&d.contains(document.activeElement));}
 
   // ---------- movement ----------
-  function moveList(d){var it=items();if(!it.length)return;
-    var i=-1;for(var x=0;x<it.length;x++){if(it[x].getAttribute('data-id')===CUR){i=x;break;}}
-    if(i<0)i=0;else i=Math.max(0,Math.min(it.length-1,i+d));
-    setCursor(it[i].getAttribute('data-id'));activate(false);}
   function kpos(cs){for(var x=0;x<cs.length;x++)for(var y=0;y<cs[x].cards.length;y++)
     if(cs[x].cards[y].getAttribute('data-id')===CUR)return {ci:x,ri:y};
     return {ci:-1,ri:-1};}
-  function moveKanban(dx,dy){var cs=cols();if(!cs.length)return;var p=kpos(cs);
-    if(p.ci<0){for(var x=0;x<cs.length;x++)if(cs[x].cards.length){setCursor(cs[x].cards[0].getAttribute('data-id'));break;}
-      return;}
-    var ci=p.ci,ri=p.ri;
-    if(dx){var nx=ci;while(true){nx+=dx;if(nx<0||nx>=cs.length){nx=ci;break;}if(cs[nx].cards.length)break;}
-      ci=nx;ri=Math.min(ri,cs[ci].cards.length-1);}
-    if(dy)ri=Math.max(0,Math.min(cs[ci].cards.length-1,ri+dy));
-    var c=cs[ci].cards[ri];if(c)setCursor(c.getAttribute('data-id'));}
-  function homeEnd(end){if(vw()==='kanban'){var cs=cols();var ci=kpos(cs).ci;
-      if(ci<0){for(var x=0;x<cs.length;x++)if(cs[x].cards.length){ci=x;break;}if(ci<0)return;}
-      var col=cs[ci];if(!col.cards.length)return;var c=end?col.cards[col.cards.length-1]:col.cards[0];
-      setCursor(c.getAttribute('data-id'));}
-    else{var it=items();if(!it.length)return;var el=end?it[it.length-1]:it[0];
-      setCursor(el.getAttribute('data-id'));activate(false);}}
 
   window.toggleHelp=function(f){var h=$('help');if(!h)return;
     h.classList.toggle('open',(f===undefined)?!h.classList.contains('open'):!!f);};
   document.addEventListener('click',function(e){var h=$('help');if(!h||!h.classList.contains('open'))return;
     if(h.contains(e.target)||(e.target.closest&&e.target.closest('#kbdBtn')))return;h.classList.remove('open');});
 
-  function isType(e){var t=e.target;if(!t)return false;var n=(t.tagName||'').toLowerCase();
-    return n==='input'||n==='textarea'||n==='select'||t.isContentEditable;}
-
-  document.addEventListener('keydown',function(e){
-    if(e.defaultPrevented||e.metaKey||e.ctrlKey||e.altKey)return;
-    if(isType(e))return;
-    var k=e.key;
-    if(k==='?'){window.toggleHelp();e.preventDefault();return;}
-    if(k==='Escape'){
-      var h=$('help');if(h&&h.classList.contains('open')){window.toggleHelp(false);e.preventDefault();return;}
-      if(drawerOpen()){closeDrawer();e.preventDefault();return;}
-      if(inDetail()){focusCursor();e.preventDefault();return;}
-      if(CUR){clearCursor();e.preventDefault();return;}
-      return;}
-    if(vw()==='backlog')return;  // a read-only list: help + Escape only, no row cursor to move
-    var down=(k==='ArrowDown'||k==='j'),up=(k==='ArrowUp'||k==='k'),
-        left=(k==='ArrowLeft'||k==='h'),right=(k==='ArrowRight'||k==='l');
-    if(vw()==='kanban'){
-      if(inDrawer()){if(left){e.preventDefault();closeDrawer();}return;}  // drawer caught the keyboard: Up/Down scroll its content, Left/Esc return to the board
-      if(up||down){e.preventDefault();moveKanban(0,down?1:-1);return;}  // moveKanban self-lands on first card when no cursor (no double-jump)
-      if(left||right){e.preventDefault();moveKanban(right?1:-1,0);return;}
-      if(k==='Home'||k==='End'){e.preventDefault();if(!ensureCursor())return;homeEnd(k==='End');return;}
-      if(k==='Enter'){if(!onBoard())return;e.preventDefault();if(!ensureCursor())return;activate(true);return;}
-    }else{
-      if(inDetail()){if(left){e.preventDefault();focusCursor();}return;}
-      if(up||down){e.preventDefault();moveList(down?1:-1);return;}
-      if(k==='Home'||k==='End'){e.preventDefault();homeEnd(k==='End');return;}
-      if(right||k==='Enter'){if(k==='Enter'&&!onBoard())return;e.preventDefault();if(!ensureCursor())return;activate(true);focusDetail();return;}
-    }
-  });
+  // the shared namespace each board's own script reads: one cursor, one selection, one view
+  var B=window.saidBoard={$:$,vw:vw,items:items,cols:cols,kpos:kpos,cur:function(){return CUR;},setCursor:setCursor,
+    activate:activate,ensureCursor:ensureCursor,focusCursor:focusCursor,clearCursor:clearCursor,drawerOpen:drawerOpen,
+    closeDrawer:closeDrawer,inDetail:inDetail,focusDetail:focusDetail,onBoard:onBoard,inDrawer:inDrawer,boards:{},
+    board:function(){return document.body.getAttribute('data-board')||'features';}};
 
   // ---------- tasks / detail (unchanged behavior) ----------
   window.copyNext=function(btn){var d=btn.closest('.d-next');var c=d&&d.querySelector('.nextcmd');if(!c)return;
@@ -153,8 +110,8 @@
 
   function refreshVisible(){if(!window.htmx)return;var v=vw();
     if(v==='kanban'){var kk=$('kanban');if(kk)htmx.trigger(kk,'refresh');}
-    else if(v==='backlog'){var bl=$('backlog-list');if(bl)htmx.trigger(bl,'refresh');}
     else htmx.trigger('#roster','refresh');}
+  refreshVisible=(function(f){return function(){var b=B.board(),o=B.boards[b];if(b!=='features'){if(o&&o.refresh)o.refresh(window.__fresh);return;}f();};})(refreshVisible);
   window.refreshVisible=refreshVisible;
   // Manual refresh: force a live derive (busts the server's short-TTL guard). __fresh is read
   // synchronously by the fragment's hx-vals while htmx.trigger issues the request, then reset.
@@ -171,6 +128,23 @@
     setTimeout(function(){if(CUR&&byId(CUR))paint();else CUR=null;},80);};
   window.toggleHideClosed=function(cb){var k=$('kanban');if(k)k.classList.toggle('hide-closed',cb.checked);
     if(CUR&&!vis(byId(CUR)))clearCursor();};
+  // ---------- the board switch: one board surface at a time; a board the switch does not show opens features ----------
+  function boardNames(){return Array.prototype.map.call(document.querySelectorAll('.board-switch a[data-board]'),function(a){return a.getAttribute('data-board');});}
+  function setBoard(b){if(boardNames().indexOf(b)<0)b='features';var feat=b==='features',p=$('boardpane');document.body.setAttribute('data-board',b);
+    try{localStorage.setItem('sb-board',b);}catch(e){}
+    document.querySelectorAll('.board-switch a[data-board]').forEach(function(a){var on=a.getAttribute('data-board')===b;a.classList.toggle('btn-active',on);if(on)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
+    ['listwrap','kanbanwrap'].forEach(function(id){var el=$(id);if(el)el.style.display=feat?'':'none';});
+    document.querySelectorAll('.vtoggle,.hz-right .switch').forEach(function(el){el.style.display=feat?'':'none';});
+    if(!p&&!feat){p=document.createElement('section');p.id='boardpane';p.className='boardpane';$('main').appendChild(p);}
+    if(p){p.style.display=feat?'none':'';p.setAttribute('data-board',b);
+      if(!feat){var o=B.boards[b];if(o&&o.show)o.show(p);else p.innerHTML='<div class="empty-state">This board has nothing to show yet.</div>';}}
+    var u=new URL(location.href);if(feat)u.searchParams.delete('board');else u.searchParams.set('board',b);
+    history.replaceState(null,'',u.pathname+u.search+u.hash);}
+  document.addEventListener('htmx:beforeRequest',function(e){var t=e.detail&&e.detail.elt;if(B.board()!=='features'&&t&&(t.id==='roster'||t.id==='kanban')){e.preventDefault();B.skipped=true;}});
+  setBoard=(function(f){return function(b){f(b);if(B.board()==='features'&&B.skipped){B.skipped=false;window.refreshNow();}};})(setBoard);
+  window.setBoard=setBoard;
+  document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('.board-switch a[data-board]');
+    if(!a||e.button>0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;e.preventDefault();setBoard(a.getAttribute('data-board'));});
 
   document.addEventListener('htmx:afterSwap',function(e){var t=e.target;if(!t)return;
     if(t.id==='roster'||t.id==='kanban'){
@@ -190,13 +164,6 @@
     return fetch(path,{method:'POST',credentials:'same-origin',
       headers:{'Content-Type':'application/json','X-Said-Board':'1','X-Said-Board-Csrf':csrf()},
       body:JSON.stringify(payload)}).then(function(r){return r.json().catch(function(){return {ok:false,error:'bad response'};});});}
-  window.addTodo=function(form){var i=form.elements.text,t=(i.value||'').trim();
-    if(!t){return false;}
-    post('/todo',{text:t}).then(function(r){
-      if(!r.ok){say(form,r.error||'could not add',true);return;}
-      i.value='';say(form,'added');refreshVisible();
-    }).catch(function(){say(form,'could not add',true);});
-    return false;};
   window.saveConnect=function(form){var v=(form.elements.app.value||'').trim();
     post('/connect',{app:v}).then(function(r){
       say(form,r.ok?'saved, reload to apply':(r.error||'could not save'),!r.ok);
@@ -205,12 +172,15 @@
 
   // No auto-poll: status refreshes on a full page load and via the header refresh button only.
   apply(localStorage.getItem('sb-theme')||(sysDark()?'dark':'light'));
-  // a stored view whose toggle is not on this page (Backlog on an unconnected board) falls back
+  // a stored view whose toggle is not on this page (a view the board no longer has) falls back
   var sv=localStorage.getItem('sb-view')||'list';
   if(!document.querySelector('.vtoggle .btn[data-view="'+cssEsc(sv)+'"]'))sv='list';
   document.body.setAttribute('data-view',sv);
   document.querySelectorAll('.vtoggle .btn').forEach(function(b){b.classList.toggle('btn-active',b.getAttribute('data-view')===sv);});
   restoreLane();
+  // the board to open: the URL's ?board=, else the stored one; a feature link in the URL fragment opens features
+  var wb=null;try{wb=new URLSearchParams(location.search).get('board')||localStorage.getItem('sb-board');}catch(e){}
+  setBoard(/^#[A-Za-z]+-\d/.test(location.hash)?'features':(wb||'features'));
   // A feature named in the URL fragment (`#PROJ-01`) opens its deep-dive once the list has loaded:
   // the id regex gates the lookup, the row's own click opens it, and an unknown id does nothing.
   (function(){var id='';try{id=decodeURIComponent((location.hash||'').slice(1));}catch(e){return;}

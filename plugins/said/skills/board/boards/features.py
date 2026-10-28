@@ -168,9 +168,11 @@ def render_tasks(tasks, fid=None):
             % (default, total, todo_n, head, "".join(rows)))
 
 
-def render_feature(data, fid):
-    f = next((x for x in data["features"] if x["id"].lower() == fid.lower()
-              or x["id"].lower().startswith(fid.lower() + "-")), None)
+def render_feature(data, fid, lane=None):
+    hits = [x for x in data["features"] if x["id"].lower() == fid.lower()
+            or x["id"].lower().startswith(fid.lower() + "-")]
+    # the same id in two lanes: the named lane's match first; an unknown or absent lane keeps the first match
+    f = next((x for x in hits if lane and x["lane"] == lane), None) or (hits[0] if hits else None)
     if not f:
         return '<div class="empty-state">No such feature: <code>%s</code></div>' % esc(fid)
     ci = PHASE_SEQ.index(f["phase"]) if f["phase"] in PHASE_SEQ else -1
