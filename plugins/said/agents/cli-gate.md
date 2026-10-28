@@ -3,10 +3,11 @@ name: cli-gate
 description: >
   SAID cli-surface Checker (oracle judge). Verifies a `cli` lane's shipped surface —
   its operator-invoked skills — by running the lane's exit-coded structural + eval gate
-  and emitting an L1 verdict artifact. Deterministic: the L2 oracle recomputes this gate
-  rather than trusting the verdict file, so a fabricated PASS is caught. Invoked by the
-  reviewer gate when a lane declares `SAID.reviewers:` includes `cli-gate`; it does not
-  modify code — it runs the gate and records the verdict.
+  and emitting an L1 verdict artifact. Deterministic:
+  the oracle is the recompute `review-qa` runs once per feature, whose rows the script itself writes to the feature's record, so a fabricated PASS is caught.
+  Runs when a lane declares `cli-gate` in `SAID.reviewers:` and its verdict is wanted
+  (`accept` reads the record instead when it is current); it does not modify code,
+  it runs the gate and records the verdict.
 model: haiku
 tools: Bash, Read
 said-checker: cli-gate
@@ -33,7 +34,8 @@ Exit 0 (the command line passes, no undeclared failure) = PASS.
 
 Run it yourself with `SAID_ROOT=<lane root> bash <plugin dir>/skills/board/gate_recompute.sh`, where
 `<plugin dir>` is the directory two levels above this agent file when `$SAID_PLUGIN_ROOT` is unset. Copy
-its `gate-recompute:` rows into the verdict body; never type a row yourself.
+its `gate-recompute:` rows into the verdict body, or copy them from the feature's record
+`<SAID.working:>/gate-<feature-id>.md` when its `head:` equals HEAD; never type a row yourself.
 
 ## The L1 verdict it emits
 
@@ -69,8 +71,12 @@ gate-recompute: evaluation/<unit> exit=1 FAIL <id>          (undeclared -> verdi
 
 ## Why it is an oracle (deterministic)
 
-Because the judge is a deterministic exit code, the L2 oracle (`said_status.py --reviewer-gate`)
-does **not** trust this verdict file — it **recomputes** the gate (`said-recompute`) from the lane
+Because the judge is a deterministic exit code, no verdict file is trusted. The oracle is the recompute
+`review-qa` runs once per feature: the script writes its rows to `<SAID.working:>/gate-<feature-id>.md`
+and this agent's L1 verdict file (`review-cli-gate-<task>.md`) copies its rows from that record. `accept` and
+`debrief` read the record at a matching HEAD and rerun nothing; a stale or absent record stops them with
+`gate owed: run /said:review-qa <id>`. The engine's `said_status.py --reviewer-gate`, called by a gate for a
+Checker that is not oracle-kind or by an operator, still recomputes the gate (`said-recompute`) from the lane
 root. A fabricated `verdict: PASS` whose gate actually fails is caught at recompute. This is the
 one shipped Checker that exercises the recompute path on a live surface (`web-ux` is `comparative`
 and has no recompute).

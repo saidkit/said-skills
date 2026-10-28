@@ -46,7 +46,7 @@ A fast-track run is a `## Fast-track F<NN>` block in the tasks log whose `closed
 - **What runs:** run quality gates (once) + Fix integrity + Refs conformance for the listed ids only; every other step is feature-mode's, except Step 0 #1-#2 (the run form's parse and status check). BLOCK when the log has no open `## Fast-track F<NN>` block (absent, or its `closed:` filled).
 - **Fix integrity adds two run lines per listed task:** the deferral line `fast-track F<NN>: review-ux, code review, review-qa, accept deferred to its close`, written by `impl`, compared byte for byte; and the line beginning `fast-track F<NN> code review:`, which `/said:said`'s run close (or the operator driving the close) writes into the task's `### Fix` after the task's code-review group is reviewed and before this gate runs. A missing or altered line is a FAIL for that task; a task in no code-review group has no such line: FAIL (the run stays open; the run close is re-issued with the task in a group, then this gate re-runs). Plan one row per task for them, `fix-claim/<task-id>/run-lines`.
 - **Semantic rows:** discharge a row a declared reviewer covers by the run's verdict, `docs/working/<feature-id>/review-<checker-id>-<feature-id>-F<NN>.md` (`verdict: PASS`), in place of the per-task one; absent or not `verdict: PASS`, the row reads as it does for a missing per-task verdict.
-- **Report:** In run-mode `<id>` is `<feature-id>-F<NN>` everywhere this skill writes it (the Phase A plan, the `.full.md` redirect, the Phase C report): `docs/working/<feature-id>/review-qa-<feature-id>-F<NN>.md`. It is the run's gate report, never the feature's verdict; the feature's Deliver row runs feature-mode.
+- **Report:** In run-mode `<id>` is `<feature-id>-F<NN>` everywhere this skill writes it, except the gate record, which is keyed by the feature id (the Phase A plan, the `.full.md` redirect, the Phase C report): `docs/working/<feature-id>/review-qa-<feature-id>-F<NN>.md`. It is the run's gate report, never the feature's verdict; the feature's Deliver row runs feature-mode.
 
 ## Common compositions
 
@@ -145,11 +145,11 @@ Procedure (above the gate-reviewer threshold, the `### Fix` and `Refs:` parsing 
 
 ## Phase B — Execute
 
-> **Stance: run the umbrella once; re-run Fix-claim mechanicals; run Refs assertions where mapped. One verdict per check. No interpretation.**
+> **Stance: run the gate recompute once, writing the record; re-run Fix-claim mechanicals; run Refs assertions where mapped. One verdict per check. No interpretation.**
 
 Procedure:
 
-1. **Quality gates (Q4=a — full umbrella always).** Run `<quality-gates-umbrella>` (resolved in Step 0 #3) in one shot. Capture exit code + stdout/stderr. PASS / FAIL by exit code.
+1. **Quality gates (Q4=a — full umbrella always, once).** A `doc` lane keeps its `doc-gate` terminal and writes no record; a Secondary, Tertiary or Quaternary resolution runs `<quality-gates-umbrella>` in one shot and captures exit code + stdout/stderr. When Step 0 #3 resolved the umbrella through the Primary chain to a shell command (`SAID.commands:`, including a declared `none`, which skips only the lane command), run `SAID_ROOT=<lane-root> SAID_GATE_OUT=<SAID.working:>/gate-<id>.md bash <skill-dir>/../board/gate_recompute.sh` in one shot (`<SAID.working:>` resolved against the lane root; `<id>` = the feature id in every mode; the script runs the lane command first, then every harness, so it subsumes the umbrella; run-mode writes the same record). Exit 0 is PASS and 1 is FAIL (an `EXPECTED` row is a declared failure, not a FAIL); exit 2 (missing lane key) or 3 (nested run) is a HALT, not a verdict, and leaves no record. The script wrote the record, a session never types a row. The step reads the `head:` line and the rows from the record, and the report cites the record path and its `head:`.
 
 2. **Fix presence + claim re-checks.** For each parsed claim:
    - **Test count (Q1=b — ≥-tolerant):** re-run `<tests>`, parse count from output, verify `actual >= claim_end`. PASS if so; FAIL if actual < claim (test deletion or regression).
@@ -168,6 +168,7 @@ Procedure:
    | section | check | verdict | evidence |
    |---|---|---|---|
    | quality-gates | <umbrella command> | PASS | exit 0; <test count + lint/typecheck/knip status> |
+   | quality-gates | gate_recompute.sh -> <record path> | PASS | exit 0; head: <sha>; <N> harness rows (<M> PASS, <K> EXPECTED) |
    | fix-claim/<task-id> | <claim — e.g., Tests N -> M> | PASS | actual: M (≥ claim); `<tests>` |
    | fix-claim/<task-id> | <claim — e.g., grep returns 0> | PASS | `<re-verify command>` -> 0 matches |
    | fix-claim/<task-id> | <claim — e.g., file deleted> | PASS | `! [ -e <path> ]` -> true |
@@ -207,10 +208,10 @@ Gate effect for `/said:debrief`:
 - **NEVER hardcode language-specific commands in this SKILL.md.** No literal `bunx tsc`, `go test`, `cargo run`, `npm run` actions inside skill steps. Always resolve via Step 0 #3. (Examples in the resolution chain are illustrative for the resolver, not action prescriptions.)
 - **Don't run on `Status: Todo` / `Status: In progress` tasks.** BLOCK; redirect to `/said:impl`.
 - **Don't auto-promote WARN -> PASS.** Operator must verify each WARN. Auto-promotion defeats the gate.
-- **Don't edit code, specs, or tasks.** Read-only by contract. Even when finding obvious typos.
+- **Don't edit code, specs, or tasks.** Read-only by contract. Even when finding obvious typos. The one write is the gate record the recompute script itself produces (Phase B #1).
 - **Don't re-implement what `/said:accept` does.** Strict scope separation: hygiene (this skill) vs behavioral contract (sibling). Don't read `### Acceptance` sections; don't classify AC items.
 - **Don't synthesize grep commands from ambiguous prose.** Q2=c — try canonical-shape extraction first; on parse failure, operator-prompt. Don't fabricate complex grep commands from prose hints.
-- **Don't run partial quality gates in task-mode.** Q4=a — full umbrella always. Partial gating risks missing cross-cutting regressions; the cost is acceptable.
+- **Don't run partial quality gates in task-mode.** Q4=a — full umbrella always. Partial gating risks missing cross-cutting regressions; the cost is acceptable. The record (`<SAID.working:>/gate-<id>.md`) is the one place the full set runs: `accept` and `debrief` read it and rerun nothing.
 - **Don't strict-equal gate test counts.** Q1=b — `actual ≥ claim` is correct. Test growth is expected; deletion shows up elsewhere (failed lint, removed test files visible in diff).
 - **Don't grow `docs/qa/feature-qa-checklist.md` from the skill side.** Project owns its rule corpus; skill reads. Operator adds entries as patterns earn their place per the earn-its-place-ADR. Skill stays rule-agnostic.
 - **Don't run UX rules.** This skill reads `docs/qa/feature-qa-checklist.md` only.
@@ -230,7 +231,7 @@ Before exiting Phase C:
 - [ ] All 3 phases distinct in transcript (Preflight + Phase A + Phase B + Phase C).
 - [ ] Phase A produced `review-qa-<id>.md` plan + STOPPED for operator review.
 - [ ] No hardcoded language-specific commands in execution path — all resolved via Step 0 #3.
-- [ ] `<quality-gates-umbrella>` ran exactly once per invocation.
+- [ ] `<quality-gates-umbrella>` (or the recompute script, Phase B #1) ran exactly once per invocation.
 - [ ] No edits to source files, specs, or tasks — read-only confirmed.
 - [ ] `Refs:` items without a mapping in `docs/qa/feature-qa-checklist.md` surfaced as WARN, not auto-promoted.
 - [ ] Test count claims verified with `actual >= claim` semantics, not strict-equal.

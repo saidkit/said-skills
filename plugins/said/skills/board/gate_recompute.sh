@@ -11,8 +11,13 @@
 # Exit 0 iff the command line passes and no harness fails undeclared; 2 = a missing lane key; 3 = a nested run
 # of the same lane (a harness that recomputes another lane, e.g. a fixture, is allowed).
 # "until" compares with the lane's own plugin version (its validate target, else <lane>/.claude-plugin).
+# SAID_GATE_OUT=<file>: also write the run's record there -- "head: <sha>" (HEAD of the physical lane root,
+# "none" without git) then every row above, in print order; written whole at exit (a halt or a kill leaves no
+# record); unset, nothing is written and stdout is unchanged. The `skill-doctor: <file> open-P1=<n> reviewer=<id>`
+# rows a reviewer wrote through gate_record_row.py survive a rerun at the same head and are dropped at a moved one;
+# the gate-recompute rows are always replaced whole.
 # Env: SAID_ROOT (lane root), SAID_PLUGIN_ROOT (this plugin),
-#      SAID_RECOMPUTE_TIMEOUT (seconds per harness, default 120)
+#      SAID_RECOMPUTE_TIMEOUT (seconds per harness, default 120), SAID_GATE_OUT (record file, optional)
 lane_root="$(cd "${SAID_ROOT:-$PWD}" 2>/dev/null && pwd -P)"
 case ":${SAID_GATE_RECOMPUTE_ACTIVE:-}:" in
   *":$lane_root:"*)
@@ -26,6 +31,35 @@ import json, os, re, signal, subprocess, sys
 
 root, plugin_root, timeout = sys.argv[1], sys.argv[2], int(sys.argv[3])
 ID = re.compile(r"^[A-Za-z][A-Za-z0-9._-]*$")
+rows = []  # every row printed, for the record
+
+
+def row(text):
+    print(text)
+    rows.append(text)
+
+
+def write_record(path):
+    # the record is the script's, never a session's: head sha from the physical root, then the rows
+    phys = os.path.realpath(root)
+    try:
+        sha = subprocess.run(["git", "-C", phys, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() or "none"
+    except OSError:
+        sha = "none"
+    kept = []  # a reviewer's rows stand only at the head they were written for
+    try:
+        prior = open(path).read().split("\n")
+        if prior[0] == "head: %s" % sha:
+            kept = [l for l in prior[1:] if l.startswith("skill-doctor: ")]
+    except OSError:
+        pass
+    os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("head: %s\n" % sha)
+        for r in rows + kept:
+            f.write(r + "\n")
+    os.replace(tmp, path)
 
 
 def key(text, name):
@@ -74,10 +108,10 @@ def lane_version(unit):
 
 fail = 0
 if commands.strip() == "none":
-    print("gate-recompute: commands skip (SAID.commands: none)")
+    row("gate-recompute: commands skip (SAID.commands: none)")
 else:
     rc = subprocess.run(commands, shell=True, cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
-    print("gate-recompute: commands exit=%d %s" % (rc, "PASS" if rc == 0 else "FAIL"))
+    row("gate-recompute: commands exit=%d %s" % (rc, "PASS" if rc == 0 else "FAIL"))
     fail |= rc != 0
 
 docs = os.path.join(root, docs_root.strip("/"))
@@ -104,7 +138,8 @@ for d, dirs, files in os.walk(evaluation, followlinks=False):
         units.append(d)
 for d in sorted(units):
     unit = os.path.relpath(d, docs)
-    env = dict(os.environ, PWD=d)  # keep the logical path: harnesses resolve their root from it
+    env = {k: v for k, v in os.environ.items() if k != "SAID_GATE_OUT"}  # the record is this run's, never a child's
+    env["PWD"] = d  # keep the logical path: harnesses resolve their root from it
     try:
         p = subprocess.Popen(["bash", "./harness.sh"], cwd=d, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT, start_new_session=True)
@@ -113,7 +148,7 @@ for d in sorted(units):
     except subprocess.TimeoutExpired:
         os.killpg(p.pid, signal.SIGKILL)
         p.communicate()
-        print("gate-recompute: %s exit=124 FAIL timeout-%ds" % (unit, timeout))
+        row("gate-recompute: %s exit=124 FAIL timeout-%ds" % (unit, timeout))
         fail = 1
         continue
     text = out.decode("utf-8", "replace")
@@ -121,14 +156,17 @@ for d in sorted(units):
     ver = lane_version(unit)
     ok_decl = {i: u for i, u in declared.get(unit, {}).items() if u is None or ver is None or vtuple(ver) < vtuple(u)}
     if rc == 0:
-        print("gate-recompute: %s exit=0 PASS" % unit)
+        row("gate-recompute: %s exit=0 PASS" % unit)
         for i in sorted(declared.get(unit, {})):
-            print("gate-recompute: %s exit=0 PASS stale-declaration %s" % (unit, i))
+            row("gate-recompute: %s exit=0 PASS stale-declaration %s" % (unit, i))
         continue
     if ids and all(ID.match(i) and i in ok_decl for i in ids):
-        print("gate-recompute: %s exit=%d EXPECTED %s" % (unit, rc, " ".join(ids)))
+        row("gate-recompute: %s exit=%d EXPECTED %s" % (unit, rc, " ".join(ids)))
     else:
-        print("gate-recompute: %s exit=%d FAIL %s" % (unit, rc, " ".join(ids) or "no-fail-id"))
+        row("gate-recompute: %s exit=%d FAIL %s" % (unit, rc, " ".join(ids) or "no-fail-id"))
         fail = 1
+gate_out = os.environ.get("SAID_GATE_OUT")
+if gate_out:
+    write_record(gate_out)
 sys.exit(1 if fail else 0)
 PY

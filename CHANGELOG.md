@@ -2,6 +2,16 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## Unreleased
+
+One gate verdict per feature: the full harness recompute runs once, at `review-qa`, and every later gate reads its record.
+
+- **Changed:** `review-qa` runs its quality-gate step through `skills/board/gate_recompute.sh` with `SAID_GATE_OUT=<working dir>/gate-<feature-id>.md`; the script writes that record itself (`head: <sha>` first, then every `gate-recompute:` row), and a session never types a row. A halted or killed run leaves no record; with the variable unset the script prints exactly what it printed before. A `doc` lane keeps its `doc-gate` terminal and writes no record.
+- **Changed:** `accept` and `debrief` read the record at a matching HEAD and rerun nothing; an absent or stale record stops them with `gate owed: run /said:review-qa <id>`. `accept` keeps its reviewer-gate call only for a declared Checker that is not process-spawn plus deterministic.
+- **Added:** the record also carries one reviewer-written `skill-doctor: <file> open-P1=<n> reviewer=<session>` row per touched skill file, written through the bundled `skills/board/gate_record_row.py`; a rerun of the script at the same head keeps these rows and a moved head drops them, and `accept` and `debrief` never read them.
+- **Removed:** the reviewer-gate recorded probe at `impl` Phase C (task close) and, for a `cli-gate` Checker, at `accept` Preflight. `impl` Phase C step 2 now runs the lane command plus the `docs/evaluation/<unit>/harness.sh` each task names, never the full recompute; Phase C has seven steps.
+- **Migration:** a feature closed before this release has no record: run `/said:review-qa <feature-id>` once before `accept` or `debrief`.
+
 ## [0.24.0] - 2026-10-26
 
 One observe skill: `said:status` is folded into `said:board`. `/said:board` opens the web page; `/said:board --cli` prints the terminal board it replaces, and `/said:board --json` its data.
