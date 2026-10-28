@@ -160,5 +160,5 @@ Confirm it writes `docs/working/<feature>/scope.md` in your layout. If it asks f
 
 ## What ships generic vs what you own
 
-- **Ships generic (don't edit in the plugin):** the said:* skills + agents (currently 16 skills + 9 agents) -- all placeholder-driven. The plugin ships no project files; scaffolding comes from your starter.
+- **Ships generic (don't edit in the plugin):** the said:* skills + agents (currently 17 skills + 9 agents) -- all placeholder-driven. The plugin ships no project files; scaffolding comes from your starter.
 - **You own (per project):** the `## Lane` block, your `## Earned rules`, your ADRs / UX-specs / rule registry / grammar, the filled checklists, your docs layout -- all yours; the plugin ships none of it.

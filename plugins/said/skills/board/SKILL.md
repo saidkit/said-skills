@@ -1,37 +1,50 @@
 ---
 name: board
 description: >
-  SAID board, the one read-only observe skill: where every feature sits in the SAID phase chain
+  SAID board, the one observe skill: where every feature sits in the SAID phase chain
   (Scope -> Architect -> Implement -> Deliver -> Closed), what is stalled or waiting, and the command
-  that advances each, derived from on-disk artifacts. The local web page is the default surface;
-  `--cli` prints the terminal board and `--json` the data. Triggered ONLY by "/said:board
-  [<feature-id>] [--cli | --json] [--lanes] [--stale] [stop] [--port N] [--lane ...] [--connect URL]".
+  that advances each, derived from on-disk artifacts; beside it the backlog board and the lane todo
+  board. The local web page is the default surface; `--cli` prints the terminal board and `--json`
+  the data. Triggered ONLY by "/said:board [backlog | todo] [<feature-id>] [--cli | --json] [--lanes]
+  [--stale] [stop] [--port N] [--lane ...] [--connect URL]".
   NOT for driving a phase; NOT root-cause tracing ("/said:triage"); NOT lane configuration
   ("/said:setup").
 ---
 
 # said:board — the SAID board
 
-Run `flow`'s Step-1 reconstruction over **every** feature and **report**: phase, progress, what is stalled, and the command that advances each. `flow` decides and acts on one feature; this reports on all and drives nothing. One deterministic core, `said_status.py`, renders three surfaces: the web page (`serve.py`, the default), the terminal board (`--cli`) and the data layer (`--json`). The web numbers are the terminal numbers because both come from the same `analyze()`. The artifacts are the only source of truth.
+Run `flow`'s Step-1 reconstruction over **every** feature and **report**: phase, progress, what is stalled, and the command that advances each. `flow` decides and acts on one feature; this reports on all and drives nothing. One deterministic core per board renders three surfaces. For the features board, `said_status.py` renders them: the web page (`serve.py`, the default), the terminal board (`--cli`) and the data layer (`--json`). The web numbers are the terminal numbers because both come from the same `analyze()`. The artifacts are the only source of truth.
 
 ## Contract — holds every run
 
-- **Read-only.** No edits, no test runs, no downstream skill invoked. The web page is GET-only unless `--connect` opts in (below).
+- **Observe, with two row writes.** No code, spec or task edits, no test runs, no downstream skill invoked. The page's only writes are a row's priority token and its order on the backlog and todo boards (plus, with `--connect`, the app URL); the features board writes nothing.
 - **Derive, never store.** Reconstruct from artifacts each run; write no status file or `_resume.md`. The web page caches a derive only until the next explicit refresh (a full page load or the header button).
-- **Script numbers are canonical.** `said_status.py` owns the counts; never override them in prose. A wrong number is a bug to fix in the script, not a value to hand-edit.
+- **Script numbers are canonical.** `said_status.py` owns the features board's counts and `said_backlog.py` the backlog and todo boards'; never override them in prose. A wrong number is a bug to fix in the script, not a value to hand-edit.
 - **Loopback only.** The web server binds `127.0.0.1`, holds no credential, makes no network call of its own and proxies nothing.
-- **Hard exit.** `--cli` / `--json`: end with the rendered board and a suggested `Next:` command. Web: launch (or stop) the server, report URL and pid, hand back. Never block on the server, never proceed into a phase. `Next` is copyable text, never a button that runs a `/said:` command.
+- **Hard exit.** `--cli` / `--json`: end with the rendered board and, on the features board, a suggested `Next:` command. Web: launch (or stop) the server, report URL and pid, hand back. Never block on the server, never proceed into a phase. `Next` is copyable text, never a button that runs a `/said:` command.
+
+## Boards
+
+| Board | Web page | `--cli` / `--json` |
+|---|---|---|
+| features (default) | `/said:board` | `said_status.py` (Step 1) |
+| backlog | `/said:board backlog`: the entries by stage and by priority, with each entry's record trail | `said_backlog.py --root <repo-root> --board backlog [--json]` |
+| todo | `/said:board todo`: one tab per registry lane that has a `todo.md`, state and priority filters | `said_backlog.py --root <repo-root> --board todo [--json]` |
+| sessions | reserved, not built: say so and run nothing | none |
+
+The header's board switch moves between the three built boards on one page; each board derives, caches and refreshes on its own. `backlog` and `todo` take no `<feature-id>`, `--lanes`, `--stale`, `--stale-days` or `--lane`: the backlog is the root's one file and the todo board reads the root's lane registry itself. Run `said_backlog.py` only with `--board`; its `set-priority` and `move` subcommands are the page's writes, never this skill's.
 
 ## Invocation
 
 - `/said:board` — open the web board for the current lane (launch the server, open the browser).
 - `/said:board <feature-id>` — open the web board on that feature's deep-dive.
+- `/said:board backlog`, `/said:board todo`: open the web board on that board; with `--cli` or `--json`, print it as text or data (the Boards table).
 - `/said:board stop` — stop the running server.
 - `/said:board --cli` — the terminal roster; `/said:board --cli <feature-id>` the terminal deep-dive.
 - `/said:board --json` — the structured data layer (any view, with the same arguments).
 - `--lanes` — the cross-lane board, grouped by lane: a `--cli` / `--json` view (`--lanes` alone renders it as `--cli`). The web page shows one lane at a time through its header's lane select.
 - `--stale` — attention filter: only non-`Closed` features past their idle threshold. A `--cli` / `--json` argument; on the web page, the header's `stale only` toggle.
-- `--port N`, `--lane ...`, `--stale-days N`, `--connect <url>`, `--todo-file <path>` — web server flags (below).
+- `--port N`, `--lane ...`, `--stale-days N`, `--connect <url>`: web server flags (below).
 
 ## Step 0 — Resolve conventions (declaration-first, then glob)
 
@@ -71,19 +84,20 @@ python3 <skill-dir>/said_status.py \
 - **Omit `--prefixes` / `--legacy-prefixes`** and the script infers the active set (a prefix is active if any id has a spec or `scope.md`); pass them when `CLAUDE.md` states the issued set, to be exact. With `--lane`, a top-level `--prefixes` is ignored: each lane infers its set unless it gives `;prefixes=`, and `--legacy-prefixes` still applies to every lane unless it gives `;legacy=`. `--today` makes a run reproducible; omit it for the real date.
 - **Show the text output verbatim** — columns are deterministically aligned; re-typing reintroduces the drift the script exists to remove.
 - **No `python3`?** Execute the reconstruction contract below by hand with grep/git, and say so.
+- **`--cli` / `--json` for `backlog` or `todo`**: run `python3 <skill-dir>/said_backlog.py --root <repo-root> --board backlog|todo [--json]` and show its output verbatim; the page's numbers are its numbers.
 
 **The web page (default)** — launch or stop the server:
 
 ```bash
 python3 <skill-dir>/serve.py --root <repo-root> [--prefixes PROJ,LEGACY (without --lane)] \
   [--legacy-prefixes LEGACY] [--lane NAME:...]... [--today YYYY-MM-DD] [--stale-days N] \
-  [--port <n>] [--no-open] [--connect http://localhost:3000] [--todo-file docs/todo.md]
+  [--port <n>] [--no-open] [--connect http://localhost:3000]
 python3 <skill-dir>/serve.py stop [--port <n>]
 ```
 
-- On launch it binds `127.0.0.1:<port>`, prints `said:board, <url>/, pid <pid>`, writes a state file (`$TMPDIR/said-board.json`) and opens the browser. With a `<feature-id>`, pass `--no-open` and open the printed URL (it ends in `/`) with `#<feature-id>` appended: the page opens on that feature's deep-dive (an unknown or malformed id opens the board as usual).
+- On launch it binds `127.0.0.1:<port>`, prints `said:board, <url>/, pid <pid>`, writes a state file (`$TMPDIR/said-board.json`) and opens the browser. With a `<feature-id>`, pass `--no-open` and open the printed URL (it ends in `/`) with `#<feature-id>` appended: the page opens on that feature's deep-dive (an unknown or malformed id opens the board as usual). For `backlog` or `todo`, pass `--no-open` and open the printed URL with `?board=backlog` or `?board=todo` appended.
 - **Report the URL and pid**, then hand back; the server runs until stopped. `stop` reads the state file (or falls back to the port's listener) and stops only that server; report what was stopped. Prefer `/said:board stop` over a manual `pkill`.
-- **`--connect <url>`** opts in to a local companion app (loopback URLs only): the page then emits the app's embed, cache-fed comment badges, a Backlog view of the local todo file (`--todo-file`, default `docs/todo.md`) and two local-file writes (`POST /connect`, `POST /todo`), each behind the Origin check, the CSRF token, the JSON-plus-custom-header rule and the opt-in. Without the flag none of it exists. The page's connect form saves which app it talks to, and a later launch with no flag reuses that saved app. A connected board prints and opens a `localhost` URL, not `127.0.0.1`, so the app's session cookie is sent. The embed contract, the badge cache and the write controls are specified in the board's design record.
+- **`--connect <url>`** opts in to a local companion app (loopback URLs only): the page then emits the app's embed, cache-fed comment badges, its mount points and one more local-file write, the app URL (`POST /connect`), behind the Origin check, the CSRF token, the JSON-plus-custom-header rule and the opt-in. Without the flag none of it exists. The page's connect form saves which app it talks to, and a later launch with no flag reuses that saved app. A connected board prints and opens a `localhost` URL, not `127.0.0.1`, so the app's session cookie is sent. The embed contract, the badge cache and the write controls are specified in the board's design record.
 
 ## Step 2 — Add the judgment a script can't
 
@@ -94,7 +108,7 @@ The script gives facts; you give the reading. After showing its output:
 
 ## The reviewer-set enforcement gate (L2 / L4)
 
-Separate from the read-only board, `said_status.py` exposes an **exit-coded** enforcement mode — `--reviewer-gate` — that validates a lane's declared `SAID.reviewers:` set (each Checker's L1 verdict header + a deterministic-family recompute) and exits non-zero on a failing set. `/said:board` never invokes it; the gates do. No pre-close hook runs it automatically: the plugin's only hook is a `SessionStart` re-anchor that injects context and blocks nothing, and no artifact claims the close is auto-blocked; the live-close block stays the gates' own rule.
+Separate from the board, `said_status.py` exposes an **exit-coded** enforcement mode, `--reviewer-gate`, that validates a lane's declared `SAID.reviewers:` set (each Checker's L1 verdict header + a deterministic-family recompute) and exits non-zero on a failing set. `/said:board` never invokes it; the gates do. No pre-close hook runs it automatically: the plugin's only hook is a `SessionStart` re-anchor that injects context and blocks nothing, and no artifact claims the close is auto-blocked; the live-close block stays the gates' own rule.
 
 ## Reconstruction contract — what `said_status.py` computes (and the by-hand fallback)
 
@@ -185,8 +199,8 @@ Resolve lanes per Step 0, then run the script with one `--lane NAME:root=...;doc
 - **Don't trust the Summary Table over the sections** — the script emits an `! integrity` note on mismatch.
 - **Don't render legacy/foreign prefixes per-row.** Collapse to the `legacy:` line.
 - **Don't fabricate dates.** No git -> say so, use in-file `(YYYY-MM-DD)` only.
-- **Don't add a write route to the web page without all four controls, or one that is on without `--connect`.** Everything else is GET.
-- **Don't make the integration default-on.** A plain launch is byte-for-byte the read-only board: no script tag, no mount points, no extra routes.
+- **Don't add a write route without its controls.** Every write checks the Origin, the CSRF token and the JSON-plus-custom-header rule, caps its body and takes its target from the server's own configuration, never from the request; an integration write also needs `--connect`. Everything else is GET.
+- **Don't make the integration default-on.** A plain launch carries no script tag, no mount points and no integration route.
 - **Don't fetch badge counts.** They come from the board's local cache file, so they are instant and survive the app being down.
 - **Don't give the server a credential, a network call, a non-loopback bind, a build step or a render-blocking CDN `<script>`.** htmx is `defer`, daisyUI a plain stylesheet, the server stdlib-only.
 - **Don't reimplement `analyze()`.** Every surface reads `said_status.py` beside this file.

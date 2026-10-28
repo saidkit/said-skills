@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """serve.py — said:board local web dashboard.
 
-Read-only, loopback-only, stdlib-only server. Reuses the analyzer beside it
+Loopback-only, stdlib-only server. Reuses the analyzer beside it
 (said_status.py), its deterministic core, and serves it as a live local page. The HTML shell
 loads **htmx** and **daisyUI** from a CDN (no pip, no node_modules, no build);
 htmx drives the auto-refresh + deep-dive, daisyUI provides components + themes.
-See REQUIREMENTS.md for the contract.
+Its only writes are local files: the backlog and todo boards set a priority token or move an
+entry (`POST /backlog/priority`, `/backlog/order`, `/todo/priority`, `/todo/order`).
 
 **Optional integration (opt-in, `--connect <url>`).** Pointed at a local companion
 app, the board additionally emits an embed — one stylesheet link, one script tag,
 and empty mount points that the app's bundle hydrates — reads comment counts off a
-local cache file, serves a Backlog view of the local todo file, and accepts two
-local-file writes (`POST /connect`, `POST /todo`). Without the flag none of that
-exists: no script tag, no mount points, no extra routes, no behaviour change.
+local cache file, and accepts one more local-file write, the app URL (`POST /connect`).
+Without the flag none of that exists: no script tag, no mount points, no extra route.
 
 The rule that shapes the whole integration: **the board writes local files; the app
 talks to the remote.** The board holds no credential, makes no network call of its
@@ -84,12 +84,10 @@ def _md_inline(s):  # s is already html-escaped; render inline `code`/**bold**, 
 # a config file behind an earlier connect). `connected()` gates every emitter, so
 # an unconfigured install renders and routes exactly as it always has.
 BOARD_DIR = "docs/.board"            # ONE machine-local root: config + cache. Gitignore it.
-CONFIG_JSON = "config.json"          # {"app": "http://localhost:<port>", "todo": "docs/todo.md"}
+CONFIG_JSON = "config.json"          # {"app": "http://localhost:<port>"}
 CACHE_INDEX = ("cache", "index.json")  # badge counts, written by whatever syncs with the app
-TODO_DEFAULT = "docs/todo.md"        # the local backlog file (--todo-file overrides)
 CACHE_MAX_AGE_DAYS = 30              # older than this: the cache is stale -> render nothing
 MAX_BODY = 8192                      # a local write is one line of text, never a payload
-MAX_TODO_LEN = 200
 LOOPBACK = ("localhost", "127.0.0.1", "::1")
 CSRF_META = "said-board-csrf"        # the token is minted into the page...
 CSRF_HEADER = "X-Said-Board-Csrf"    # ...and required back on every write
@@ -247,47 +245,27 @@ def write_config(update):
     return cfg
 
 
-def append_todo(text):
-    """Append one checklist line to the local todo file. Returns the line written."""
-    line = " ".join(str(text).split())[:MAX_TODO_LEN]
-    item = "- [ ] %s (%s)" % (line, date.today().isoformat())
-    path = CFG["todo_path"]
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    exists = os.path.isfile(path)
-    tail = "\n"
-    if exists and os.path.getsize(path):
-        with open(path, "rb") as fh:      # last byte only — the file may be long
-            fh.seek(-1, os.SEEK_END)
-            tail = fh.read(1).decode("utf-8", "ignore")
-    with open(path, "a", encoding="utf-8") as fh:
-        if not exists:
-            fh.write("# Backlog\n\n")
-        elif tail != "\n":
-            fh.write("\n")
-        fh.write(item + "\n")
-    return item
-
-
 # --- single-flight guard: derive on refresh, cache until the next one --------
-# Read-only board: analyze() (a git-per-feature call, seconds on a large repo)
+# The features board: analyze() (a git-per-feature call, seconds on a large repo)
 # runs only on an explicit refresh — a full page load or the header button, both
 # fresh=True — and the result is cached until the next such refresh. Non-fresh
 # requests (deep-dive clicks, lane switches) always reuse the cached derive, so
 # navigating the board never re-runs git. Single-flight collapses the page-load
 # fan-in (page + roster + kanban) onto one run.
-_cache = {}                       # stale_days -> (monotonic_ts, data)
+_cache = {}                       # (board, stale_days) -> (monotonic_ts, data)
 _cache_lock = threading.Lock()
-_flight = {}                      # stale_days -> Lock (one derive per key in flight)
+_write_lock = threading.Lock()    # the board writes, one at a time
+_flight = {}                      # (board, stale_days) -> Lock (one derive per key in flight)
 
 
 def _analyze(stale_days):
     return said_status.analyze(CFG["lanes"], CFG.get("today") or date.today().isoformat(), stale_days, CFG["project"])
 
 
-def get_data(stale_days=None, fresh=False):
-    key = stale_days
+_gen = {}                         # key -> writes so far: a derive that saw an older file is never cached
+
+
+def _single_flight(key, derive, fresh):
     started = time.monotonic()
     if not fresh:
         hit = _cache.get(key)
@@ -299,90 +277,53 @@ def get_data(stale_days=None, fresh=False):
         hit = _cache.get(key)     # a concurrent request may have refreshed meanwhile
         if hit and (not fresh or hit[0] >= started):
             return hit[1]         # non-fresh reuses any cached value; fresh only one produced after it began
-        data = _analyze(stale_days)
-        _cache[key] = (time.monotonic(), data)
+        gen = _gen.get(key, 0)
+        data = derive()
+        if _gen.get(key, 0) == gen:   # a write landed meanwhile: serve this read once, cache nothing
+            _cache[key] = (time.monotonic(), data)
         return data
+
+
+def get_data(stale_days=None, fresh=False):
+    return _single_flight(("features", stale_days), lambda: _analyze(stale_days), fresh)
+
+
+def get_backlog(fresh=False):  # its own key: a backlog load or refresh never runs the analyzer
+    return _single_flight(("backlog",), lambda: said_backlog.board_view(said_backlog.read_all(CFG["root"])), fresh)
+
+
+def warm_features():
+    """The features the features board already derived, or none: a backlog or todo load never runs the analyzer."""
+    hit = _cache.get(("features", None))
+    return (hit[1].get("features") or []) if hit else []
+
+
+def get_todo(fresh=False):  # its own key, as the backlog's
+    return _single_flight(("todo",), lambda: said_backlog.todo_view(said_backlog.read_all(CFG["root"])), fresh)
 
 
 # --- the boards: one module per thing; they import the shell's helpers by name -----------------------
 sys.modules.setdefault("serve", sys.modules[__name__])  # run as a script, the shell is still `serve` to its boards
 from boards.features import render_feature, render_kanban, render_roster  # noqa: E402
-
-
-# --- the Backlog view: the LOCAL todo file, read-only, in the task-row idiom --
-# Connected-only, because it is a route the default install does not have. The list
-# is the local file and nothing else; the shared intake arrives through the
-# `backlog` mount point, which the app's bundle owns.
-TODO_ITEM = re.compile(r"^\s*[-*]\s+(?:\[([ xX])\]\s*)?(\S.*?)\s*$")
-TODO_DATE = re.compile(r"\s*\((\d{4}-\d{2}-\d{2})\)\s*$")
-
-
-def parse_todo(text):
-    """Markdown checklist -> rows. Headings become section labels; anything else is skipped."""
-    out = []
-    for raw in text.splitlines():
-        line = raw.rstrip()
-        if not line.strip():
-            continue
-        if line.lstrip().startswith("#"):
-            head = line.lstrip("#").strip()
-            if head:
-                out.append({"head": head})
-            continue
-        m = TODO_ITEM.match(line)
-        if not m:
-            continue
-        box, body = m.group(1), m.group(2)
-        when = ""
-        md = TODO_DATE.search(body)
-        if md:
-            when, body = md.group(1), body[:md.start()].rstrip()
-        if not body:
-            continue
-        status = "" if box is None else ("Done" if box.lower() == "x" else "Todo")
-        out.append({"text": body, "status": status, "date": when})
-    return out
-
-
-def read_todo():
-    """(rows, exists) for the configured local todo file. Never raises."""
-    try:
-        with open(CFG["todo_path"], encoding="utf-8") as fh:
-            return parse_todo(fh.read()), True
-    except OSError:
-        return [], False
-
-
-def render_backlog():
-    rows, exists = read_todo()
-    stamp = '<span id="updated" hx-swap-oob="true" class="stamp">updated %s</span>' % datetime.now().strftime("%H:%M:%S")
-    rel = esc(CFG["todo_rel"])
-    items = [r for r in rows if "text" in r]
-    if not items:
-        return stamp + ('<div class="empty-state">%s <code>%s</code>.</div>'
-                        % ("No local backlog yet —" if exists else "No local backlog file at", rel))
-    open_n = sum(1 for r in items if r["status"] != "Done")
-    done_n = len(items) - open_n
-    out = [stamp, '<div class="bl-note"><span class="lbl">local</span>'
-                  '<span class="nm">%d open, %d done</span><code>%s</code></div>' % (open_n, done_n, rel)]
-    for r in rows:
-        if "head" in r:
-            out.append('<div class="lanehead">%s</div>' % esc(r["head"]))
-            continue
-        cls = (r["status"] or "none").lower()
-        out.append('<div class="bl-item t-%s"><span class="t-dot"></span>'
-                   '<span class="t-title">%s</span><span class="t-date">%s</span>'
-                   '<span class="t-status">%s</span></div>'
-                   % (esc(cls), esc(r["text"]), esc(r["date"]), esc(r["status"] or "—")))
-    return "\n".join(out)
+from boards.backlog import VIEWS as BACKLOG_VIEWS, render_backlog_board  # noqa: E402
+from boards.todo import render_todo_board  # noqa: E402
+import said_backlog  # noqa: E402  the backlog reader beside the analyzer
 
 
 # --- page shell (htmx + daisyUI from CDN; inline CSS only for layout) --------
 # --- static assets -----------------------------------------------------------
 # Hardcoded allowlist: the request path is only ever a dict KEY, never joined to a
-# filesystem path — so there is no traversal surface (`/board.css` and `/board.js` only).
+# filesystem path - so there is no traversal surface (`/board.css`, `/board.js` and each board's own script).
 ASSETS = {"/board.css": ("board.css", "text/css; charset=utf-8"),
-          "/board.js": ("board.js", "application/javascript; charset=utf-8")}
+          "/board.js": ("board.js", "application/javascript; charset=utf-8"),
+          "/boards/features.js": ("boards/features.js", "application/javascript; charset=utf-8"),
+          "/boards/backlog.js": ("boards/backlog.js", "application/javascript; charset=utf-8"),
+          "/boards/todo.js": ("boards/todo.js", "application/javascript; charset=utf-8"),
+          "/boards/lists.js": ("boards/lists.js", "application/javascript; charset=utf-8"),
+          "/boards/lists.css": ("boards/lists.css", "text/css; charset=utf-8")}
+# the boards the header switch offers, the features board first (the default); board.js swaps the surface
+BOARD_WRITES = ("/backlog/priority", "/backlog/order", "/todo/priority", "/todo/order")  # on with no flag, all behind _write_guard
+BOARD_SWITCH = (('features', 'Features', '/?board=features'), ('backlog', 'Backlog', '/?board=backlog'), ('todo', 'Todo', '/?board=todo'))
 
 
 def read_asset(filename):
@@ -414,7 +355,7 @@ def page():
                    'aria-label="Lane">%s</select>') % lane_opts
     # --- the embed (opt-in). Every one of these strings is "" unless --connect is on. ---
     app = CFG.get("app") or ""
-    embed = bl_toggle = bl_view = body_extra = ""
+    embed = conn_form = body_extra = ""
     if connected():
         # data-said-origin is the ONLY place the app's origin is written; nothing is hardcoded.
         embed = ('<meta name="%s" content="%s">'
@@ -422,23 +363,15 @@ def page():
                  '<script src="%s/embed/said-widgets.js" defer data-said-origin="%s"></script>'
                  % (CSRF_META, esc(CFG["csrf"]), esc(app), esc(app), esc(app)))
         body_extra = ' data-connected="1"'
-        bl_toggle = ('<button class="btn btn-xs join-item" data-view="backlog" '
-                     'onclick="setView(this)">Backlog</button>')
-        bl_view = (
-            '<div id="backlogwrap"><section class="backlog">'
-            '<form class="bl-add" onsubmit="return addTodo(this)">'
-            '<input class="input input-sm bl-input" name="text" maxlength="%d" autocomplete="off" '
-            'placeholder="add a local backlog item..." aria-label="New backlog item">'
-            '<button class="btn btn-xs" type="submit">add</button>'
-            '<span class="bl-msg" role="status"></span></form>'
-            '<section id="backlog-list" hx-get="/fragment/backlog" hx-trigger="load, refresh" '
-            'hx-indicator="#refreshBtn"><div class="empty-state">loading...</div></section>'
-            '%s'
-            '<form class="bl-conn" onsubmit="return saveConnect(this)"><span class="lbl">app</span>'
-            '<input class="input input-xs bl-input" name="app" value="%s" aria-label="Local app URL">'
-            '<button class="btn btn-xs" type="submit">save</button>'
-            '<span class="bl-msg" role="status"></span></form>'
-            "</section></div>" % (MAX_TODO_LEN, mount("backlog"), esc(app)))
+        # the app-URL form posts to /connect: it exists only on an already-connected board
+        conn_form = ('<form class="bl-conn" onsubmit="return saveConnect(this)"><span class="lbl">app</span>'
+                     '<input class="input input-xs bl-input" name="app" value="%s" aria-label="Local app URL">'
+                     '<button class="btn btn-xs" type="submit">save</button>'
+                     '<span class="bl-msg" role="status"></span></form>' % esc(app))
+    else:  # the board writes are on with no flag, so every page carries the token they require
+        embed = '<meta name="%s" content="%s">' % (CSRF_META, esc(CFG["csrf"]))
+    board_switch = '<nav class="board-switch" aria-label="Board">%s</nav>' % "".join(
+        '<a class="btn btn-ghost btn-xs" data-board="%s" href="%s">%s</a>' % (esc(b), esc(h), esc(t)) for b, t, h in BOARD_SWITCH)
     # 3-zone header: LEFT (logo,SAID,project,lane,Update,updated-time) | CENTER (List|Kanban) | RIGHT (rest)
     head = (
         '<div class="hz-left">'
@@ -449,16 +382,16 @@ def page():
         '<button id="refreshBtn" class="btn btn-xs update-pill" onclick="refreshNow()" title="Update from git">Update</button>'
         '<span id="updated" class="stamp">loading...</span>'
         "</div>"
-        '<div class="hz-center"><div class="join vtoggle">'
+        '<div class="hz-center">%s<div class="join vtoggle">'
         '<button class="btn btn-xs join-item btn-active" data-view="list" onclick="setView(this)">List</button>'
-        '<button class="btn btn-xs join-item" data-view="kanban" onclick="setView(this)">Kanban</button>%s</div></div>'
+        '<button class="btn btn-xs join-item" data-view="kanban" onclick="setView(this)">Kanban</button></div></div>'
         '<div class="hz-right">%s'
         '<label class="switch"><input id="staleToggle" type="checkbox" class="toggle toggle-sm" onchange="refreshVisible()">stale only</label>'
         '<label class="switch kanban-only"><input type="checkbox" class="toggle toggle-sm" onchange="toggleHideClosed(this)">hide closed</label>'
         '<button id="kbdBtn" class="btn btn-ghost btn-sm btn-square" onclick="toggleHelp()" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">⌨️</button>'
         '<button id="themeBtn" class="btn btn-ghost btn-sm btn-square" onclick="cycleTheme()" title="Toggle theme">\U0001F319</button>'
         "</div>"
-    ) % (HOME, MARK % (22, 22), esc(project), lane_ico, lane_select, bl_toggle, mount("status"))
+    ) % (HOME, MARK % (22, 22), esc(project), lane_ico, lane_select, board_switch, mount("status"))
     vals = ("hx-vals='js:{stale: (document.getElementById(\"staleToggle\")||{}).checked?1:0, "
             "fresh: window.__fresh?1:0, "
             "lane: (document.getElementById(\"laneSelect\")||{}).value||\"\"}'")
@@ -482,7 +415,7 @@ def page():
         '<section class="detail" id="detail" tabindex="-1"><div class="empty-state">Select a feature — or press <kbd class="k">Up</kbd> <kbd class="k">Down</kbd> — to see its position in the SAID cycle.</div></section>'
         "</div>"
         '<div id="kanbanwrap"><section id="kanban" class="kanban" hx-get="/fragment/kanban" hx-trigger="load, refresh" hx-indicator="#refreshBtn" %s></section></div>'
-        "%s</main>"
+        "</main>"
         '<aside id="drawer" aria-label="feature detail"><div class="drawer-h">'
         '<button class="btn btn-xs btn-ghost" onclick="closeDrawer()" title="Close">✕ close</button></div>'
         '<div id="drawer-content" class="drawer-content"></div></aside>'
@@ -497,17 +430,18 @@ def page():
         '<div class="krow"><span>Toggle help</span><span class="keys"><kbd class="k">?</kbd></span></div>'
         "</div>"
         '<footer><span class="tagline">as said, so done</span>'
-        "<span>%s</span>"
+        "<span>%s</span>%s"
         '<span class="khint"><kbd>Up</kbd><kbd>Down</kbd> move, <kbd>Enter</kbd> open, <kbd>esc</kbd> back, <kbd>?</kbd> keys</span>'
         '<a href="/api/status.json" target="_blank">/api/status.json</a></footer>'
-        '<script src="/board.js" defer></script></body></html>'
-    ) % (esc(project), FONTS, HTMX, DAISY, embed, body_extra, head, vals, vals, bl_view,
-         ("local files, %s" % esc(app)) if connected() else "read-only, 127.0.0.1")
+        '<script src="/board.js" defer></script><script src="/boards/features.js" defer></script><script src="/boards/lists.js" defer></script><script src="/boards/backlog.js" defer></script><script src="/boards/todo.js" defer></script></body></html>'
+    ) % (esc(project), FONTS, HTMX, DAISY, embed, body_extra, head, vals, vals,
+         "local files, %s" % (esc(app) if connected() else "127.0.0.1"), conn_form)
 
 
 # --- HTTP handler ------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
     server_version = "said-board"
+    timeout = 10                  # a stalled request body never holds a handler thread for good
 
     def _send(self, body, ctype="text/html; charset=utf-8", code=200):
         data = body.encode("utf-8") if isinstance(body, str) else body
@@ -519,7 +453,14 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(data)
 
+    def _foreign_host(self):
+        """True unless the Host is one of this server's own loopback origins (a rebinding page sends its own)."""
+        own = {o.split("://", 1)[1] for o in (CFG.get("origins") or set())}
+        return (self.headers.get("Host") or "").strip().lower() not in own
+
     def do_GET(self):
+        if self._foreign_host():
+            return self._send("host", ctype="text/plain", code=403)
         u = urlparse(self.path)
         path, q = u.path, parse_qs(u.query)
         try:
@@ -535,10 +476,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(render_kanban(get_data(fresh=fresh), stale_only=stale, lane=q.get("lane", [None])[0]))
             elif path.startswith("/fragment/feature/"):
                 fid = path[len("/fragment/feature/"):]
-                self._send(render_feature(get_data(), fid) if ID_RE.match(fid)
+                self._send(render_feature(get_data(), fid, lane=q.get("lane", [None])[0]) if ID_RE.match(fid)
                            else '<div class="empty-state">Invalid feature id.</div>', code=200 if ID_RE.match(fid) else 400)
-            elif path == "/fragment/backlog" and connected():  # opt-in: absent (404) otherwise
-                self._send(render_backlog())
+            elif path.startswith("/backlog/") and path[len("/backlog/"):] in BACKLOG_VIEWS:
+                fresh = q.get("fresh", ["0"])[0] in ("1", "true", "on")
+                nexts = {f["id"]: f.get("next") or "" for f in warm_features()}
+                self._send(render_backlog_board(get_backlog(fresh=fresh), path[len("/backlog/"):], nexts))
+            elif path == "/todo/board":
+                fresh = q.get("fresh", ["0"])[0] in ("1", "true", "on")
+                self._send(render_todo_board(get_todo(fresh=fresh), lane=q.get("lane", [None])[0],
+                                             state=q.get("state", ["all"])[0], priority=q.get("priority", ["all"])[0],
+                                             features=warm_features(), lanes=CFG.get("lanes") or [], root=CFG["root"]))
             elif path == "/api/status.json":
                 self._send(json.dumps(get_data(), ensure_ascii=False, indent=2), ctype="application/json; charset=utf-8")
             elif path == "/healthz":
@@ -564,14 +512,14 @@ class Handler(BaseHTTPRequestHandler):
     do_HEAD = do_GET
 
     def _reject(self):
-        self._send("read-only: GET only", ctype="text/plain", code=405)
+        self._send("GET only", ctype="text/plain", code=405)
 
     do_PUT = do_DELETE = do_PATCH = _reject
 
-    # --- local writes (opt-in) -----------------------------------------------
-    # Two routes, both LOCAL FILES: /connect writes docs/.board/config.json, /todo
-    # appends one line to the local todo file. Nothing else, no other method — and
-    # neither exists at all unless the integration is on.
+    # --- local writes ---------------------------------------------------------
+    # All LOCAL FILES: /connect writes docs/.board/config.json and exists only when the
+    # integration is on; the four board writes set a priority token or move an entry in
+    # the backlog or a lane's todo file. Nothing else, no other method.
     #
     # A loopback server has no authentication, which was safe while it was GET-only:
     # any page in any tab can POST cross-origin to a localhost port, and a form-encoded
@@ -582,7 +530,7 @@ class Handler(BaseHTTPRequestHandler):
     #   2. a CSRF token minted into the page and required back;
     #   3. JSON content type PLUS a custom header — neither is producible by a cross-site
     #      form post, so a preflight becomes mandatory and control 1 actually runs;
-    #   4. opt-in — no flag, no route.
+    #   4. opt-in - no flag, no route (/connect only; the board writes carry controls 1-3).
     # No CORS header is ever sent, so that preflight fails and no other origin can reach
     # these routes even before the checks run.
     def _json(self, obj, code=200):
@@ -592,13 +540,13 @@ class Handler(BaseHTTPRequestHandler):
         """None when the request may write, else (code, reason)."""
         if self.headers.get("Origin") not in (CFG.get("origins") or set()):
             return (403, "origin")
-        if not (self.headers.get("Content-Type") or "").lower().startswith("application/json"):
+        if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
             return (415, "content-type")
         if not self.headers.get(WIDGET_HEADER):
             return (403, "header")
         want = CFG.get("csrf") or ""
         token = self.headers.get(CSRF_HEADER) or ""
-        if not want or not hmac.compare_digest(token, want):
+        if not want or not hmac.compare_digest(token.encode("utf-8", "surrogateescape"), want.encode("utf-8")):
             return (403, "csrf")
         return None
 
@@ -612,15 +560,17 @@ class Handler(BaseHTTPRequestHandler):
             return None
         try:
             payload = json.loads(self.rfile.read(n).decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
+        except (ValueError, UnicodeDecodeError, RecursionError):
             return None
         return payload if isinstance(payload, dict) else None
 
     def do_POST(self):
+        if self._foreign_host():
+            return self._json({"ok": False, "error": "host"}, code=403)
         path = urlparse(self.path).path
-        if path not in ("/connect", "/todo"):
-            return self._reject()          # every other path: read-only, GET only
-        if not connected():
+        if path not in ("/connect",) + BOARD_WRITES:
+            return self._reject()          # every other path: GET only
+        if path == "/connect" and not connected():
             return self._json({"ok": False, "error": "not found"}, code=404)
         bad = self._write_guard()
         if bad:
@@ -628,21 +578,53 @@ class Handler(BaseHTTPRequestHandler):
         payload = self._body()
         if payload is None:
             return self._json({"ok": False, "error": "bad request"}, code=400)
+        if path in BOARD_WRITES:
+            return self._board_write(path, payload)
         try:
-            if path == "/connect":
-                app = normalize_origin(payload.get("app"))
-                if not app:
-                    return self._json({"ok": False, "error": "a local http(s) URL is required"}, code=400)
-                write_config({"app": app})
-                CFG["app"] = app           # a reload picks up the new origin; no restart needed
-                return self._json({"ok": True, "app": app})
-            text = payload.get("text")
-            if not isinstance(text, str) or not text.strip():
-                return self._json({"ok": False, "error": "text is required"}, code=400)
-            item = append_todo(text)
-            return self._json({"ok": True, "item": item, "file": CFG["todo_rel"]})
+            app = normalize_origin(payload.get("app"))
+            if not app:
+                return self._json({"ok": False, "error": "a local http(s) URL is required"}, code=400)
+            write_config({"app": app})
+            CFG["app"] = app           # a reload picks up the new origin; no restart needed
+            return self._json({"ok": True, "app": app})
         except OSError as exc:
             return self._json({"ok": False, "error": "cannot write: %s" % exc}, code=500)
+
+    def _board_write(self, path, payload):
+        """A priority or an order write on the backlog or a lane's todo file, through the reader's writers.
+        The body names an entry (key, line, and the lane for a todo line), never a file: the root is the
+        server's own, and any other key is refused."""
+        board, kind = path.split("/")[1:3]
+        allowed = {"key", "line", "letter"} if kind == "priority" else {"key", "line", "to", "before"}
+        if board == "todo":
+            allowed |= {"lane"}
+        if set(payload) - allowed:
+            return self._json({"ok": False, "error": "unknown field: %s" % ", ".join(sorted(set(payload) - allowed))[:80]}, code=400)
+        lane = payload.get("lane") if board == "todo" else None
+        if board == "todo" and not isinstance(lane, str):
+            return self._json({"ok": False, "error": "lane is required"}, code=400)
+        try:
+            with _write_lock:            # one write at a time: a read-modify-replace never races another
+                ok, msg = self._apply_write(kind, payload, lane)
+                with _cache_lock:
+                    _gen[(board,)] = _gen.get((board,), 0) + 1
+                    _cache.pop((board,), None)  # the board re-reads on its next load
+        except Exception as exc:  # the writers refuse rather than raise; this is the last fence
+            ok, msg = False, "refused: %s" % type(exc).__name__
+        msg = said_backlog.clean(str(msg), 300)
+        for r in {os.path.realpath(os.path.abspath(CFG["root"])), os.path.abspath(CFG["root"])}:
+            if len(r) > 1:
+                msg = msg.replace(r, "<root>")  # a writer error never names an absolute path
+        if not ok:
+            return self._json({"ok": False, "error": msg}, code=409)
+        return self._json({"ok": True, "result": msg})
+
+    def _apply_write(self, kind, payload, lane):
+        if kind == "priority":
+            return said_backlog.set_priority(CFG["root"], payload.get("letter"), key=payload.get("key"),
+                                             line=payload.get("line"), lane=lane)
+        return said_backlog.move_entry(CFG["root"], payload.get("key"), payload.get("line"), lane=lane,
+                                       to=payload.get("to"), before=payload.get("before"))
 
     def log_message(self, fmt, *args):
         sys.stderr.write("  %s %s\n" % (datetime.now().strftime("%H:%M:%S"), (fmt % args)))
@@ -726,7 +708,7 @@ def stop_server(port):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="said:board — local web dashboard (read-only, loopback).")
+    ap = argparse.ArgumentParser(description="said:board - local web dashboard (loopback; local-file writes only).")
     ap.add_argument("--root", default=".")
     ap.add_argument("--docs-dir", default="docs/features")
     ap.add_argument("--working-dir", default="docs/working")
@@ -739,10 +721,8 @@ def main():
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true")
     ap.add_argument("--connect", metavar="URL",
-                    help="opt in to the local companion app at URL (loopback only) — embed, badges, "
-                         "Backlog view and the two local-file writes. Omit and none of it exists.")
-    ap.add_argument("--todo-file", default=None,
-                    help="the local backlog file, relative to --root (default: %s)" % TODO_DEFAULT)
+                    help="opt in to the local companion app at URL (loopback only): embed, badges, "
+                         "mounts and the app-URL write. Omit and none of it exists.")
     ap.add_argument("command", nargs="?", default="start", choices=["start", "stop"],
                     help="start (default) or stop the running server")
     a = ap.parse_args()
@@ -777,10 +757,7 @@ def main():
                          "treats those as different hosts and will not send the app's session cookie. "
                          "Serve both on localhost.\n")
     CFG["app"] = app
-    CFG["csrf"] = secrets.token_urlsafe(32) if app else ""
-    todo_rel = a.todo_file or stored.get("todo") or TODO_DEFAULT
-    CFG["todo_rel"] = todo_rel
-    CFG["todo_path"] = os.path.normpath(os.path.join(a.root, todo_rel))
+    CFG["csrf"] = secrets.token_urlsafe(32)  # every launch: the board writes need it, connected or not
 
     missing = [f for f, _ in ASSETS.values() if not os.path.isfile(os.path.join(_BASE, f))]
     if missing:
@@ -798,8 +775,8 @@ def main():
     sys.stderr.write("said:board, %s, pid %d\n%s, loopback, htmx + daisyUI via CDN\n"
                      "stop: `python3 serve.py stop`  (or Ctrl-C), state: %s\n"
                      % (url, os.getpid(),
-                        ("connected, %s, local writes: /connect /todo (%s)" % (CFG["app"], CFG["todo_rel"]))
-                        if connected() else "read-only", PIDFILE))
+                        ("connected, %s, local writes: /connect and the board writes" % CFG["app"])
+                        if connected() else "board writes: priority and order on the backlog and todo boards", PIDFILE))
     if not a.no_open:
         try:
             webbrowser.open(url)
