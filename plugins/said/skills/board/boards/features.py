@@ -1,12 +1,13 @@
 """said:board, the features board: the roster, the kanban and a feature's deep-dive, rendered from the analyzer's data.
 
 A board is one page module over one thing; the shell (serve.py) owns the server, routes, header, refresh and
-cache, the keyboard shell and the write guard. This board registers no route and writes nothing.
+cache, the keyboard shell and the write guard. This board registers no route; its one write is the priority pick (POST /features/priority, the shell's guard).
 """
 from datetime import datetime
 
 import said_status
 from serve import PHASE_SEQ, _md_inline, chip, esc, mount  # the shell's helpers
+from boards import lists as L
 
 
 def _pct(f):
@@ -22,6 +23,14 @@ def _bar(pct, empty=False):
     if empty:
         return '<progress class="progress prog empty" value="0" max="100"></progress>'
     return '<progress class="progress progress-success prog" value="%d" max="100"></progress>' % pct
+
+
+def _pbox(f):
+    """The priority box of a feature: the backlog's box, opening the picker (the spec head's line is what a pick writes);
+    a feature with no spec yet has no head to write, so its box only shows."""
+    if not f["paths"]["spec"]:
+        return L.prio(f["priority"])
+    return L.pslot(f["priority"], 'data-fid="%s" data-lane="%s" data-priority="%s"' % (esc(f["id"]), esc(f["lane"]), esc(f["priority"])))
 
 
 def _flag_html(f):
@@ -48,10 +57,10 @@ def render_row(f):
     return (
         '<button class="row" data-id="%s" data-phase="%s" onclick="selectRow(this)" '
         'hx-get="/fragment/feature/%s" hx-target="#detail" hx-swap="innerHTML" aria-label="%s %s">'
-        '<span class="rid">%s</span>%s<span class="mid">%s</span>%s<span class="rflag">%s</span>'
+        '<span class="rid">%s</span>%s%s<span class="mid">%s</span>%s<span class="rflag">%s</span>'
         "</button>"
     ) % (esc(f["id"]), esc(f["phase"]), esc(f["id"]), esc(f["id"]), esc(f["phase"]),
-         esc(f["id"]), _pill(f["phase"]), mid, todo, _flag_html(f))
+         esc(f["id"]), _pbox(f), _pill(f["phase"]), mid, todo, _flag_html(f))
 
 
 def render_kcard(f):
@@ -73,8 +82,8 @@ def render_kcard(f):
     return (
         '<button class="kcard" data-id="%s" data-phase="%s" hx-get="/fragment/feature/%s" '
         'hx-target="#drawer-content" hx-swap="innerHTML" onclick="openDrawer(this)">'
-        '<div class="kc-idrow"><span class="kc-id">%s</span>%s</div><div class="kc-mid">%s%s</div>%s</button>'
-    ) % (esc(f["id"]), esc(f["phase"]), esc(f["id"]), esc(f["id"]), name, prog, todo, flag)
+        '<div class="kc-idrow"><span class="kc-id">%s</span>%s%s</div><div class="kc-mid">%s%s</div>%s</button>'
+    ) % (esc(f["id"]), esc(f["phase"]), esc(f["id"]), esc(f["id"]), name, _pbox(f), prog, todo, flag)
 
 
 def render_kanban(data, stale_only=False, lane=None):
@@ -123,11 +132,15 @@ SEC_ORDER = ["Problem", "Root cause", "Approach", "Reading list", "Acceptance",
              "Fix", "Deviations", "Gotchas", "Out of scope"]
 
 
+TASK_STATUS_RANK = {"Todo": 0, "Backlog": 1, "Done": 2, "Canceled": 3, "Superseded": 4}
+
+
 def render_tasks(tasks, fid=None):
     if not tasks:
         return '<section class="d-tasks"><h4>Tasks</h4><div class="sec-b muted">No task log yet.</div></section>'
     rows = []
-    for t in tasks:
+    # the sheet's order: status, then priority, then task id; the priority box is read-only here (the log is append-only)
+    for t in sorted(tasks, key=lambda t: (TASK_STATUS_RANK.get(t["status"], 5), said_status.PRIO_RANK.get(t["priority"], 3), t["id"])):
         status = t["status"]
         cls, disp = (status or "none").lower(), (status or "—")
         secs = t["sections"]
@@ -147,9 +160,9 @@ def render_tasks(tasks, fid=None):
         rows.append(
             '<details class="task t-%s"><summary>'
             '<span class="t-dot"></span><code class="t-id">%s</code>'
-            '<span class="t-title">%s</span>%s%s<span class="t-status">%s</span>'
+            '<span class="t-title">%s%s</span>%s%s<span class="t-status">%s</span>'
             "</summary><div class=\"task-body\">%s</div></details>"
-            % (esc(cls), esc(t["id"]), esc(t["title"] or ""), dt, chip(fid, t["id"]), esc(disp), detail))
+            % (esc(cls), esc(t["id"]), L.prio(t["priority"]), esc(t["title"] or ""), dt, chip(fid, t["id"]), esc(disp), detail))
     total = len(tasks)
     todo_n = sum(1 for t in tasks if (t["status"] or "").lower() == "todo")
     default = "todo" if todo_n else "all"
@@ -207,10 +220,10 @@ def render_feature(data, fid, lane=None):
             % esc(f["completeness_note"])) if f.get("completeness_note") else ""
     tasks = render_tasks(said_status.feature_tasks([f["paths"]["tasks"]] if f["paths"]["tasks"] else []), f["id"])
     return (
-        '<div class="d-head"><span class="rid big">%s</span>%s%s%s</div>%s'
+        '<div class="d-head"><span class="rid big">%s</span>%s%s%s%s</div>%s'
         '<ul class="steps steps-horizontal d-steps">%s</ul>'
         '<div class="d-gates">%s</div>%s%s'
         '<div class="d-dates">%s</div>%s%s%s'
         '<div class="d-files">%s</div>'
-    ) % (esc(f["id"]), _pill(f["phase"]), lane_tag, chip(f["id"]), d_name, steps, esc(gate_line), comp, prog, dates,
+    ) % (esc(f["id"]), _pill(f["phase"]), _pbox(f), lane_tag, chip(f["id"]), d_name, steps, esc(gate_line), comp, prog, dates,
          tasks, mount("thread", scope="feature", feature=f["id"]), nxt, files)

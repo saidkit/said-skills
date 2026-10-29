@@ -122,10 +122,11 @@
     for(var i=0;i<ls.options.length;i++){if(ls.options[i].value===want){ok=true;break;}}
     if(ok){if(ls.value!==want){ls.value=want;refreshVisible();}}  // htmx already fired load with the default; re-load the stored lane
     else{localStorage.setItem('sb-lane',ls.value);}}              // no/stale stored lane -> keep the first-declared default
-  window.setView=function(btn){var m=btn.getAttribute('data-view');document.body.setAttribute('data-view',m);localStorage.setItem('sb-view',m);
+  function setView(btn){var m=btn.getAttribute('data-view');document.body.setAttribute('data-view',m);localStorage.setItem('sb-view',m);
     document.querySelectorAll('.vtoggle .btn').forEach(function(b){b.classList.toggle('btn-active',b.getAttribute('data-view')===m);});
     document.body.classList.remove('drawer-open');refreshVisible();
-    setTimeout(function(){if(CUR&&byId(CUR))paint();else CUR=null;},80);};
+    setTimeout(function(){if(CUR&&byId(CUR))paint();else CUR=null;},80);}
+  document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.vtoggle [data-view]');if(b)setView(b);});
   window.toggleHideClosed=function(cb){var k=$('kanban');if(k)k.classList.toggle('hide-closed',cb.checked);
     if(CUR&&!vis(byId(CUR)))clearCursor();};
   // ---------- the board switch: one board surface at a time; a board the switch does not show opens features ----------
@@ -134,7 +135,7 @@
     try{localStorage.setItem('sb-board',b);}catch(e){}
     document.querySelectorAll('.board-switch a[data-board]').forEach(function(a){var on=a.getAttribute('data-board')===b;a.classList.toggle('btn-active',on);if(on)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
     ['listwrap','kanbanwrap'].forEach(function(id){var el=$(id);if(el)el.style.display=feat?'':'none';});
-    document.querySelectorAll('.vtoggle,.hz-right .switch').forEach(function(el){el.style.display=feat?'':'none';});
+    var fb=$('featbar');if(fb)fb.style.display=feat?'':'none';
     if(!p&&!feat){p=document.createElement('section');p.id='boardpane';p.className='boardpane';$('main').appendChild(p);}
     if(p){p.style.display=feat?'none':'';p.setAttribute('data-board',b);
       if(!feat){var o=B.boards[b];if(o&&o.show)o.show(p);else p.innerHTML='<div class="empty-state">This board has nothing to show yet.</div>';}}

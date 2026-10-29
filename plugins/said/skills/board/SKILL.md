@@ -17,7 +17,7 @@ Run `flow`'s Step-1 reconstruction over **every** feature and **report**: phase,
 
 ## Contract — holds every run
 
-- **Observe, with two row writes.** No code, spec or task edits, no test runs, no downstream skill invoked. The page's only writes are a row's priority token and its order on the backlog and todo boards (plus, with `--connect`, the app URL); the features board writes nothing.
+- **Observe, with page writes.** No code, task or other spec edits, no test runs, no downstream skill invoked. The page's writes, by board: backlog, a row's priority and order, quick add of an entry, and edits to an entry's text, notes and tags (with Undo); todo, a line's priority and order, its state, and edits to its text and sub-items (with Undo); features, a feature's `**Priority:**` line on its spec head; plus, with `--connect`, the app URL. Every write touches one entry (an order write moves the entry with its sub-bullets) or one spec head line, behind the same Host, Origin and CSRF checks.
 - **Derive, never store.** Reconstruct from artifacts each run; write no status file or `_resume.md`. The web page caches a derive only until the next explicit refresh (a full page load or the header button).
 - **Script numbers are canonical.** `said_status.py` owns the features board's counts and `said_backlog.py` the backlog and todo boards'; never override them in prose. A wrong number is a bug to fix in the script, not a value to hand-edit.
 - **Loopback only.** The web server binds `127.0.0.1`, holds no credential, makes no network call of its own and proxies nothing.
@@ -28,15 +28,15 @@ Run `flow`'s Step-1 reconstruction over **every** feature and **report**: phase,
 | Board | Web page | `--cli` / `--json` |
 |---|---|---|
 | features (default) | `/said:board` | `said_status.py` (Step 1) |
-| backlog | `/said:board backlog`: the entries by stage and by priority, with each entry's record trail | `said_backlog.py --root <repo-root> --board backlog [--json]` |
+| backlog | `/said:board backlog`: the entries in four views (Outline, By section, By stage, By priority), with each entry's record trail | `said_backlog.py --root <repo-root> --board backlog [--json]` |
 | todo | `/said:board todo`: one tab per registry lane that has a `todo.md`, state and priority filters | `said_backlog.py --root <repo-root> --board todo [--json]` |
 | sessions | reserved, not built: say so and run nothing | none |
 
-The header's board switch moves between the three built boards on one page; each board derives, caches and refreshes on its own. `backlog` and `todo` take no `<feature-id>`, `--lanes`, `--stale`, `--stale-days` or `--lane`: the backlog is the root's one file and the todo board reads the root's lane registry itself. Run `said_backlog.py` only with `--board`; its `set-priority` and `move` subcommands are the page's writes, never this skill's.
+The header's board switch moves between the three built boards on one page; each board derives, caches and refreshes on its own. `backlog` and `todo` take no `<feature-id>`, `--lanes`, `--stale`, `--stale-days` or `--lane`: the backlog is the root's one file and the todo board reads the root's lane registry itself. Run `said_backlog.py` only with `--board`; the page's writes (listed in the Contract) are the page's, never this skill's.
 
 ## Invocation
 
-- `/said:board` — open the web board for the current lane (launch the server, open the browser).
+- `/said:board` — open the web board for the current lane (launch the server with `--no-open` and open the printed URL with `?board=features` appended, so the page does not reopen the last board).
 - `/said:board <feature-id>` — open the web board on that feature's deep-dive.
 - `/said:board backlog`, `/said:board todo`: open the web board on that board; with `--cli` or `--json`, print it as text or data (the Boards table).
 - `/said:board stop` — stop the running server.

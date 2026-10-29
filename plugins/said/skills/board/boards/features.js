@@ -32,6 +32,24 @@
   function isType(e){var t=e.target;if(!t)return false;var n=(t.tagName||'').toLowerCase();
     return n==='input'||n==='textarea'||n==='select'||t.isContentEditable;}
 
+  // the priority box on a row, a card or the sheet: a pick writes the spec head's line, then the lists and an open sheet re-read
+  function csrf(){var m=window.document.querySelector('meta[name="said-board-csrf"]');return m?m.content:'';}
+  function resheet(id){['detail','drawer-content'].forEach(function(c){var box=$(c),s=box&&box.querySelector('.d-head .pslot[data-fid]');
+    if(s&&s.getAttribute('data-fid')===id&&window.htmx){var ln=s.getAttribute('data-lane');
+      htmx.ajax('GET','/fragment/feature/'+encodeURIComponent(id)+(ln?'?lane='+encodeURIComponent(ln):''),{target:'#'+c,swap:'innerHTML'});}});}
+  function setPriority(slot,letter){var id=slot.getAttribute('data-fid'),ln=slot.getAttribute('data-lane'),body={id:id,letter:letter||'none'};if(ln)body.lane=ln;
+    fetch('/features/priority',{method:'POST',credentials:'same-origin',body:JSON.stringify(body),
+      headers:{'Content-Type':'application/json','X-Said-Board':'1','X-Said-Board-Csrf':csrf()}})
+      .then(function(r){return r.json().catch(function(){return {ok:false,error:'HTTP '+r.status};});})
+      .then(function(j){var u=$('updated');
+        if(j&&j.ok){window.refreshVisible();resheet(id);}else if(u)u.textContent=(j&&j.error)||'refused';})
+      .catch(function(){var u=$('updated');if(u)u.textContent='the board did not answer';});}
+  function pickPriority(slot){if(B.lists)B.lists.pick(slot,slot.getAttribute('data-priority')||'',function(l){setPriority(slot,l);});}
+  document.addEventListener('click',function(e){var s=e.target.closest&&e.target.closest('.pslot[data-fid]');
+    if(!s)return;e.preventDefault();e.stopPropagation();pickPriority(s);},true);
+  document.addEventListener('keydown',function(e){var s=e.target.closest&&e.target.closest('.pslot[data-fid]');
+    if(s&&(e.key==='Enter'||e.key===' ')){e.preventDefault();e.stopPropagation();pickPriority(s);}},true);
+
   document.addEventListener('keydown',function(e){
     if(e.defaultPrevented||e.metaKey||e.ctrlKey||e.altKey)return;
     if(isType(e))return;

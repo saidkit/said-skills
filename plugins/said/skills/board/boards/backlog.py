@@ -1,224 +1,279 @@
-"""said:board, the backlog board: the backlog file's entries as a stage-grouped card grid, by stage or by priority.
+"""said:board, the backlog board: the backlog file's entries as an outline of cards, or as cards by section, stage or priority.
 
 A board is one page module over one thing. This one renders the view model `said_backlog.board_view()` builds,
 the same model `said_backlog.py --board backlog` prints as text and `--json`, so the page and the terminal carry
-the same numbers. It writes nothing; every string goes through `esc`. The page shape: a tab per view, filter
-bars (area, stage, record class, search, show closed, reset, priority), one card per entry with a detail block
-the page's side panel shows, and a status line the page's header shows. A feature's `next` comes from the
-features board's cache when it is already warm; the backlog board never runs the analyzer.
+the same numbers. It writes nothing (the add button posts to the one writer); every string goes through `esc`. One fragment carries every entry once, in
+the shape of the chosen view, with its sheet as a hidden template; the toolbar, the filter row and the folds are
+the shared list client (lists.js), which hides what the filters leave out. A card's stage is the reader's own.
 """
-from serve import esc  # the shell's helper
+import datetime
+import os
 
-VIEWS = ("stage", "priority")
+import said_backlog
+from serve import esc  # the shell's helper
+from boards import lists as L
+
+VIEWS = ("outline", "section", "stage", "priority")
+VIEW_LABEL = {"outline": "Outline", "section": "By section", "stage": "By stage", "priority": "By priority"}
 STATE_WORD = {"open": "open", "wip": "in progress", "done": "done"}
-STAGE_COLOR = {"Entry": "#64748b", "Idea": "#2563eb", "Owed reply": "#0891b2", "Scoped": "#7c3aed",
-               "Bugfix": "#dc2626", "Wip only": "#b91c1c", "Promoted": "#d97706", "Resolved": "#6b7280",
-               "Done": "#6b7280"}
-CLOSED_STAGES = ("Done", "Resolved")
-PRIO_COLOR = {"A": "#dc2626", "B": "#d97706", "C": "#2563eb"}
-REC_CLASSES = ("feature", "idea", "handover", "bugfix", "entry")
+STAGE_COLOR = {"Entry": "var(--st-entry)", "Record": "var(--st-record)", "Promoted": "var(--st-promoted)"}
+STAGE_ORDER = CHAIN = ("Entry", "Record", "Promoted")
+RANK = {"A": 0, "B": 1, "C": 2}
 
 
 def stage_color(stage):
-    return STAGE_COLOR.get(stage, "#64748b")
+    return STAGE_COLOR.get(stage, "var(--st-entry)")
 
 
-def prio_badge(letter):
-    """The priority badge: `#A` / `#B` / `#C` in its colour, a dashed `none` without one."""
-    if letter in PRIO_COLOR:
-        return '<span class="lb-prio" style="background:%s" title="priority #%s">#%s</span>' % (PRIO_COLOR[letter], letter, letter)
-    return '<span class="lb-prio none" title="no priority">none</span>'
+def mark(row):
+    return row["feature"] or row["record"]
 
 
-def write_controls(row):
-    """The row's two writes, no confirm: a priority button per letter (none clears) and, for a top-level entry, up and down."""
-    out = ['<span class="row-ctl pctl" role="group" aria-label="Priority and order">']
-    for letter in ("A", "B", "C", "none"):
-        on = (row["priority"] or "none") == letter
-        out.append('<button type="button" class="btn btn-ghost btn-xs%s" data-w="priority" data-letter="%s" aria-pressed="%s" title="%s">%s</button>'
-                   % (" btn-active" if on else "", letter, "true" if on else "false",
-                      "clear the priority" if letter == "none" else "priority #" + letter, letter))
-    pos = int(row.get("position") or 0)
-    if pos >= 1:
-        if pos > 1:
-            out.append('<button type="button" class="btn btn-ghost btn-xs" data-w="order" data-to="%d" aria-label="Move up" title="move up">&uarr;</button>' % (pos - 1))
-        out.append('<button type="button" class="btn btn-ghost btn-xs" data-w="order" data-to="%d" aria-label="Move down" title="move down">&darr;</button>' % (pos + 1))
-    out.append('<span class="row-msg muted" role="status"></span></span>')
-    return "".join(out)
+def formed(row):
+    return bool(row["record"] or row["feature"])
 
 
-def rec_class(row):
-    if row["feature"]:
-        return "feature"
-    if row["record"] and row["trail"]:
-        return row["trail"][0]["kind"] if row["trail"][0]["kind"] in REC_CLASSES else "idea"
-    return "entry"
+def chain_at(row):
+    return 2 if row["feature"] else 1 if row["record"] else 0
 
 
-def card_id(row):
-    """The bold id of a card: the feature, else the record folder, else the stamp, else the line."""
-    if row["feature"]:
-        return row["feature"]
-    if row["record"]:
-        return row["record"]
-    if row["stamp"]:
-        return "@" + row["stamp"]
-    return "line %d" % row["line"]
-
-
-def area(row):
-    return row["section"] + (" / " + row["group"] if row["group"] else "")
-
-
-def trail_text(row):
-    """records: idea 2026-01-02, scope, spec, tasks; a missing one is named."""
-    if not row["trail"]:
-        return "no idea, scope, spec or tasks file"
-    return ", ".join("%s%s%s" % (t["kind"], (" " + t["date"]) if t.get("date") else "", "" if t["exists"] else " (missing)")
-                     for t in row["trail"])
-
-
-def flags(row, nexts):
-    out = ["%s file missing: %s" % (t["kind"], t["path"]) for t in row["trail"] if not t["exists"]]
-    if row["state"] == "unknown":
-        out.append("the state is not open, in progress or done")
+def notes(row):
+    """The entry's own notes: a sub-bullet that is only the record or feature link is the mark, not a note."""
+    out = []
+    for note in row.get("notes") or []:
+        n = note["text"]
+        label = n[1:n.find("]")] if n.startswith("[") and n.endswith(")") and "](" in n else ""
+        if label and (label == row["record"] or label == row["feature"] or (row["feature"] and label.startswith(row["feature"]))):
+            continue
+        out.append(note)
     return out
 
 
-def _trail_spans(row):
-    return ", ".join('<span class="lb-trail%s" title="%s">%s</span>%s'
-                     % ("" if t["exists"] else " missing", esc(t["path"]), esc(t["kind"]),
-                        (" " + esc(t["date"])) if t.get("date") else "")
-                     for t in row["trail"]) or "no idea, scope, spec or tasks file"
+def _note_list(ns, edit=False):
+    """The notes as nested lists, one level per depth (a note never skips a level); the sheet's carry the editor's
+    attributes, except a note with a link in it, which is read-only."""
+    html, depth = [], -1
+    for n in ns:
+        d = min(n["depth"], depth + 1)
+        while depth > d:
+            html.append("</li></ul>")
+            depth -= 1
+        if depth == d:
+            html.append("</li>")
+        else:
+            html.append('<ul class="subs">')
+            depth += 1
+        if edit and "](" not in n["text"] and L.editable(n["raw"]):
+            html.append('<li class="sub" %s><span class="nt" tabindex="0" role="button" title="click to edit">%s</span>'
+                        '<button type="button" class="nx" %s aria-label="remove this note" title="remove">x</button>'
+                        % (L.ed_attrs("note", n["line"], n["raw"], value=n["text"]), L.inline(n["text"]), L.ed_attrs("note-del", n["line"], n["raw"])))
+        else:
+            html.append('<li class="sub">%s' % L.inline(n["text"]))
+    html.append("</li></ul>" * (depth + 1))
+    return "".join(html)
 
 
-def _detail(row, path, related, nexts):
-    """The side panel's content for one card, rendered here; the page only moves it into the panel."""
-    dl = []
+def words(row):
+    return " ".join(row["text"].replace('"', "").split()[:5])
 
-    def add(k, v):
-        if v:
-            dl.append("<dt>%s</dt><dd>%s</dd>" % (esc(k), v))
-    add("kind", "backlog entry (%s)" % esc(rec_class(row)))
-    add("area", esc(area(row)))
-    add("stage", '<span class="lb-stage" style="--sc:%s">%s</span>' % (stage_color(row["stage"]), esc(row["stage"])))
-    add("priority", "%s, home %s:%d (the entry line)" % ("#" + esc(row["priority"]) if row["priority"] else "none", esc(path), row["line"]))
-    add("status", esc(STATE_WORD.get(row["state"], row["state"])))
-    add("raised", esc(row["date"] or ""))
-    add("records", "<ul>%s</ul>" % "".join('<li>%s%s <code>%s</code>%s</li>' % (esc(t["kind"]), (" " + esc(t["date"])) if t.get("date") else "",
-                                                                             esc(t["path"]), "" if t["exists"] else ' <span class="lb-flag">missing</span>')
-                                           for t in row["trail"]) if row["trail"] else "none")
+
+def who(row):
+    return "[%s]" % row["date"] if row["date"] else '"%s"' % words(row)
+
+
+def next_step(row):
+    """(command, what it does) for the entry sheet's Next row."""
+    if row["state"] == "done":
+        return "", "done: kept for the record, shown with show done"
     if row["feature"]:
-        add("feature", '<a class="bl-feature link" href="/#%s">%s</a>' % (esc(row["feature"]), esc(row["feature"])))
-    add("next", ("<code>%s</code>" % esc(nexts[row["feature"]])) if nexts.get(row["feature"]) else "")
-    add("flags", "<br>".join(esc(f) for f in flags(row, nexts)))
-    add("notes", "<ul>%s</ul>" % "".join("<li>%s</li>" % esc(n) for n in row.get("notes") or []) if row.get("notes") else "")
-    add("record key", "<code>%s</code>" % esc(row["key"]))
-    add("source", "<code>%s:%d</code>" % (esc(path), row["line"]))
-    add("text", esc(row["text"]))
-    rel = ""
-    if related:
-        rel = ('<h3>Related, as the records state</h3><ul class="lb-rel">%s</ul>'
-               % "".join('<li><button type="button" class="link" data-open="%s">%s</button> %s</li>'
-                         % (esc(r["key"]), esc(card_id(r)), esc(r["text"][:80])) for r in related))
-    return ('<template class="lb-detail"><h2>%s</h2><div class="lb-dtitle">%s</div><dl class="lb-dl">%s</dl>%s'
-            '<div class="lb-dctl">%s %s</div></template>'
-            % (esc(card_id(row)), esc(row["text"]), "".join(dl), rel, prio_badge(row["priority"]), write_controls(row)))
+        miss = [t for t in row["trail"] if not t["exists"]]
+        kinds = [t["kind"] for t in miss]
+        scope = next((t["path"] for t in row["trail"] if t["kind"] == "scope"), "")
+        if "scope" in kinds:
+            return ("/said:scope-refine " + (os.path.dirname(scope) or scope)), "the feature has no scope yet"
+        if miss:
+            return "/said:architect " + scope, "the feature is missing its " + ", ".join(kinds)
+        return "/said:board " + row["feature"], ('shows its phase and the command that advances it, or open the <a class="flink" href="/#%s">Features board, %s</a>'
+                                                  % (esc(row["feature"]), esc(row["feature"])))
+    if row["record"]:
+        return "/said:backlog promote " + who(row), "plans its move to a feature of a lane, then asks you to confirm once"
+    return "/said:backlog move " + who(row), "gives it a record folder (idea, handover or bugfix) and moves its notes there"
 
 
-def _card(row, path, related, nexts):
-    nxt = nexts.get(row["feature"]) if row["feature"] else ""
-    q = " ".join((card_id(row), row["text"], area(row), trail_text(row), nxt or "", " ".join(row.get("notes") or []))).lower()
-    feat = ""
-    if row["feature"]:
-        feat = ' <a class="bl-feature link" href="/#%s">%s</a>' % (esc(row["feature"]), esc(row["feature"]))  # the features board's deep link
-    fl = flags(row, nexts)
-    return ('<li class="bl-row" data-key="%s" data-id="%s" data-line="%d" data-state="%s" data-stage="%s" data-area="%s" '
-            'data-rec="%s" data-closed="%s" data-q="%s" tabindex="0" role="button" aria-label="%s, %s" style="--sc:%s" data-priority="%s">'
-            '<div class="lb-h">%s<b>%s</b><span class="lb-badge">%s</span><span class="lb-stage">%s</span>%s%s</div>'
-            '<div class="lb-t">%s</div>'
-            '<div class="lb-m">records: %s%s</div>%s%s%s</li>'
-            % (esc(row["key"]), esc(row["key"]), row["line"], esc(row["state"]), esc(row["stage"]), esc(row["section"]),
-               rec_class(row), "1" if row["stage"] in CLOSED_STAGES else "0", esc(q), esc(card_id(row)), esc(row["stage"]),
-               stage_color(row["stage"]), esc(row["priority"]),
-               prio_badge(row["priority"]), esc(card_id(row)), esc(area(row)), esc(row["stage"]),
-               (' <span class="lb-raised">raised %s</span>' % esc(row["date"])) if row["date"] else "", write_controls(row),
-               esc(row["text"]), _trail_spans(row), feat,
-               ('<div class="lb-m">next: <code>%s</code></div>' % esc(nxt)) if nxt else "",
-               ('<div class="lb-f">%s</div>' % esc("; ".join(fl))) if fl else "",
-               _detail(row, path, related, nexts)))
+def _sheet(row, path, today):
+    """The sheet on the feature sheet's anatomy, from the entry's own data; the page moves it into the drawer."""
+    mk = mark(row)
+    head = ""
+    if mk:
+        big = ("rid big long" if len(mk) > 16 else "rid big")
+        head = (('<a class="flink %s" href="/#%s" title="open %s on the Features board">%s</a>' % (big, esc(mk), esc(mk), esc(mk))) if row["feature"]
+                else '<span class="%s">%s</span>' % (big, esc(mk)))
+    head += ('<span class="ph es" style="--pc:%s" data-stage="%s">%s</span><span class="estate" data-state="%s">%s</span>'
+             % (stage_color(row["stage"]), esc(row["stage"]), esc(row["stage"]), esc(row["state"]), esc(STATE_WORD.get(row["state"], row["state"]))))
+    crumb = " / ".join(esc(x) for x in (row["section"], row["group"], row["subgroup"]) if x)
+    cmd, why = next_step(row)
+    dates = "raised %s%s" % (esc(row["date"] or "-"), (", age " + L.age(row["date"], today)) if row["date"] and L.age(row["date"], today) else "")
+    text, _ident = said_backlog.strip_id(row["text"])
+    ed = L.editable(row["raw"])
+    out = ['<div class="d-head">%s</div><div class="ecrumb">%s</div><div class="d-name%s"%s>%s</div>'
+           % (head, crumb, "" if mk else " solo",
+              (' %s tabindex="0" role="button" title="click to edit"' % L.ed_attrs("text", row["line"], row["raw"], value=text)) if ed else "", L.inline(text)),
+           L.steps(CHAIN, chain_at(row)), L.next_row(cmd, why), L.prio_switch(row["priority"]), '<div class="d-dates">%s</div>' % dates]
+    ns = notes(row)
+    every = row.get("notes") or []
+    last = every[-1] if every else {"line": row["line"], "raw": row["raw"], "depth": -1}
+    out.append(L.esec("Notes", (_note_list(ns, True) if ns else '<div class="eempty">No notes.</div>')
+                      + ('<button type="button" class="addnote" %s>+ add note</button>' % L.ed_attrs("note-add", last["line"], last["raw"], depth=last["depth"])
+                         if L.editable(last["raw"]) else "")))
+    chips = "".join('<span class="tagc">#%s%s</span>' % (esc(t), ('<button type="button" class="tagx" %s aria-label="remove tag %s" title="remove">x</button>'
+                                                                  % (L.ed_attrs("tag-del", row["line"], row["raw"], tag=t), esc(t))) if ed else "") for t in row["tags"])
+    out.append(L.esec("Tags", '<div class="tagrow">%s%s</div>' % (chips, ('<input type="text" class="tag-in" %s maxlength="60" placeholder="+ tag" aria-label="add a tag">'
+                                                                         % L.ed_attrs("tag-add", row["line"], row["raw"])) if ed else "")))
+    if row["trail"]:
+        files = "".join('<div class="erow %s"><span class="t-dot"></span><code class="t-id">%s</code><span class="ep">%s</span><span class="t-status">%s</span></div>'
+                        % ("ok" if t["exists"] else "miss", esc(t["kind"]), esc(t["path"]), "present" if t["exists"] else "missing") for t in row["trail"])
+    else:
+        files = '<div class="eempty">No record yet: this entry is the line alone.</div>'
+    out.append(L.esec("Feature files" if row["feature"] else "Record", files))
+    out.append(L.esec("Source", '<div class="esrc"><code>%s:%d</code><span>position %d in the file</span></div>' % (esc(path), row["line"], row["position"])))
+    return '<template class="lb-detail">%s</template>' % "".join(out)
 
 
-def _chips(attr, label, items, colors=None):
-    out = ['<div class="lb-bar" role="group" aria-label="%s"><span class="lb-lbl">%s:</span>' % (esc(label), esc(label))]
-    for value, n in items:
-        dot = ('<i style="background:%s"></i>' % colors[value]) if colors and value in colors else ""
-        out.append('<button type="button" class="lb-chip" data-f="%s" data-v="%s" aria-pressed="true">%s%s <span class="muted">(%d)</span></button>'
-                   % (attr, esc(value), dot, esc(value if attr != "prio" or value == "none" else "#" + value), n))
-    out.append("</div>")
+def _attrs(row, cid, path):
+    q = " ".join([row["text"], row["section"], row["group"], row["subgroup"], row["record"], row["feature"], row["stamp"], row["stage"]]
+                 + ["#" + t for t in row["tags"]] + [n["text"] for n in row.get("notes") or []]).lower()
+    return ('data-key="%s" data-line="%d" data-position="%d" data-cid="%s" data-state="%s" data-stage="%s" data-priority="%s" '
+            'data-section="%s" data-formed="%d" data-done="%d" data-q="%s" tabindex="0" role="button" style="--sc:%s" aria-label="%s"'
+            % (esc(row["key"]), row["line"], row["position"], esc(cid), esc(row["state"]), esc(row["stage"]), esc(row["priority"]),
+               esc(row["section"]), formed(row), row["state"] == "done", esc(q), stage_color(row["stage"]), esc(row["text"][:80])))
+
+
+def _subs(row):
+    ns = notes(row)
+    return _note_list(ns) if ns else ""
+
+
+def _outline_card(row, cid, path, today):
+    right = "%s%s" % (('<span class="st">%s</span>' % esc(STATE_WORD.get(row["state"], row["state"]))) if row["state"] != "open" else "",
+                      ('<span class="dt">%s</span>' % esc(row["date"])) if row["date"] else "")
+    drag = row["position"] >= 1
+    return ('<li class="bl-row ecard%s" %s><div class="er"><span class="lead">%s%s</span><span class="tx">%s</span>%s%s</div>%s%s</li>'
+            % (" dnd" if drag else "", _attrs(row, cid, path), L.GRIP if drag else "", L.pslot(row["priority"]), L.inline(row["text"]),
+               ('<span class="mk">%s</span>' % esc(mark(row))) if mark(row) else "", right, _subs(row), _sheet(row, path, today)))
+
+
+def _card(row, path, today, drop):
+    trail = ", ".join('<span class="%s">%s%s</span>' % ("ok" if t["exists"] else "miss", esc(t["kind"]), "" if t["exists"] else " (missing)") for t in row["trail"])
+    return ('<li class="bl-row bcard" %s%s><div class="h">%s<span>%s</span><span class="badge2">%s</span>%s%s</div><div class="t">%s</div>%s%s%s%s</li>'
+            % (_attrs(row, "", path), ' draggable="true"' if drop else "", L.pslot(row["priority"]), esc(row["stage"]), esc(row["section"]),
+               ('<span>%s</span>' % esc(row["date"])) if row["date"] else "",
+               ('<span class="wip">%s</span>' % esc(STATE_WORD[row["state"]])) if row["state"] == "wip" else "",
+               L.inline(row["text"]), ('<div class="m">%s</div>' % esc(" / ".join(x for x in (row["group"], row["subgroup"]) if x))) if row["group"] else "",
+               ('<div class="m">%s</div>' % trail) if trail else "", ('<div class="mkr"><span class="mk">%s</span></div>' % esc(mark(row))) if mark(row) else "",
+               _sheet(row, path, today)))
+
+
+def _entries(rows, cid, path, today):
+    return '<ul class="entries">%s</ul>' % "".join(_outline_card(r, cid, path, today) for r in rows)
+
+
+def _add_control(label, section, topic, subtopic=None):
+    """The heading's add button: it names the topic (and subtopic) it adds to; the page shows it on hover or focus."""
+    return (' <button type="button" class="qa" data-qs="%s" data-qt="%s"%s title="add an entry to %s" aria-label="add an entry to %s">+ add</button>'
+            % (esc(section), esc(topic), (' data-qu="%s"' % esc(subtopic)) if subtopic is not None else "", esc(label), esc(label)))
+
+
+def _outline(rows, outline, path, today, targets):
+    """The headings come from the file's own sections, so a topic with no entry still shows its heading and add control."""
+    tree = {}
+    for r in rows:
+        sec = tree.setdefault(r["section"], {"direct": [], "topics": {}})
+        if not r["group"]:
+            sec["direct"].append(r)
+        else:
+            tp = sec["topics"].setdefault(r["group"], {"direct": [], "subs": {}})
+            (tp["subs"].setdefault(r["subgroup"], []) if r["subgroup"] else tp["direct"]).append(r)
+    shape = {o["title"]: {t["title"]: t["subtopics"] for t in o["topics"]} for o in outline}
+    out = []
+    for name in dict.fromkeys([o["title"] for o in outline] + list(tree)):
+        sec = tree.get(name, {"direct": [], "topics": {}})
+        n = len(sec["direct"]) + sum(len(t["direct"]) + sum(len(u) for u in t["subs"].values()) for t in sec["topics"].values())
+        out.append('<div class="grp%s">%s' % (" tgt" if name in targets else "", L.heading("h2", "sec:" + name, name, L.count(n))))
+        if sec["direct"]:
+            out.append(_entries(sec["direct"], name + "|", path, today))
+        for g in dict.fromkeys(list(shape.get(name, {})) + list(sec["topics"])):
+            tp = sec["topics"].get(g, {"direct": [], "subs": {}})
+            m = len(tp["direct"]) + sum(len(u) for u in tp["subs"].values())
+            subs = list(dict.fromkeys(shape.get(name, {}).get(g, []) + list(tp["subs"])))
+            body = _entries(tp["direct"], "%s|%s" % (name, g), path, today) if tp["direct"] else ""
+            for sg in subs:
+                urows = tp["subs"].get(sg, [])
+                body += '<div class="topic sub2">%s%s</div>' % (
+                    L.heading("h4", "sub:%s|%s|%s" % (name, g, sg), sg, '<small data-of="%d">%d</small>' % (len(urows), len(urows)), tail=_add_control(sg, name, g, sg)),
+                    _entries(urows, "%s|%s|%s" % (name, g, sg), path, today) if urows else "")
+            out.append('<div class="topic">%s%s</div>' % (L.heading("h3", "grp:%s|%s" % (name, g), g, '<small data-of="%d">%d</small>' % (m, m),
+                                                                    tail="" if subs else _add_control(g, name, g)), body))
+        out.append("</div>")
     return "".join(out)
 
 
-def _counted(rows, key, order=None):
-    seen = {}
-    for r in rows:
-        seen[key(r)] = seen.get(key(r), 0) + 1
-    names = [v for v in (order or []) if v in seen] + sorted(v for v in seen if v not in (order or []))
-    return [(v, seen[v]) for v in names]
+def _by(rows, by, path, today):
+    if by == "section":
+        names = list(dict.fromkeys(r["section"] for r in rows))
+        groups = [(n, "", "", lambda r, n=n: r["section"] == n, False) for n in names]
+    elif by == "stage":
+        names = [s for s in STAGE_ORDER if any(r["stage"] == s for r in rows)]
+        groups = [(n, '<i style="--sc:%s"></i>' % stage_color(n), "", lambda r, n=n: r["stage"] == n, False) for n in names]
+    else:
+        groups = [("Priority #" + p if p != "none" else "No priority", "", p, lambda r, p=p: (r["priority"] or "none") == p, True) for p in L.PRIORITIES]
+    out = []
+    for name, dot, p, test, drop in groups:
+        mine = [r for r in rows if test(r)]
+        if by != "priority":
+            mine.sort(key=lambda r: (RANK.get(r["priority"], 3), r["line"]))
+        out.append('<div class="sect%s" %s><h2>%s%s %s</h2><ul class="grid">%s%s</ul></div>'
+                   % (" pdrop" if drop else "", ('data-drop="%s"' % p) if drop else "", dot, esc(name), L.count(len(mine)),
+                      "".join(_card(r, path, today, drop) for r in mine),
+                      ('<li class="dzone">drop a card here to %s</li>' % ("clear its priority" if p == "none" else "set #" + p)) if drop else ""))
+    return "".join(out)
 
 
-def render_backlog_board(view, by="stage", nexts=None):
+def _toolbar(rows, by, targets):
+    secs = list(dict.fromkeys(r["section"] for r in rows))
+    live = lambda r: r["state"] != "done"  # noqa: E731  the default card set hides done
+    tabs = [("", 'All <span class="tn" data-n="">%d</span>' % sum(1 for r in rows if live(r)), "", "")]
+    tabs += [(s, '%s <span class="tn" data-n="%s">%d</span>' % ('<em class="tgt" title="declared target, not a lane">%s</em>' % esc(s) if s in targets else esc(s), esc(s),
+                                                              sum(1 for r in rows if r["section"] == s and live(r))), "", "") for s in secs]
+    return ('<div class="btool"><div class="bt-l%s"%s><span class="lbl">section</span>%s</div>'
+            '<div class="bt-m"><label class="switch"><input type="checkbox" class="toggle toggle-sm bb-done">show done</label>'
+            '<span class="lbl">cards</span>%s</div><div class="bt-r">%s</div></div>'
+            % (" off" if by == "section" else "", ' title="By section shows every section; the tabs apply to the other views"' if by == "section" else "",
+               L.seg(tabs, "data-sec", "", "Section"), L.seg([("all", "all entries", "", ""), ("formed", "formed only", "", "")], "data-cs", "all", "Cards"),
+               L.seg([(v, VIEW_LABEL[v], "", "") for v in VIEWS], "data-bl-by", by, "View")))
+
+
+def _filters(rows):
+    live = [r for r in rows if r["state"] != "done"]
+    prios = [L.chip("none" if p == "none" else "#" + p, sum(1 for r in live if (r["priority"] or "none") == p), "prio", p, L.PRIO_COLOR.get(p)) for p in L.PRIORITIES]
+    stages = [s for s in STAGE_ORDER if any(r["stage"] == s for r in rows)]
+    chips = [L.chip(s, sum(1 for r in live if r["stage"] == s), "stage", s, stage_color(s)) for s in stages]
+    return L.filter_row([("priority", prios), ("stage", chips)], "search text, record, feature  ( / )")
+
+
+def render_backlog_board(view, by="outline", today=None):
     if by not in VIEWS:
-        by = "stage"
-    nexts = nexts or {}
+        by = "outline"
+    today = datetime.date.fromisoformat(today) if today else datetime.date.today()
     c = view["counts"]
-    status = "backlog: %d entries, %d findings" % (c["entries"], c["findings"])
-    head = ('<div class="bl-head lb-head" data-entries="%d" data-status="%s"><span class="muted">%s</span> '
-            '<span class="bl-count">%d entries</span>'
-            % (c["entries"], esc(status), esc(view["path"]), c["entries"]))
-    if c["findings"]:
-        head += ' <span class="warn">%d findings</span> <span class="muted">(<code>/said:backlog lint</code>)</span>' % c["findings"]
-    head += "</div>"
-    tabs = ('<div class="lb-tabs" role="tablist">%s</div>'
-            % "".join('<button type="button" role="tab" data-bl-by="%s" aria-selected="%s">%s</button>'
-                      % (v, "true" if v == by else "false", "By stage" if v == "stage" else "By priority")
-                      for v in VIEWS))
+    status = "backlog %s: %d entries, %d findings" % (view["path"], c["entries"], c["findings"])
     if not view["exists"]:
-        return '<div class="lb" data-board="backlog">' + tabs + head + '<div class="empty-state">No backlog file.</div></div>'
-    rows = [r for g in view["by_stage"] for r in g["rows"]]
-    groups = view["by_stage"] if by == "stage" else view["by_priority"]
-    # related: the other entries that name the same record or the same feature
-    by_ref = {}
-    for r in rows:
-        for ref in (("r", r["record"]), ("f", r["feature"])):
-            if ref[1]:
-                by_ref.setdefault(ref, []).append(r)
-
-    def related(r):
-        out, seen = [], {r["key"]}
-        for ref in (("r", r["record"]), ("f", r["feature"])):
-            for o in by_ref.get(ref, []) if ref[1] else []:
-                if o["key"] not in seen:
-                    seen.add(o["key"])
-                    out.append(o)
-        return out
-    stage_names = [g["stage"] for g in view["by_stage"]]
-    bars = (_chips("area", "area", _counted(rows, lambda r: r["section"]))
-            + _chips("stage", "stage", _counted(rows, lambda r: r["stage"], stage_names), STAGE_COLOR)
-            + _chips("rec", "record", _counted(rows, rec_class, list(REC_CLASSES)))
-            + '<div class="lb-bar"><input type="search" class="lb-q" placeholder="filter by id, title, record, next" aria-label="filter">'
-              '<label class="lb-lbl"><input type="checkbox" class="lb-closed"> show closed / done</label>'
-              '<button type="button" class="link lb-reset">reset filters</button></div>'
-            + _chips("prio", "priority", [(p, sum(1 for r in rows if (r["priority"] or "none") == p)) for p in ("A", "B", "C", "none")], PRIO_COLOR))
-    note = ('<div class="lb-note">Stage is read off the records present: an entry alone = Entry; an idea or handover record = '
-            'its stage; a feature link = Promoted; a ticked box = Done. Raised = the entry\'s stamp. Enter or a click opens the detail.</div>')
-    out = ['<div class="lb" data-board="backlog">', tabs, head, bars, note, '<div class="bl-groups" data-by="%s">' % by]
-    for g in groups:
-        label = g["stage"] if by == "stage" else ("Priority #" + g["priority"] if g["priority"] != "none" else "No priority")
-        color = stage_color(g["stage"]) if by == "stage" else PRIO_COLOR.get(g["priority"], "#64748b")
-        out.append('<section class="bl-group lb-group" style="--sc:%s"><h3>%s <span class="lb-count" data-of="%d">%d of %d</span></h3><ul class="lb-grid">%s</ul></section>'
-                   % (color, esc(label), len(g["rows"]), len(g["rows"]), len(g["rows"]),
-                      "".join(_card(r, view["path"], related(r), nexts) for r in g["rows"])))
-    out.append('</div><p class="lb-empty empty-state" hidden>No entry matches the filters.</p>'
-               '<div class="lb-foot" data-total="%d">%d of %d entries shown.</div></div>' % (len(rows), len(rows), len(rows)))
-    return "".join(out)
+        return ('<div class="lb bb" data-board="backlog"><div class="bb-foot" data-entries="0" data-status="%s"></div>'
+                '<div class="empty-state">No backlog file.</div></div>' % esc(status))
+    rows = sorted((r for g in view["by_stage"] for r in g["rows"]), key=lambda r: r["line"])
+    body = _outline(rows, view["outline"], view["path"], today, view["targets"]) if by == "outline" else _by(rows, by, view["path"], today)
+    foot = ('<div class="foot bb-foot" data-entries="%d" data-status="%s">%s, <span class="bb-n">%d</span> of %d entries shown, %d grammar findings%s</div>'
+            % (c["entries"], esc(status), esc(view["path"]), c["entries"], c["entries"], c["findings"],
+               ' (<code>/said:backlog lint</code>)' if c["findings"] else ""))
+    return ('<div class="lb bb" data-board="backlog">%s%s<div class="bl-groups%s" data-by="%s">%s</div>'
+            '<p class="bb-empty empty-state" hidden>Nothing matches the filters.</p>%s</div>'
+            % (_toolbar(rows, by, view["targets"]), _filters(rows), " blist" if by == "outline" else "", by, body, foot))

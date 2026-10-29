@@ -26,6 +26,9 @@ import sys
 import unicodedata
 from datetime import date
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import todo_md  # noqa: E402  the format's profile layer: one reader of a `**Priority:**` head
+
 # --- grammar (the SAID task-log shape) --------------------------------------
 STATUS_RE = re.compile(r"^\s*(?:[-*+]\s+)?\*\*Status:\*\*\s*(Done|Todo|Canceled|Cancelled|Superseded|Backlog)\b", re.I)
 DATE_RE = re.compile(r"\((\d{4}-\d{2}-\d{2})\)")
@@ -39,6 +42,10 @@ TASK_ID_RE = re.compile(r"[A-Z]+-?\d+(?:-[A-Za-z0-9]+)+")  # HEADER_RE's id: a `
 
 # attention-first ordering; staleness thresholds (days idle) per phase
 PHASE_RANK = {"Implement": 0, "Deliver": 1, "Architect": 2, "Scope": 3, "Closed": 4}
+# a `**Priority:**` head line: `[#A]`, a bare letter or High/Medium/Low, then an optional minted id token that ends the line
+PRIORITY_WORDS = {"high": "A", "medium": "B", "low": "C"}
+PRIO_RANK = {"A": 0, "B": 1, "C": 2}
+HEAD_LINES = 40  # the lines of a spec the priority reader looks at
 STALE_DEFAULT = {"Implement": 7, "Deliver": 7, "Architect": 14, "Scope": 14}
 
 GLYPH = {"done": "█", "empty": "░", "none": ",",
@@ -202,7 +209,7 @@ _SECTION_RE = re.compile(r"^###+\s+(.+?)\s*$")
 def feature_tasks(paths):
     """All tasks for one feature in file order (on-demand, not part of analyze()).
 
-    Returns a list of {id, title, status, date, sections} where sections maps a
+    Returns a list of {id, title, status, date, priority, sections} where sections maps a
     `### <Name>` heading to its body text. Used by the web board's deep-dive to
     show every task with expand/collapse detail; the CLI does not call this.
     """
@@ -218,7 +225,7 @@ def feature_tasks(paths):
                 continue
             h = HEADER_RE.match(ln)
             if h:
-                cur = {"id": h.group(1), "title": h.group(2).strip(), "status": None, "date": None, "sections": {}}
+                cur = {"id": h.group(1), "title": h.group(2).strip(), "status": None, "date": None, "priority": "", "sections": {}}
                 tasks.append(cur)
                 sec = None
                 continue
@@ -230,6 +237,11 @@ def feature_tasks(paths):
                 d = DATE_RE.search(ln)
                 cur["date"] = d.group(1) if d else None
                 continue
+            if sec is None and not cur["priority"]:
+                pm = todo_md.priority_head_parts(ln.strip())
+                if pm:
+                    cur["priority"] = norm_priority(pm[0])
+                    continue
             m = _SECTION_RE.match(ln)
             if m:
                 sec = m.group(1).strip()
@@ -381,12 +393,37 @@ def days_between(a, b):
         return None
 
 
+def norm_priority(raw):
+    """A, B or C for the letters and for High, Medium, Low; anything else is none ('')."""
+    v = (raw or "").strip()
+    return v.upper() if v.upper() in PRIO_RANK else PRIORITY_WORDS.get(v.lower(), "")
+
+
+def head_priority(lines):
+    """(the letter, the index of the `**Priority:**` line) in the first lines of a spec, ('', None) when it has none."""
+    for j, ln in enumerate(lines[:HEAD_LINES]):
+        parts = todo_md.priority_head_parts(ln.strip())
+        if parts:
+            return norm_priority(parts[0]), j
+    return "", None
+
+
+def spec_priority(path):
+    if not path:
+        return ""
+    try:
+        with open(path, encoding="utf-8-sig", errors="replace") as fh:
+            return head_priority(fh.read().split("\n"))[0]
+    except OSError:
+        return ""
+
+
 def _sortkey(f):
     rank = PHASE_RANK.get(f["phase"], 9)
     if f["phase"] == "Closed":  # most-recently-closed first
         d = f["last_activity"] or "0000-00-00"
         return (rank, tuple(-int(x) for x in d.split("-")), f.get("lane", ""), f["id"])
-    return (rank, (-(f["idle_days"] or 0),), f.get("lane", ""), f["id"])  # most-stale first
+    return (rank, PRIO_RANK.get(f.get("priority"), 3), (-(f["idle_days"] or 0),), f.get("lane", ""), f["id"])  # priority, then most-stale first
 
 
 def waiting_reason(workdir):
@@ -617,6 +654,7 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
             # the feature's human name (spec H1) and the filename slug, if any;
             # display_name prefers the short slug, else the full name, else None.
             "name": fname, "short_name": fshort, "display_name": fshort or fname,
+            "priority": spec_priority(specs[0] if specs else None),
             "counts": c, "done": c["Done"], "todo": c["Todo"],
             "denominator": c["Done"] + c["Todo"],
             "todo_items": t["todo_items"],

@@ -15,7 +15,7 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 | **4 — Debrief** | `said:debrief` | retrospective + backports + shipping reports |
 | **Helper** | `said:triage` | read-only root-cause investigation |
 | **Observe** | `said:board` (web page by default, `--cli` terminal, `--json` data) | read-only board — where every feature sits in the phase chain, what's stalled or waiting, and the exact command that advances it |
-| **Manage** | `said:backlog` | the backlog file written through one engine: lint against its own grammar, add an entry, move an entry to an idea record, supersede, promote a record to a lane's feature (plan, one confirm), set a priority; never a todo line |
+| **Manage** | `said:backlog` | the backlog file written through one engine: lint against its own grammar, add an entry, move an entry to an idea record, supersede, promote a record to a lane's feature (plan, one confirm), set a priority, migrate a former-grammar file; never a todo line |
 | **Recall** | `said:retrieval` | precedent/decision-record search: what the project already decided (`CLAUDE.md`, memory, ADRs, working dirs, probes), before you propose a default |
 | **Orchestrate** | `said:said` (single feature), `said:flow` (multi-lane) | drive a feature through the whole chain in one session to a printed `goal: done` signal — invoked by the `said!` / `flow!` operator macros; `said:said` can **fan out** write-disjoint tasks to concurrent `said:impl <task> arm` builders, then `said:impl <task> close` serially in main (opt-in) |
 

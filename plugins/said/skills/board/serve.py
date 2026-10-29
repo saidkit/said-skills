@@ -6,7 +6,7 @@ Loopback-only, stdlib-only server. Reuses the analyzer beside it
 loads **htmx** and **daisyUI** from a CDN (no pip, no node_modules, no build);
 htmx drives the auto-refresh + deep-dive, daisyUI provides components + themes.
 Its only writes are local files: the backlog and todo boards set a priority token or move an
-entry (`POST /backlog/priority`, `/backlog/order`, `/todo/priority`, `/todo/order`).
+entry (`POST /backlog/priority`, `/backlog/order`, `/todo/priority`, `/todo/order`), set a feature's priority on its spec head (`POST /features/priority`), add one (`POST /backlog/add`) or replace one line of an entry (`POST /backlog/edit`), or set a todo line's state or replace one of its lines (`POST /todo/state`, `POST /todo/edit`).
 
 **Optional integration (opt-in, `--connect <url>`).** Pointed at a local companion
 app, the board additionally emits an embed — one stylesheet link, one script tag,
@@ -292,12 +292,6 @@ def get_backlog(fresh=False):  # its own key: a backlog load or refresh never ru
     return _single_flight(("backlog",), lambda: said_backlog.board_view(said_backlog.read_all(CFG["root"])), fresh)
 
 
-def warm_features():
-    """The features the features board already derived, or none: a backlog or todo load never runs the analyzer."""
-    hit = _cache.get(("features", None))
-    return (hit[1].get("features") or []) if hit else []
-
-
 def get_todo(fresh=False):  # its own key, as the backlog's
     return _single_flight(("todo",), lambda: said_backlog.todo_view(said_backlog.read_all(CFG["root"])), fresh)
 
@@ -307,6 +301,7 @@ sys.modules.setdefault("serve", sys.modules[__name__])  # run as a script, the s
 from boards.features import render_feature, render_kanban, render_roster  # noqa: E402
 from boards.backlog import VIEWS as BACKLOG_VIEWS, render_backlog_board  # noqa: E402
 from boards.todo import render_todo_board  # noqa: E402
+from boards.lists import seg  # noqa: E402
 import said_backlog  # noqa: E402  the backlog reader beside the analyzer
 
 
@@ -322,8 +317,8 @@ ASSETS = {"/board.css": ("board.css", "text/css; charset=utf-8"),
           "/boards/lists.js": ("boards/lists.js", "application/javascript; charset=utf-8"),
           "/boards/lists.css": ("boards/lists.css", "text/css; charset=utf-8")}
 # the boards the header switch offers, the features board first (the default); board.js swaps the surface
-BOARD_WRITES = ("/backlog/priority", "/backlog/order", "/todo/priority", "/todo/order")  # on with no flag, all behind _write_guard
-BOARD_SWITCH = (('features', 'Features', '/?board=features'), ('backlog', 'Backlog', '/?board=backlog'), ('todo', 'Todo', '/?board=todo'))
+BOARD_WRITES = ("/backlog/priority", "/backlog/order", "/backlog/add", "/backlog/edit", "/todo/priority", "/todo/order", "/todo/state", "/todo/edit", "/features/priority")  # on with no flag, all behind _write_guard
+BOARD_SWITCH = (('backlog', 'Backlog', '/?board=backlog'), ('features', 'Features', '/?board=features'), ('todo', 'Todo', '/?board=todo'))
 
 
 def read_asset(filename):
@@ -370,8 +365,8 @@ def page():
                      '<span class="bl-msg" role="status"></span></form>' % esc(app))
     else:  # the board writes are on with no flag, so every page carries the token they require
         embed = '<meta name="%s" content="%s">' % (CSRF_META, esc(CFG["csrf"]))
-    board_switch = '<nav class="board-switch" aria-label="Board">%s</nav>' % "".join(
-        '<a class="btn btn-ghost btn-xs" data-board="%s" href="%s">%s</a>' % (esc(b), esc(h), esc(t)) for b, t, h in BOARD_SWITCH)
+    board_switch = '<nav class="board-switch join" aria-label="Board">%s</nav>' % "".join(
+        '<a class="btn btn-ghost btn-xs join-item" data-board="%s" href="%s">%s</a>' % (esc(b), esc(h), esc(t)) for b, t, h in BOARD_SWITCH)
     # 3-zone header: LEFT (logo,SAID,project,lane,Update,updated-time) | CENTER (List|Kanban) | RIGHT (rest)
     head = (
         '<div class="hz-left">'
@@ -382,16 +377,17 @@ def page():
         '<button id="refreshBtn" class="btn btn-xs update-pill" onclick="refreshNow()" title="Update from git">Update</button>'
         '<span id="updated" class="stamp">loading...</span>'
         "</div>"
-        '<div class="hz-center">%s<div class="join vtoggle">'
-        '<button class="btn btn-xs join-item btn-active" data-view="list" onclick="setView(this)">List</button>'
-        '<button class="btn btn-xs join-item" data-view="kanban" onclick="setView(this)">Kanban</button></div></div>'
+        '<div class="hz-center">%s</div>'
         '<div class="hz-right">%s'
-        '<label class="switch"><input id="staleToggle" type="checkbox" class="toggle toggle-sm" onchange="refreshVisible()">stale only</label>'
-        '<label class="switch kanban-only"><input type="checkbox" class="toggle toggle-sm" onchange="toggleHideClosed(this)">hide closed</label>'
         '<button id="kbdBtn" class="btn btn-ghost btn-sm btn-square" onclick="toggleHelp()" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">⌨️</button>'
         '<button id="themeBtn" class="btn btn-ghost btn-sm btn-square" onclick="cycleTheme()" title="Toggle theme">\U0001F319</button>'
         "</div>"
     ) % (HOME, MARK % (22, 22), esc(project), lane_ico, lane_select, board_switch, mount("status"))
+    # the features board's own toolbar row (M12), built from the shared segment helper
+    featbar = ('<div id="featbar" class="btool"><div class="bt-l"><span class="lbl">view</span><span class="vtoggle">%s</span></div>'
+               '<div class="bt-m"><label class="switch"><input id="staleToggle" type="checkbox" class="toggle toggle-sm" onchange="refreshVisible()">stale only</label>'
+               '<label class="switch kanban-only"><input type="checkbox" class="toggle toggle-sm" onchange="toggleHideClosed(this)">hide closed</label></div></div>'
+               % seg([("list", "List", "", ""), ("kanban", "Kanban", "", "")], "data-view", "list", "View"))
     vals = ("hx-vals='js:{stale: (document.getElementById(\"staleToggle\")||{}).checked?1:0, "
             "fresh: window.__fresh?1:0, "
             "lane: (document.getElementById(\"laneSelect\")||{}).value||\"\"}'")
@@ -403,12 +399,13 @@ def page():
         '<link rel="stylesheet" href="%s">'
         '<script src="%s" defer onerror="var b=document.getElementById(\'cdnwarn\');if(b)b.style.display=\'block\'"></script>'
         '<link rel="stylesheet" href="%s" onerror="var b=document.getElementById(\'cdnwarn\');if(b)b.style.display=\'block\'">'
-        '<link rel="stylesheet" href="/board.css">%s</head><body data-view="list" class="sb-loading"%s>'
+        '<link rel="stylesheet" href="/board.css"><link id="lists-css" rel="stylesheet" href="/boards/lists.css">%s</head><body data-view="list" class="sb-loading"%s>'
         # a full page load is an explicit refresh -> the initial fragment loads derive fresh (async, while
         # the logo ticks); board.js clears __fresh after they settle so later navigation reuses the cache.
         '<script>window.__fresh=true</script>'
         '<div id="cdnwarn">A CDN asset (htmx/daisyUI) failed to load — data is live, but styling/refresh may be limited.</div>'
         "<header>%s</header><main id=\"main\" aria-keyshortcuts=\"ArrowUp ArrowDown ArrowLeft ArrowRight Enter Escape\">"
+        "%s"
         '<div id="listwrap" class="cols">'
         '<section class="roster" id="roster" hx-get="/fragment/roster" hx-trigger="load, refresh" hx-indicator="#refreshBtn" %s>'
         '<div class="empty-state">loading...</div></section>'
@@ -417,7 +414,7 @@ def page():
         '<div id="kanbanwrap"><section id="kanban" class="kanban" hx-get="/fragment/kanban" hx-trigger="load, refresh" hx-indicator="#refreshBtn" %s></section></div>'
         "</main>"
         '<aside id="drawer" aria-label="feature detail"><div class="drawer-h">'
-        '<button class="btn btn-xs btn-ghost" onclick="closeDrawer()" title="Close">✕ close</button></div>'
+        '<button class="btn btn-sm btn-ghost btn-square" onclick="closeDrawer()" title="Close (Esc)" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>'
         '<div id="drawer-content" class="drawer-content"></div></aside>'
         '<div id="backdrop" onclick="closeDrawer()"></div>'
         '<div id="help" role="dialog" aria-modal="false" aria-label="keyboard shortcuts">'
@@ -431,10 +428,11 @@ def page():
         "</div>"
         '<footer><span class="tagline">as said, so done</span>'
         "<span>%s</span>%s"
-        '<span class="khint"><kbd>Up</kbd><kbd>Down</kbd> move, <kbd>Enter</kbd> open, <kbd>esc</kbd> back, <kbd>?</kbd> keys</span>'
+        '<span class="khint"><kbd>Up</kbd><kbd>Down</kbd> or <kbd>j</kbd><kbd>k</kbd> move, <kbd>Enter</kbd> open, <kbd>esc</kbd> back, '
+        '<kbd>A</kbd><kbd>B</kbd><kbd>C</kbd><kbd>0</kbd> priority and <kbd>/</kbd> search on backlog and todo, <kbd>?</kbd> keys</span>'
         '<a href="/api/status.json" target="_blank">/api/status.json</a></footer>'
         '<script src="/board.js" defer></script><script src="/boards/features.js" defer></script><script src="/boards/lists.js" defer></script><script src="/boards/backlog.js" defer></script><script src="/boards/todo.js" defer></script></body></html>'
-    ) % (esc(project), FONTS, HTMX, DAISY, embed, body_extra, head, vals, vals,
+    ) % (esc(project), FONTS, HTMX, DAISY, embed, body_extra, head, featbar, vals, vals,
          "local files, %s" % (esc(app) if connected() else "127.0.0.1"), conn_form)
 
 
@@ -480,13 +478,12 @@ class Handler(BaseHTTPRequestHandler):
                            else '<div class="empty-state">Invalid feature id.</div>', code=200 if ID_RE.match(fid) else 400)
             elif path.startswith("/backlog/") and path[len("/backlog/"):] in BACKLOG_VIEWS:
                 fresh = q.get("fresh", ["0"])[0] in ("1", "true", "on")
-                nexts = {f["id"]: f.get("next") or "" for f in warm_features()}
-                self._send(render_backlog_board(get_backlog(fresh=fresh), path[len("/backlog/"):], nexts))
+                self._send(render_backlog_board(get_backlog(fresh=fresh), path[len("/backlog/"):], CFG.get("today")))
             elif path == "/todo/board":
                 fresh = q.get("fresh", ["0"])[0] in ("1", "true", "on")
                 self._send(render_todo_board(get_todo(fresh=fresh), lane=q.get("lane", [None])[0],
                                              state=q.get("state", ["all"])[0], priority=q.get("priority", ["all"])[0],
-                                             features=warm_features(), lanes=CFG.get("lanes") or [], root=CFG["root"]))
+                                             today=CFG.get("today")))
             elif path == "/api/status.json":
                 self._send(json.dumps(get_data(), ensure_ascii=False, indent=2), ctype="application/json; charset=utf-8")
             elif path == "/healthz":
@@ -580,6 +577,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "error": "bad request"}, code=400)
         if path in BOARD_WRITES:
             return self._board_write(path, payload)
+        if not isinstance(payload.get("app"), str):
+            return self._json({"ok": False, "error": "a local http(s) URL is required"}, code=400)
         try:
             app = normalize_origin(payload.get("app"))
             if not app:
@@ -591,40 +590,68 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "error": "cannot write: %s" % exc}, code=500)
 
     def _board_write(self, path, payload):
-        """A priority or an order write on the backlog or a lane's todo file, through the reader's writers.
-        The body names an entry (key, line, and the lane for a todo line), never a file: the root is the
-        server's own, and any other key is refused."""
+        """A priority, an order or an add write on the backlog or a lane's todo file, or a priority write on a feature's
+        spec head, through the reader's writers. The body names an entry (key, line, and the lane for a todo line) or a
+        feature (id, and the lane), never a file: the root is the server's own, and any other key is refused."""
         board, kind = path.split("/")[1:3]
-        allowed = {"key", "line", "letter"} if kind == "priority" else {"key", "line", "to", "before"}
+        allowed = ({"id", "lane", "letter"} if board == "features" else {"section", "topic", "subtopic", "text"} if kind == "add" else {"op", "line", "expected", "text"} | ({"depth"} if board == "backlog" else set()) if kind == "edit"
+                   else {"line", "expected", "state"} if kind == "state" else {"key", "line", "letter"} if kind == "priority" else {"key", "line", "to", "before"})
         if board == "todo":
             allowed |= {"lane"}
         if set(payload) - allowed:
             return self._json({"ok": False, "error": "unknown field: %s" % ", ".join(sorted(set(payload) - allowed))[:80]}, code=400)
-        lane = payload.get("lane") if board == "todo" else None
+        lane = payload.get("lane") if board in ("todo", "features") else None
         if board == "todo" and not isinstance(lane, str):
             return self._json({"ok": False, "error": "lane is required"}, code=400)
+        if board == "features" and lane is not None and not isinstance(lane, str):
+            return self._json({"ok": False, "error": "lane must be text"}, code=400)
         try:
             with _write_lock:            # one write at a time: a read-modify-replace never races another
-                ok, msg = self._apply_write(kind, payload, lane)
+                ok, msg, written = self._apply_write(board, kind, payload, lane)
+                key = ("features", None) if board == "features" else (board,)
                 with _cache_lock:
-                    _gen[(board,)] = _gen.get((board,), 0) + 1
-                    _cache.pop((board,), None)  # the board re-reads on its next load
+                    _gen[key] = _gen.get(key, 0) + 1
+                    _cache.pop(key, None)  # the board re-reads on its next load
         except Exception as exc:  # the writers refuse rather than raise; this is the last fence
-            ok, msg = False, "refused: %s" % type(exc).__name__
+            ok, msg, written = False, "refused: %s" % type(exc).__name__, None
         msg = said_backlog.clean(str(msg), 300)
         for r in {os.path.realpath(os.path.abspath(CFG["root"])), os.path.abspath(CFG["root"])}:
             if len(r) > 1:
                 msg = msg.replace(r, "<root>")  # a writer error never names an absolute path
         if not ok:
             return self._json({"ok": False, "error": msg}, code=409)
-        return self._json({"ok": True, "result": msg})
+        return self._json(dict({"ok": True, "result": msg}, **(written or {})))
 
-    def _apply_write(self, kind, payload, lane):
+    def _feature_priority(self, fid, lane, letter):
+        """The spec head of one feature of the server's own lanes: the id picks it (the lane too when two lanes share the id)."""
+        if not isinstance(fid, str) or not ID_RE.match(fid):
+            return False, "refused: a feature id is required"
+        hits = [(lr, f) for lr in get_data()["lanes"] for f in lr["features"] if f["id"] == fid and (lane is None or lr["name"] == lane)]
+        if len(hits) != 1:
+            return False, "refused: %s" % ("no such feature" if not hits else "the id is in several lanes; name the lane")
+        lr, f = hits[0]
+        if not f["paths"]["spec"]:
+            return False, "refused: %s has no spec" % fid
+        return said_backlog.set_feature_priority(f["paths"]["spec"], lr["root"], letter)
+
+    def _apply_write(self, board, kind, payload, lane):
+        if board == "features":
+            return self._feature_priority(payload.get("id"), lane, payload.get("letter")) + (None,)
+        if kind == "state":
+            return said_backlog.todo_state(CFG["root"], lane, payload.get("line"), payload.get("expected"), payload.get("state"))
+        if kind == "edit" and board == "todo":
+            return said_backlog.todo_edit(CFG["root"], lane, payload.get("op"), payload.get("line"), payload.get("expected"), text=payload.get("text"))
+        if kind == "edit":
+            return said_backlog.edit(CFG["root"], payload.get("op"), payload.get("line"), payload.get("expected"),
+                                     text=payload.get("text"), depth=payload.get("depth"))
+        if kind == "add":
+            return said_backlog.add(CFG["root"], payload.get("section"), payload.get("topic"), payload.get("subtopic"),
+                                    payload.get("text"), CFG.get("today") or date.today().isoformat())
         if kind == "priority":
             return said_backlog.set_priority(CFG["root"], payload.get("letter"), key=payload.get("key"),
-                                             line=payload.get("line"), lane=lane)
+                                             line=payload.get("line"), lane=lane) + (None,)
         return said_backlog.move_entry(CFG["root"], payload.get("key"), payload.get("line"), lane=lane,
-                                       to=payload.get("to"), before=payload.get("before"))
+                                       to=payload.get("to"), before=payload.get("before")) + (None,)
 
     def log_message(self, fmt, *args):
         sys.stderr.write("  %s %s\n" % (datetime.now().strftime("%H:%M:%S"), (fmt % args)))
