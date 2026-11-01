@@ -798,12 +798,17 @@ def main():
     # 127.0.0.1 as different hosts, and a session cookie set by the app on one is simply
     # not sent from the other — which presents as broken sign-in, not as a config error.
     url = "http://%s:%d/" % ("localhost" if connected() else "127.0.0.1", port)
+    # stop sends TERM: unwind like Ctrl-C so the finally below clears the pidfile; a second TERM is ignored
+    def _term(*_):
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        sys.exit(0)
+    signal.signal(signal.SIGTERM, _term)
     _write_pidfile(port, url)
     sys.stderr.write("said:board, %s, pid %d\n%s, loopback, htmx + daisyUI via CDN\n"
                      "stop: `python3 serve.py stop`  (or Ctrl-C), state: %s\n"
                      % (url, os.getpid(),
                         ("connected, %s, local writes: /connect and the board writes" % CFG["app"])
-                        if connected() else "board writes: priority and order on the backlog and todo boards", PIDFILE))
+                        if connected() else "board writes: backlog priority, order, add, edit; todo priority, order, state, edit; feature priority", PIDFILE))
     if not a.no_open:
         try:
             webbrowser.open(url)
