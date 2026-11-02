@@ -108,7 +108,7 @@ The script gives facts; you give the reading. After showing its output:
 
 ## The reviewer-set enforcement gate
 
-`said_status.py --reviewer-gate` is an **exit-coded** mode that validates a lane's declared `SAID.reviewers:` set (each Checker's verdict header + a deterministic-family recompute) and exits non-zero on a failing set. `/said:board` never invokes it; the gates do. Run no hook that calls it, and state no close as auto-blocked.
+`said_status.py --reviewer-gate` is an **exit-coded** mode that validates a lane's declared `SAID.reviewers:` set (each Checker's verdict header + a deterministic-family recompute) and exits non-zero on a failing set. `/said:board` never invokes it; the gates do. No pre-close hook runs it automatically: the plugin's only hook is a `SessionStart` re-anchor that injects context and blocks nothing, and no artifact claims the close is auto-blocked; the live-close block stays the gates' own rule.
 
 ## Reconstruction contract — what `said_status.py` computes (and the by-hand fallback)
 
