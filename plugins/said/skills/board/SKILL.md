@@ -44,7 +44,7 @@ The header's board switch moves between the three built boards on one page; each
 - `/said:board --json` — the structured data layer (any view, with the same arguments).
 - `--lanes` — the cross-lane board, grouped by lane: a `--cli` / `--json` view (`--lanes` alone renders it as `--cli`). The web page shows one lane at a time through its header's lane select.
 - `--stale` — attention filter: only non-`Closed` features past their idle threshold. A `--cli` / `--json` argument; on the web page, the header's `stale only` toggle.
-- `--port N`, `--lane ...`, `--stale-days N`, `--connect <url>`: web server flags (below).
+- `--port N`, `--lane ...`, `--connect <url>`: web server flags (below). `--stale-days N` sets the idle threshold on the page and on `--cli` / `--json`.
 
 ## Step 0 — Resolve conventions (declaration-first, then glob)
 
@@ -77,7 +77,7 @@ python3 <skill-dir>/said_status.py \
   --root <repo-root> --docs-dir <docs>/features --working-dir <working> \
   [--prefixes PROJ,LEGACY (without --lane)] [--legacy-prefixes LEGACY] [--today YYYY-MM-DD] \
   [--lane NAME[:root=...;docs=...;working=...;prefixes=...;legacy=...]]... [--project <label>] \
-  [<feature-id>] [--stale] [--json]
+  [<feature-id>] [--stale] [--stale-days N] [--json]
 ```
 
 - No `<feature-id>` -> roster, `<feature-id>` -> deep-dive, `--stale` -> attention filter, one `--lane` per lane -> cross-lane board, `--json` -> the data layer (reason over it; don't re-derive by eye).
@@ -97,7 +97,7 @@ python3 <skill-dir>/serve.py stop [--port <n>]
 
 - On launch it binds `127.0.0.1:<port>`, prints `said:board, <url>/, pid <pid>`, writes a state file (`$TMPDIR/said-board.json`) and opens the browser. With a `<feature-id>`, pass `--no-open` and open the printed URL (it ends in `/`) with `#<feature-id>` appended: the page opens on that feature's deep-dive (an unknown or malformed id opens the board as usual). For `backlog` or `todo`, pass `--no-open` and open the printed URL with `?board=backlog` or `?board=todo` appended.
 - **Report the URL and pid**, then hand back; the server runs until stopped. `stop` reads the state file (or falls back to the port's listener) and stops only that server; report what was stopped. Prefer `/said:board stop` over a manual `pkill`.
-- **`--connect <url>`** opts in to a local companion app (loopback URLs only): the page then emits the app's embed, cache-fed comment badges, its mount points and one more local-file write, the app URL (`POST /connect`), behind the Origin check, the CSRF token, the JSON-plus-custom-header rule and the opt-in. Without the flag none of it exists. The page's connect form saves which app it talks to, and a later launch with no flag reuses that saved app. A connected board prints and opens a `localhost` URL, not `127.0.0.1`, so the app's session cookie is sent. The embed contract, the badge cache and the write controls are specified in the board's design record.
+- **`--connect <url>`** opts in to a local companion app (loopback URLs only): the page then emits the app's embed, cache-fed comment badges, its mount points and one more local-file write, the app URL (`POST /connect`), behind the Origin check, the CSRF token, the JSON-plus-custom-header rule and the opt-in. Without the flag none of it exists. The page's connect form saves which app it talks to, and a later launch with no flag reuses that saved app. A connected board prints and opens a `localhost` URL, not `127.0.0.1`, so the app's session cookie is sent.
 
 ## Step 2 — Add the judgment a script can't
 
@@ -106,9 +106,9 @@ The script gives facts; you give the reading. After showing its output:
 - Interpret a flag: `⚠ Nd idle` on Implement -> name the likely stall (an open gate? a blocked task?); `! integrity` -> point at the drift (Summary Table vs parsed sections); `waiting:` -> name the operator question it waits on.
 - Answer follow-ups from `--json` (stalest, oldest-started, most Todo) — reason over the data.
 
-## The reviewer-set enforcement gate (L2 / L4)
+## The reviewer-set enforcement gate
 
-Separate from the board, `said_status.py` exposes an **exit-coded** enforcement mode, `--reviewer-gate`, that validates a lane's declared `SAID.reviewers:` set (each Checker's L1 verdict header + a deterministic-family recompute) and exits non-zero on a failing set. `/said:board` never invokes it; the gates do. No pre-close hook runs it automatically: the plugin's only hook is a `SessionStart` re-anchor that injects context and blocks nothing, and no artifact claims the close is auto-blocked; the live-close block stays the gates' own rule.
+`said_status.py --reviewer-gate` is an **exit-coded** mode that validates a lane's declared `SAID.reviewers:` set (each Checker's verdict header + a deterministic-family recompute) and exits non-zero on a failing set. `/said:board` never invokes it; the gates do. Run no hook that calls it, and state no close as auto-blocked.
 
 ## Reconstruction contract — what `said_status.py` computes (and the by-hand fallback)
 
@@ -126,7 +126,7 @@ Per registry feature-id, glob `<id>*` so sub-phased specs (`<id>-<slug>.md`) and
 Denominator = `Done + Todo` (Canceled + Backlog shown but excluded from the bar). If a `## Summary
 Table` exists, cross-check its rows vs the parsed counts; on mismatch emit a one-line **data-integrity** note — parsed `Status:` lines win, the table is a convenience index that can go stale.
 
-**Gate sub-ticks** (meaningful at Deliver/Closed), from working-dir artifacts, a run's `-F<NN>.md` report excluded: `review-qa*.md`->qa; ->ux: `review-ux*.md`, or, when the lane's `## Lane` block declares Checkers in `SAID.reviewers:`, a `review-<checker-id>-<feature-id>*.md` for every one (the feature id right after the exact Checker id, so `cli` never ticks from a `cli-gate` file; one declared Checker's file alone does not tick; any verdict, PASS or FAIL: presence only; validation is the reviewer gate's), `accept*.md`->accept, `debrief.md`->debrief-started, `## Debrief close` footer->debrief-done. Render `✓` present, `○` pending, `–` n/a (`ux –` for a no-UI feature — absence of a UX gate is not a failure).
+**Gate sub-ticks** (meaningful at Deliver/Closed), from working-dir artifacts, a run's `-F<NN>.md` report excluded: `review-qa*.md`->qa; ->ux: `review-ux*.md`, or, when the lane's `## Lane` block declares Checkers in `SAID.reviewers:`, a `review-<checker-id>-<feature-id>*.md` for every one (the feature id right after the exact Checker id, so `cli` never ticks from a `cli-gate` file; one declared Checker's file alone does not tick; any verdict, PASS or FAIL: presence only; validation is the reviewer gate's), `accept*.md`->accept, `debrief.md`->debrief-started, `## Debrief close` footer->debrief-done. Render `✓` present, `○` pending, `-` n/a (`ux -` for a no-UI feature — absence of a UX gate is not a failure).
 
 **Waiting on an operator question.** A separate axis from the gate ticks: a tick shows only that a file is present, never that it passed. A feature waits on one of two derived sources, the first that applies:
 1. The accept file: the newest `accept-*.md` in `<working>/<id>/` by modification time (a run's `-F<NN>` report excluded) whose last `Verdict:` line, bulleted (`- Verdict: ...`) or not, outside a code fence, reads exactly `MANUAL-PENDING` -> reason `accept MANUAL-PENDING`. The `accept` tick stays present; the wait says it has not passed.
@@ -136,7 +136,7 @@ Render the reason as `waiting: <reason>` in the feature's roster flags and as `W
 **Fast-track runs.** A `## Fast-track F<NN>` block in the tasks log is a run, never a task: it matches no task heading and changes no count. Its listed set is the ids on its `tasks:` line plus every task carrying `**Fast-track:** F<NN>`; it is open while its `closed:` line is empty. For each open run the deep-dive prints `fast-track open: F<NN>, <n> tasks`, and every roster, `--stale` included, prints `<feature-id> fast-track open: F<NN>, <n> tasks`: an open run is always an attention item. Only tokens shaped like a task id (`PROJ-01-03`) on the `tasks:` line count. A run's reports (names ending `-F<NN>.md`) never tick a feature-level gate, never raise the accept wait and never move the `Next` action.
 
 **Dates.** `started` = min `(YYYY-MM-DD)` across Status lines, `last task-date` = max, `git last-activity` = `git log -1 --format=%cd --date=short -- <id>*.md <id>*.tasks.md <working>/<id>/`.
-`idle` = today − max(last task-date, git last-activity), `age` = today − started.
+`idle` = today - max(last task-date, git last-activity), `age` = today - started.
 
 **Staleness.** Non-`Closed` only: `⚠ <idle>d idle` when idle exceeds the phase threshold — default
 **Implement/Deliver 7d, Scope/Architect 14d** (tunable; state the value used). `Closed` carries no staleness. No git -> say so, fall back to in-file dates; never fabricate an activity date.
@@ -158,12 +158,12 @@ SAID status, <PROJECT>, <n> lane(s), <today>
 
 <ID-7>  <Phase-9>  <bar-9>  <done>/<tot>  <n Todo>  <flags>
 ...
-Next: <cmd1>, <cmd2>, <cmd3>        <- top ≤3 actionable, phase order
+Next: <cmd1>, <cmd2>, <cmd3>        <- top <=3 actionable, phase order
 legacy: <prefixes> — <one-line why, where they live>
 !  <data-integrity notes, if any>
 ```
 
-- **bar** = 9 cells, `█` × round(9 × done/denominator), `░` for the rest. No denominator yet (Scope/Architect) -> `,,,,,,,,,` — "no work counted," not "0% done."
+- **bar** = 9 cells, `█` x round(9 x done/denominator), `░` for the rest. No denominator yet (Scope/Architect) -> `,,,,,,,,,` — "no work counted," not "0% done."
 - **flags** = `⚠ Nd idle`, `waiting: <reason>` and/or `⛔ blocked: ...`; `Closed` rows may show the gate ticks instead.
 - One line per feature. Never list legacy features per-row.
 
@@ -174,7 +174,7 @@ Markdown (keep `file:line` paths clickable) — the "position in the SAID cycle"
 - **Pipeline** — an arrow sequence with the current stop marked:
   `Scope ✓ -> Architect ✓ -> Implement ● -> Deliver ○ -> Closed ○` (`✓` done, `●` current, `○` ahead).
   Never a box-drawn diagram.
-- **Deliver** line (at/after Deliver): `review-qa ✓, review-ux –, accept ○, debrief ○`.
+- **Deliver** line (at/after Deliver): `review-qa ✓, review-ux -, accept ○, debrief ○`.
 - **Tasks** — rollup (`Done N, Todo M, Canceled K`), then the open items:
   `<id>-<nn>, <title>, <status-date>`. Canceled/Backlog folded under a count.
 - **Dates** — started, last activity, age, idle (with the threshold applied).
@@ -187,7 +187,7 @@ Resolve lanes per Step 0, then run the script with one `--lane NAME:root=...;doc
 
 ## Rendering rules
 
-- **No box-drawing / pseudographics** (`│ ─ ┌ └ ├ ...`) anywhere. Pipelines are arrow sequences or nested lists; the roster is space-aligned columns in a code fence.
+- **No box-drawing / pseudographics** (the Unicode line and corner characters) anywhere. Pipelines are arrow sequences or nested lists; the roster is space-aligned columns in a code fence.
 - **Block-glyph progress bars are fine** — `█`/`░` are data-viz marks, not diagram borders.
 - One line per feature in the roster; the deep-dive may breathe. Prefer lists.
 

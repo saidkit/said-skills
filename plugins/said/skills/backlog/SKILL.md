@@ -17,7 +17,7 @@ description: >
 
 1. **One engine, by path.** Every operation is one subcommand of
    `python3 "${CLAUDE_SKILL_DIR}/../board/said_backlog.py" --root <root> <subcommand> ...`. Never edit the
-   backlog file, a record folder or a lane's working dir by hand; the engine keeps every write in the file's
+   backlog file, a record folder or a lane's working dir by hand (a hand edit is the operator's, never yours); the engine keeps every write in the file's
    grammar and refuses what would break it.
 2. **The root** is the directory whose `CLAUDE.md` declares the backlog's docs root and holds
    `<docs-root>backlog.md` (the multi-lane root when a `SAID.lanes:` registry exists). Find it from the
@@ -28,18 +28,19 @@ description: >
    candidates with their line.
 4. **A refusal is the answer.** Exit 2 with a line starting `refused:` means nothing was written; show the
    line to the operator and stop. Never retry with altered arguments to get past it.
-5. **Show each write.** After a write (add, record, supersede, promote or migrate with `--apply`, set-priority) show the
+5. **Show each write.** After a write (add, move, supersede, promote or migrate with `--apply`, set-priority) show the
    engine's `wrote ...` line, then point to `/said:board backlog` to see the result. `lint` writes nothing.
    This skill has no report, page or view of its own.
 6. **Never a todo line.** Refuse a request for a lane todo line or a todo edit other than `migrate todo`: this
    skill never edits a todo file (only `migrate todo` rewrites one, once), and the priority write it runs never
-   names a lane. A todo item is a feature task (`/said:add-task`) or a hand edit of the lane's own list.
+   names a lane. A todo item is a feature task (`/said:add-task`) or a hand edit the operator makes in the lane's own list.
 7. **The format the engine reads.** The file is `todo-md/2`, specified once in the SPEC.md of the todo-md
    repository, https://github.com/saidkit/todo-md (its version key is `format: todo-md/2`); cite it, never restate it. The engine
    reports any other form as a lint finding and never reads it beside the current one; fix it with
-   `migrate`, by hand, or name it to the operator.
+   `migrate`, or name it to the operator, who may edit it by hand.
 8. **One operation per call.** A bare `/said:backlog`, or an operation not listed below -> name the seven
    operations and stop; run nothing.
+9. **`--today`** (on `add` and `supersede`) is today's date in the operator's local time (`date +%Y-%m-%d`).
 
 ## Operations
 
@@ -51,8 +52,11 @@ entry's `key` and `line` of Contract rule 3. Every other placeholder comes from 
 
 `python3 $ENGINE --root ROOT lint` (add `--json` for the findings as data). Read-only. Show the findings
 grouped by code, then the summary line `lint: N errors, M warnings`. Exit 1 means errors were found, not a
-failure of the run. `stamp-missing` and `id-missing` are warnings (a legacy entry is kept; a file not yet migrated shows many `id-missing`, which is expected); `id-malformed` and `id-duplicate` are errors. Offer no fix the operator did not ask
-for; each fix is one of the operations below or a hand edit the operator makes.
+failure of the run.
+
+- `stamp-missing` and `id-missing` are warnings: a legacy entry is kept, and a file not yet migrated shows many `id-missing`, which is expected.
+- `id-malformed` and `id-duplicate` are errors.
+- Offer no fix the operator did not ask for; each fix is one of the operations below or a hand edit the operator makes.
 
 ### add (a new entry)
 
@@ -61,7 +65,7 @@ The engine appends one open entry, stamped today, at the end of the named sectio
 section that holds topics needs `--topic`, a topic that holds subtopics needs `--subtopic`), with at most two
 notes as its sub-bullets. It creates no section, topic or subtopic. `<section>`, `<topic>` and `<subtopic>`
 are titles as `--json` prints them (`backlog.sections`); ask for them when the operator did not name them.
-A `#word` in `--text` becomes a tag. `--today` is today's date (`date +%Y-%m-%d`). `--text` and each `--note` are one line of at most
+A `#word` in `--text` becomes a tag. `--text` and each `--note` are one line of at most
 300 characters, with no middle dot, stamp, priority token or id; words an entry already has are refused. The engine
 mints the entry's id (`@` and 13 digits, the clock in Unix milliseconds) at the end of the line text, and it counts in
 the 300, so `--text` holds 285 characters at most. A `supersede` mints a new id the same way. The
@@ -82,7 +86,7 @@ few words) and show it before running.
 
 `python3 $ENGINE --root ROOT supersede --key K --line N --text "<new words>" --today YYYY-MM-DD`.
 The entry's line is replaced in place: open, stamped today, the new words, then ` - supersedes [<old stamp>]`
-(or the old text quoted when it had no stamp), then a new id (the old id is dropped); its sub-bullets stay. `--today` is today's date in the operator's local time (`date +%Y-%m-%d`). A done entry is
+(or the old text quoted when it had no stamp), then a new id (the old id is dropped); its sub-bullets stay. A done entry is
 refused: it is ticked in place, never replaced.
 
 ### promote (a record to a feature, one confirm)
@@ -111,16 +115,17 @@ pass `--lane`.
    operator, and never run it on any file the operator did not name.
 2. Plan: `python3 $ENGINE --root ROOT migrate backlog`, or `python3 $ENGINE --root ROOT migrate todo --lane <TOKEN>`
    (`--file <absolute physical path>` names another file under the root). The engine prints each changed line and each removed line
-   (`-> (removed)`) and writes nothing; a long plan is capped at 40 rows with a last row counting what is not shown, and `--full` prints it all. The backlog target maps the former top-level heads to sections (a lane token or a name the frontmatter
-   declares), numbered groups to topics, former stage words to `#word` tags, `[P1]` and `[P2]` to `[#A]` and
-   `[#B]`, and `[@YYMMDD]` to `[20YY-MM-DD]`, adds `format: todo-md/2` and drops the frontmatter `structure:` block.
-   The todo target adds the frontmatter with that key, drops the todo format comment and rewrites stamps. Both
-   targets keep an existing id, rewrite the former `@B` and `@T` letter forms bare, and give every other
-   entry line an id of the migration time, unique in its file.
+   (`-> (removed)`) and writes nothing; a long plan is capped at 40 rows with a last row counting what is not shown, and `--full` prints it all. The mapping:
+   - The backlog target maps the former top-level heads to sections (a lane token or a name the frontmatter
+     declares), numbered groups to topics, former stage words to `#word` tags, `[P1]` and `[P2]` to `[#A]` and
+     `[#B]`, and `[@YYMMDD]` to `[20YY-MM-DD]`, adds `format: todo-md/2` and drops the frontmatter `structure:` block.
+   - The todo target adds the frontmatter with that key, drops the todo format comment and rewrites stamps.
+   - Both targets keep an existing id, rewrite the former `@B` and `@T` letter forms bare, and give every other
+     entry line an id of the migration time, unique in its file.
 3. Show the plan and ask the operator to confirm it. This is the one confirm.
 4. On yes, run the same command with `--apply`. On no, stop; nothing was written.
 5. A file already at version 2, a file of the other kind, and any form the engine cannot map are refused with the
-   line named and the file unchanged. Show the refusal and stop; the fix is a hand edit, then a new plan.
+   line named and the file unchanged. Show the refusal and stop; the fix is a hand edit by the operator, then a new plan.
 
 ## Anti-patterns
 
