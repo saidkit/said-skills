@@ -22,6 +22,10 @@ ascending): a kit playbook against `SAID.version` (`said@<semver>`), a starter p
 Kit playbooks come from the `upgrade/` folder of a local checkout of the plugin's own repository
 (the manifest names it), starter playbooks from the starter's `upgrade/` folder; each directory is
 looked for by name under the lane root, the lane-registry root above it and that root's parent.
+With no local checkout, the kit playbooks are read from the repository's `upgrade/` folder on
+github.com instead: 10 seconds for the whole read, 64 KiB per file, 50 files at most; any failure
+prints its cause and `0 playbooks found`. SAID_UPGRADE_API and SAID_UPGRADE_RAW replace the listing
+and file base URLs (https://api.github.com, https://raw.githubusercontent.com).
 A starter's release is the first `## <starter>@<semver>` heading of its CHANGELOG.md. A starter not
 found prints `starter <id> not in workspace` with the paths tried; the kit half still prints. An
 owed playbook whose floor is above the installed plugin is marked `blocked by plugin`; an unknown
@@ -37,10 +41,15 @@ import json
 import os
 import re
 import selectors
+import socket
 import subprocess
 import sys
+import threading
 import time
 import unicodedata
+import urllib.error
+import urllib.parse
+import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -182,19 +191,31 @@ class Loaded:
 def load_playbooks(folder):
     """Read every *.md file of `folder` (no subfolders), parse and check its header, then check
     the chain over the accepted set."""
-    r = Loaded()
     try:
         names = sorted(n for n in os.listdir(folder)
                        if n.endswith(".md") and os.path.isfile(os.path.join(folder, n)))
     except OSError:
-        return r
+        return Loaded()
+    texts = []
     for name in names:
-        r.count += 1
         try:
             with open(os.path.join(folder, name), encoding="utf-8-sig", errors="replace") as fh:
-                h, why = parse_header(fh.read(READ_CAP))
+                texts.append((name, fh.read(READ_CAP)))
         except OSError as e:
-            h, why = None, "unreadable: %s" % e.strerror
+            texts.append((name, OSError(e.strerror)))
+    return load_texts(texts)
+
+
+def load_texts(texts):
+    """Parse and check each (file name, header text or the OSError that kept it unread), then
+    check the chain over the accepted set."""
+    r = Loaded()
+    for name, text in texts:
+        r.count += 1
+        if isinstance(text, OSError):
+            h, why = None, "unreadable: %s" % text
+        else:
+            h, why = parse_header(text)
         if h and h["rollout"] in r.files:
             h, why = None, "rollout %s repeats %s" % (h["rollout"], sanitize(r.files[h["rollout"]]))
         if h:
@@ -287,18 +308,130 @@ def read_text(path, cap=READ_CAP, whole=False):
 
 
 def manifest():
-    """(said version tuple or None, kit checkout dir name or None) from the plugin's own manifest."""
+    """(said version tuple or None, kit checkout dir name or None, the repository URL as written or
+    None) from the plugin's own manifest."""
     try:
         m = json.loads(read_text(MANIFEST))
         v = semver(str(m.get("version", "")))
         repo = m.get("repository") or ""
         repo = str(repo.get("url", "") if isinstance(repo, dict) else repo)
     except Exception:  # any manifest shape that is not the expected object: version and checkout unknown
-        return None, None
+        return None, None, None
     name = repo.rstrip("/").split("/")[-1]
     if name.endswith(".git"):
         name = name[:-4]
-    return v, (name if DIR_RE.match(name) and name.strip(".") else None)
+    ok = DIR_RE.fullmatch(name) and name.strip(".")
+    return v, (name if ok else None), (repo if ok else None)
+
+
+# The remote read: the kit playbooks from the manifest's repository when no local checkout is found.
+
+REMOTE_HOST_RE = re.compile(r"^https://github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))/"
+                            r"([A-Za-z0-9][A-Za-z0-9._-]{0,99}?)(?:\.git)?/?\Z")
+REMOTE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.md$")
+REMOTE_TIMEOUT = 10          # seconds for the whole read: the listing and every file
+REMOTE_FILE_CAP = 65536      # bytes of one playbook; a larger file fails the read
+REMOTE_LIST_CAP = 1 << 20    # bytes of the folder listing
+REMOTE_FILES = 50            # .md entries of the listing; more fails the read
+SEAM_API = ("SAID_UPGRADE_API", "https://api.github.com")              # the listing base
+SEAM_RAW = ("SAID_UPGRADE_RAW", "https://raw.githubusercontent.com")   # the file base
+
+
+class _SameOrigin(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # same scheme and host only
+        old, new = urllib.parse.urlsplit(req.full_url), urllib.parse.urlsplit(newurl)
+        if (new.scheme, new.netloc) != (old.scheme, old.netloc):
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _get(url, cap, deadline):
+    left = deadline - time.monotonic()
+    if left <= 0:
+        raise TimeoutError()
+    opener = urllib.request.build_opener(_SameOrigin)
+    req = urllib.request.Request(url, headers={"User-Agent": "said-setup"})
+    with opener.open(req, timeout=left) as resp:
+        body = resp.read(cap + 1)
+    if len(body) > cap:
+        raise ValueError("larger than %d bytes" % cap)
+    return body
+
+
+def _base(seam):
+    base = os.environ.get(seam[0]) or seam[1]
+    if urllib.parse.urlsplit(base).scheme not in ("http", "https"):
+        raise ValueError("%s is not an http(s) URL" % seam[0])
+    return base.rstrip("/")
+
+
+def _remote_texts(owner, repo, deadline):
+    """[(file name, text)] of every .md file in the repository's upgrade/ folder; raises on any
+    failure, so one bad file fails the whole read."""
+    api, raw = _base(SEAM_API), _base(SEAM_RAW)
+    listing = json.loads(_get("%s/repos/%s/%s/contents/upgrade" % (api, owner, repo), REMOTE_LIST_CAP,
+                              deadline).decode("utf-8", "replace"))
+    if not isinstance(listing, list) or not all(isinstance(e, dict) for e in listing):
+        raise ValueError("the upgrade/ listing is not a list of entries")
+    names = set()
+    for e in listing:
+        name = e.get("name")
+        if e.get("type") != "file" or not isinstance(name, str) or not name.endswith(".md"):
+            continue
+        if not REMOTE_NAME_RE.match(name):
+            raise ValueError("invalid file name in the listing: %s" % name)  # sanitized where printed
+        if name in names:
+            raise ValueError("the listing names %s twice" % name)
+        names.add(name)
+        if len(names) > REMOTE_FILES:
+            raise ValueError("the listing names more than %d playbooks" % REMOTE_FILES)
+    texts = []
+    for name in sorted(names):  # the file URL is built here, never taken from the listing
+        try:
+            body = _get("%s/%s/%s/HEAD/upgrade/%s" % (raw, owner, repo, name), REMOTE_FILE_CAP, deadline)
+        except ValueError as e:
+            raise ValueError("%s is %s" % (name, e))
+        texts.append((name, body.decode("utf-8-sig", "replace")))
+    return texts
+
+
+def remote_cause(e):
+    """One short cause for a failed remote read."""
+    if isinstance(e, urllib.error.HTTPError):
+        return "HTTP %d" % e.code
+    if isinstance(e, urllib.error.URLError):
+        e = e.reason if isinstance(e.reason, BaseException) else e
+        if isinstance(e, (TimeoutError, socket.timeout)):
+            return "timed out"
+        return "unreachable: %s" % (e.strerror if isinstance(e, OSError) and e.strerror else e)
+    if isinstance(e, (TimeoutError, socket.timeout)):
+        return "timed out"
+    if isinstance(e, ValueError):
+        return str(e)
+    return type(e).__name__
+
+
+def remote_load(repo_url):
+    """(cause or None, Loaded) for the kit playbooks read from the repository; the whole read ends
+    within REMOTE_TIMEOUT seconds or fails as timed out."""
+    m = REMOTE_HOST_RE.match(repo_url)
+    if not m:
+        return "the repository is not a github.com URL", Loaded()
+    deadline = time.monotonic() + REMOTE_TIMEOUT
+    box = {}
+
+    def work():
+        try:
+            box["texts"] = _remote_texts(m.group(1), m.group(2), deadline)
+        except Exception as e:  # every failure is a cause line, never a halt
+            box["cause"] = remote_cause(e)
+
+    t = threading.Thread(target=work, daemon=True)
+    t.start()
+    t.join(REMOTE_TIMEOUT)
+    if "texts" in box:
+        return None, load_texts(box["texts"])
+    return box.get("cause", "timed out after %d s" % REMOTE_TIMEOUT), Loaded()
 
 
 def bounded_output(cmd):
@@ -471,7 +604,8 @@ class Section:
     """One run: the manifest, the plugin list and every playbook folder are read once."""
 
     def __init__(self):
-        self.said_v, self.kit_dir = manifest()
+        self.said_v, self.kit_dir, self.repo_url = manifest()
+        self._remote = None   # (cause, loaded): one remote read per run, shared by every lane
         self._plugins = None
         self._loads = {}
         self._starters = {}
@@ -555,9 +689,15 @@ class Section:
             return ["kit playbooks: no repository named in the plugin manifest"] + render_load(empty), empty
         found, tried = find_dir(self.kit_dir, roots)
         if not found:
-            empty = Loaded()
-            return (["kit playbooks: no local checkout (tried: %s)" % ", ".join(show_path(p) for p in tried)]
-                    + render_load(empty), empty)
+            lines = ["kit playbooks: no local checkout (tried: %s)" % ", ".join(show_path(p) for p in tried)]
+            if self._remote is None:
+                self._remote = remote_load(self.repo_url)
+            cause, r = self._remote
+            if cause:
+                lines.append("kit playbooks: remote read failed: %s" % sanitize(cause, cap=200))
+            else:
+                lines.append("kit playbooks: fetched from %s/upgrade" % sanitize(self.repo_url.rstrip("/"), cap=PATH_CAP))
+            return lines + render_load(r), r
         folder = os.path.join(found, "upgrade")
         r = self.load(folder)
         return ["kit playbooks: %s" % show_path(folder)] + render_load(r), r
