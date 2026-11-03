@@ -153,7 +153,7 @@ If a §D-class question surfaces during Q&A — an operator question the skill c
 
 ## Step 3 — Spec coverage gate (read-only — classify + flag, never write)
 
-Classify the new task vs the companion spec (anchors from Step 0 step 6). This gate **detects and flags**; it does **not** write spec content — authoring a spec edit is `/said:architect`'s charter, not this skill's (a task-appender never writes a sibling-owned artifact; ADR-SAID-S01 charter boundary).
+Classify the new task vs the companion spec (anchors from Step 0 step 6). This gate **detects and flags**; it does **not** write spec content — authoring a spec edit is `/said:architect`'s charter, not this skill's (a task-appender never writes a sibling-owned artifact).
 
 - **Covered** — spec already mandates this requirement -> proceed to Step 4. No flag.
 - **Gap** — spec silent or partial on the new task's requirement -> **record a `### Gotchas` flag** on the new task (`Spec GAP vs <spec-path> § <section>: <one-line>. Propagate via /said:architect propagate-new-info before impl.`) and **STOP**, redirecting the operator to `/said:architect <spec-path>` (propagate-new-info branch) to author the spec edit. Do not draft or write the edit here.

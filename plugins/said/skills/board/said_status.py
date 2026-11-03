@@ -1072,9 +1072,10 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
 
 
 def _governs_surface(meta, surface):
-    """Whether a resolved Checker governs `surface` (ADR-SAID-S06 section 3 self-selection). A Checker with
-    no said-governs, no `surface=` clause (it governs by shape, not medium), or `surface=any` governs
-    any surface (backward compat); otherwise it governs only the surface(s) its said-governs names."""
+    """Whether a resolved Checker governs `surface` (self-selection: a Checker governs only the
+    surface it declares). A Checker with no said-governs, no `surface=` clause (it governs by
+    shape, not medium), or `surface=any` governs any surface (backward compat); otherwise it
+    governs only the surface(s) its said-governs names."""
     g = (meta or {}).get("said-governs")
     if not g:
         return True
@@ -1131,7 +1132,8 @@ def reviewer_gate(workdir, surface, reviewers, checker_index, head_sha, root="."
                             "instantiated; set surface= to the lane's medium (config error)" % gv))
             passed = False
             continue
-        # said-governs routing (ADR-SAID-S06 section 3): a RESOLVED Checker that does not govern this surface
+        # said-governs routing (a Checker governs only the surface it declares): a RESOLVED Checker
+        # that does not govern this surface
         # is not required here; a governs-less Checker governs any; an unresolved (nominal) reviewer
         # stays required, so a mismatched/absent said-governs is never a skip-the-gate lever
         if meta is not None and not _governs_surface(meta, surface):
