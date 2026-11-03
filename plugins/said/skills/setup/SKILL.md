@@ -31,8 +31,8 @@ lane from scratch is `said:install`'s job, not this skill's.
 - **The checker script owns the verdicts.** `setup_check.py` (beside this file) is the
   deterministic oracle; render what it emits, never override a verdict in prose. A wrong verdict
   is a bug to fix in the script or the schema, not a value to hand-edit.
-- **Hard exit at the report** (read-only). End with the ledger; never proceed into a phase, never
-  auto-invoke another skill.
+- **Hard exit at the report** (read-only). End with the ledger and versions; never proceed into a
+  phase, never auto-invoke another skill.
 - **Run-when-asked, not a gate.** This skill is invoked on demand; it is never wired into the SAID
   cycle as an always-on gate.
 - **Propose, do not guess.** On any finding whose repair needs a decision the schema cannot settle
@@ -92,6 +92,13 @@ The script gives the facts; add the reading a script cannot:
 - **ADVISORY** , a recommended-but-not-fatal gap (a missing skeleton dir, an absent optional axis,
   lanes beneath a root with no registry).
 
+## Step 3, versions
+
+After the ledger run `python3 <skill-dir>/setup_versions.py --root <lane-root>` (on a registry
+root with no `--lane`, `--registry` replaces `--root`); show it verbatim, `--help` has the rules.
+It writes nothing and exits 0. A playbook header has five keys: `rollout`, `plugin`, `from`, `to`,
+`after`. A lane owes every playbook whose `to` is above its stamp (no stamp: all), in `after` order.
+
 ## The statusline step
 
 `/said:setup statusline` runs `setup_statusline.py` (beside this file); the script owns the write.
@@ -135,11 +142,3 @@ The read-only ledger's `statusline` row comes from `setup_statusline.py --check`
 
 Apply a default ONLY where the schema's remediation states one unambiguously; otherwise propose.
 After a `--fix` pass, re-run the checker and show the updated ledger.
-
-## Anti-patterns
-
-- **Do not guess a discretionary value.** A choice the schema cannot settle is a proposal, never a
-  silent write.
-- **Do not run as an always-on gate.** This is a doctor the operator invokes, not a cycle step.
-- **Do not confuse the surface with `said:board`.** That skill reports a FEATURE's phase; this one
-  reports whether the LANE is well-formed.
