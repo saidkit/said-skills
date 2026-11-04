@@ -1,10 +1,10 @@
-# Upgrade playbook skit-04 -- the checkpoint switch and the shipped session roles
+# Upgrade playbook said-0.22.0 -- the checkpoint switch and the shipped session roles
 
-- rollout: skit-04
+- rollout: said-0.22.0
 - plugin: said >=0.22.0
 - from: said@0.21.0
 - to: said@0.22.0
-- after: skit-01
+- after: said-0.21.0
 
 One ordered pass that brings a project onto two `said` changes: the context-checkpoint stop is off unless a session
 switches it on, and the plugin ships the two session-role definitions a project launches with `--agent`.
@@ -18,8 +18,8 @@ switches it on, and the plugin ships the two session-role definitions a project 
   A project that relied on the stop being on by default switches it on per session (Step 3).
 - **Every write to a role definition is its owner's.** A definition is a session's own instructions: propose the
   exact lines, the owner says yes per diff. A worker session never edits them.
-- **A lane with no keyed lane block yet** takes playbook v.0.4 first; for the lane-block keys of 0.21.0
-  (`SAID.mounts`, the registry line) see playbook skit-01.
+- **A lane with no keyed lane block yet** takes playbook said-0.8.0 first; for the lane-block keys of 0.21.0
+  (`SAID.mounts`, the registry line) see playbook said-0.21.0.
 - **Bash:** the blocks below are bash (in zsh, run `bash` first). `T` is the project root, `SAID_PLUGIN` the
   installed said plugin directory.
 

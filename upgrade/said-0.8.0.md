@@ -1,6 +1,6 @@
-# Upgrade playbook v.0.4 -- the keyed lane block, the surface contract and earned rules
+# Upgrade playbook said-0.8.0 -- the keyed lane block, the surface contract and earned rules
 
-- rollout: v.0.4
+- rollout: said-0.8.0
 - plugin: said >=0.8.0
 - from: unversioned
 - to: said@0.8.0

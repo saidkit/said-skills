@@ -1,10 +1,10 @@
-# Upgrade playbook skit-01 -- the `SAID.mounts` key and the lane registry line
+# Upgrade playbook said-0.21.0 -- the `SAID.mounts` key and the lane registry line
 
-- rollout: skit-01
+- rollout: said-0.21.0
 - plugin: said >=0.21.0
 - from: said@0.20.0
 - to: said@0.21.0
-- after: skit-03
+- after: said-0.20.0
 
 One ordered pass that brings a lane or a multi-lane root onto two changes of the lane block: the key
 `SAID.code-mount` becomes the list key `SAID.mounts`, and a `SAID.lanes:` registry becomes one key line of
@@ -19,7 +19,7 @@ One ordered pass that brings a lane or a multi-lane root onto two changes of the
   reports `SAID.code-mount missing BLOCKER`. So: **plugin first, then the blocks**, never the reverse.
 - **Resolve companion symlinks before editing:** edit the target file, never the link, and count it once.
 - **Every write to a `CLAUDE.md` is its owner's.** `/said:setup --fix` shows the change and writes on consent.
-- **A lane with no keyed lane block yet** takes playbook v.0.4 first; its template already writes both keys in the
+- **A lane with no keyed lane block yet** takes playbook said-0.8.0 first; its template already writes both keys in the
   new form.
 - **Bash:** the blocks below are bash (in zsh, run `bash` first). `LANE` is the lane root (the folder holding its
   `CLAUDE.md`), `SAID_PLUGIN` the installed said plugin directory.

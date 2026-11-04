@@ -1,10 +1,10 @@
-# Upgrade playbook skit-03 -- operator questions, holds, lifts and rulings
+# Upgrade playbook said-0.20.0 -- operator questions, holds, lifts and rulings
 
-- rollout: skit-03
+- rollout: said-0.20.0
 - plugin: said >=0.20.0, magic >=0.13.0
 - from: said@0.8.0
 - to: said@0.20.0
-- after: v.0.4
+- after: said-0.8.0
 
 One ordered pass that brings a lane onto the hold vocabulary: a task that waits on an operator question carries a
 marker, is held until a recorded ruling lifts it, and the lift cites that ruling. **Config and docs only: no
@@ -17,7 +17,7 @@ engine edit, no new skill, no commit unless the lane's owner asks.**
   the section `## Decisions`, the field `resolved-by:`, the token `OPERATOR-DECISION-HELD`, the script
   `decision-gate.py`. An older engine does not see the new marker. So: **plugins first, then templates and logs**,
   never the reverse.
-- **The lane has taken playbook v.0.4:** an `## Earned rules` section with citable ids and `SAID.profile:`.
+- **The lane has taken playbook said-0.8.0:** an `## Earned rules` section with citable ids and `SAID.profile:`.
 - **Resolve companion symlinks before editing:** edit the target file, never the link.
 - **Bash:** the blocks below are bash (in zsh, run `bash` first). `LANE` is the lane root (the folder holding its
   `CLAUDE.md`), `SAID_PLUGIN` the installed said plugin directory.
