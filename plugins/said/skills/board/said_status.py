@@ -711,10 +711,33 @@ def parse_lane_arg(arg, defaults):
     return spec
 
 
-def analyze(lanes, today, stale_days, project):
+STAMP_CAP = 64
+
+
+def lane_stamps(root):
+    """The lane's SAID.version and SAID.starter as written on its own `## Lane` block key list,
+    `-` when absent or empty. A plain read for display: control and format characters are
+    dropped and a value over STAMP_CAP is cut, so a stamp cannot rewrite the terminal."""
+    try:
+        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8-sig", errors="replace") as fh:
+            block = lane_block_lines(fh.read())
+    except (OSError, ValueError):
+        block = None
+    out = {}
+    for key in ("version", "starter"):
+        v = _block_key(block, key) if block is not None else None
+        v = "".join(ch for ch in (v or "") if unicodedata.category(ch) not in ("Cc", "Cf"))
+        out[key] = (v[:STAMP_CAP - 3] + "...") if len(v) > STAMP_CAP else (v or "-")
+    return out
+
+
+def analyze(lanes, today, stale_days, project, stamps=False):
     results = [analyze_lane(L["name"], L["root"], L["docs_dir"], L["work_dir"],
                             L.get("prefixes"), L.get("legacy_prefixes"), today, stale_days)
                for L in lanes]
+    if stamps:  # the --lane board only; the single-lane board stays as it was
+        for r, L in zip(results, lanes):
+            r.update(lane_stamps(L["root"]))
     flat = [f for r in results for f in r["features"]]
     flat.sort(key=_sortkey)
     return {
@@ -789,6 +812,10 @@ def run_lines(lr, prefix):
     return ["%s%s %s" % (prefix, f["id"], run_line(r)) for f in lr["features"] for r in f.get("fast_track_open") or []]
 
 
+def _stamp_str(lr):
+    return "  version: %s  starter: %s" % (lr["version"], lr["starter"])
+
+
 def render_roster(data, stale_only=False):
     def shown(lr):
         return [f for f in lr["features"] if (not stale_only or f["stale"])]
@@ -805,6 +832,8 @@ def render_roster(data, stale_only=False):
         data["project"], n, "" if n == 1 else "s", data["today"]), ""]
     if n == 1:
         lr = data["lanes"][0]
+        if "version" in lr:
+            lines[-1:-1] = [_stamp_str(lr).lstrip()]
         rows = shown(lr)
         for f in rows:
             lines.append(_row(f, idw, phw))
@@ -827,7 +856,7 @@ def render_roster(data, stale_only=False):
                 continue
             any_shown = True
             hint = lr["root"] if lr["root"] not in (".", "") else lr["docs_dir"]
-            lines.append("lane: %s  (%s)" % (lr["name"], hint))
+            lines.append("lane: %s  (%s)%s" % (lr["name"], hint, _stamp_str(lr) if "version" in lr else ""))
             for f in rows:
                 lines.append("  " + _row(f, idw, phw))
             lines += runs
@@ -1619,7 +1648,7 @@ def main():
                 "prefixes": [p.strip() for p in a.prefixes.split(",")] if a.prefixes else None,
                 "legacy_prefixes": [p.strip() for p in a.legacy_prefixes.split(",")] if a.legacy_prefixes else None}
     lanes = [parse_lane_arg(x, defaults) for x in a.lane] if a.lane else [defaults]
-    data = analyze(lanes, a.today, a.stale_days, project)
+    data = analyze(lanes, a.today, a.stale_days, project, stamps=bool(a.lane))
 
     try:
         sys.stdout.reconfigure(encoding="utf-8")

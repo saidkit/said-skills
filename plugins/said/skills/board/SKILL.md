@@ -42,7 +42,7 @@ The header's board switch moves between the three built boards on one page; each
 - `/said:board stop` — stop the running server.
 - `/said:board --cli` — the terminal roster; `/said:board --cli <feature-id>` the terminal deep-dive.
 - `/said:board --json` — the structured data layer (any view, with the same arguments).
-- `--lanes` — the cross-lane board, grouped by lane: a `--cli` / `--json` view (`--lanes` alone renders it as `--cli`). The web page shows one lane at a time through its header's lane select.
+- `--lanes` — the cross-lane board, grouped by lane: a `--cli` / `--json` view (`--lanes` alone renders it as `--cli`), each lane carrying its `SAID.version` and `SAID.starter` stamps as written, `-` when absent (`--json`: the lane's `version` and `starter` fields). The web page shows one lane at a time through its header's lane select.
 - `--stale` — attention filter: only non-`Closed` features past their idle threshold. A `--cli` / `--json` argument; on the web page, the header's `stale only` toggle.
 - `--port N`, `--lane ...`, `--connect <url>`: web server flags (below). `--stale-days N` sets the idle threshold on the page and on `--cli` / `--json`.
 
@@ -183,7 +183,7 @@ Markdown (keep `file:line` paths clickable) — the "position in the SAID cycle"
 
 ### Cross-lane — `/said:board --cli --lanes`
 
-Resolve lanes per Step 0, then run the script with one `--lane NAME:root=...;docs=...;working=...;prefixes=...` per lane. One roster section per lane under a `lane: <name>  (<root>)` heading, columns aligned across lanes. A `<feature-id>` spanning lanes matches the umbrella id + suffixed lane ids together (`PROJ-01`, `PROJ-01-BE`), labelling each with its `lane:` and its own phase. (Phase is per-lane; cross-lane `Closed` / crossing semantics stay `/said:flow`'s job — this skill reports, it doesn't gate.)
+Resolve lanes per Step 0, then run the script with one `--lane NAME:root=...;docs=...;working=...;prefixes=...` per lane. One roster section per lane under a `lane: <name>  (<root>)  version: <stamp>  starter: <stamp>` heading (each stamp as written on the lane's block, `-` when absent; the stamps sit on the heading, not in the feature columns), columns aligned across lanes. A `<feature-id>` spanning lanes matches the umbrella id + suffixed lane ids together (`PROJ-01`, `PROJ-01-BE`), labelling each with its `lane:` and its own phase. (Phase is per-lane; cross-lane `Closed` / crossing semantics stay `/said:flow`'s job — this skill reports, it doesn't gate.)
 
 ## Rendering rules
 
