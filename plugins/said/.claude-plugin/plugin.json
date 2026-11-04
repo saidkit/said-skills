@@ -1,7 +1,7 @@
 {
   "name": "said",
   "displayName": "SAID",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "description": "SAID: Structured AI Delivery - AI engineering methodology. Skills + agents that drive a feature from idea to delivery. The stack-agnostic context engine; pair with a per-stack starter from saidkit.dev.",
   "author": {
     "name": "Viktor Shpak",
