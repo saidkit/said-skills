@@ -122,7 +122,7 @@ A session boundary is a data boundary: the engine sheds inherited context at pha
 
 ## [0.17.0] — 2026-09-22
 
-Gate-independence hardening (SAID-22): no said Deliver/review gate is satisfiable by builder-written text -- every gate is mechanical/independent, or explicitly documented as an agent-side judgement. Extends the SAID-21 principle to three remaining gates.
+Gate-independence hardening: no said Deliver/review gate is satisfiable by builder-written text -- every gate is mechanical/independent, or explicitly documented as an agent-side judgement. Extends the no-self-grading rule of the entries below to three remaining gates.
 
 - **Changed:** `review-ux` no longer pre-clears a rule PASS from the task's `### Fix` claims -- the builder-text skip-list is dropped, so `R-GATE-*` resolves only from the skill's own independent gate re-run (an unrunnable gate surfaces FAIL/BLOCKED, never a builder-claimed PASS).
 - **Added:** `earned-rules.py check` resolves a cited rule's linked record on disk -- a present-but-unresolvable cited link is WARN before the contract date and FAIL on-or-after (pivoting on the task's close date); a no-link cited rule is WARN; "resolves" follows symlinks from the lane root, not git-committed-reachability. Whole-block link-health is advisory in `count`, never gating.
@@ -130,7 +130,7 @@ Gate-independence hardening (SAID-22): no said Deliver/review gate is satisfiabl
 
 ## [0.16.0] — 2026-09-22
 
-The anti-self-default backstop (SAID-21, socket 4): a decision a task *depends on* is now visible and attribution-checkable, so an autonomous builder under a blanket grant cannot self-default it and build the dependent work.
+The anti-self-default backstop (socket 4): a decision a task *depends on* is now visible and attribution-checkable, so an autonomous builder under a blanket grant cannot self-default it and build the dependent work.
 
 - **Added:** a task carries a write-once `**Blocked-on decision:** <id>` marker; its resolution is an append-only `## Decisions` ledger record (`- <id> resolved-by: user@<turn> -- "<verbatim quote>" -- <date> [supersedes: <prior>]`), authored by `architect` and `add-task` (explicit, never inferred) and written only by a main-context resolve step.
 - **Added:** `decision-gate.py`, a bundled **structural** checker — it PASSes only when the ledger record cites a user-role turn with a verbatim substring quote, a basis not in the self-default deny-list (grant / standing-autonomy / default / assistant / subagent / arm), postdating the marker; else HOLD. The semantic "decides, not merely mentions" check stays agent-side.
@@ -139,7 +139,7 @@ The anti-self-default backstop (SAID-21, socket 4): a decision a task *depends o
 
 ## [0.15.0] — 2026-09-22
 
-The owed-operator-decision fuse (SAID-21): a decision the engine reserves for the operator is announced once, then held — never settled by an autonomous builder and rubber-stamped by later gates.
+The owed-operator-decision fuse: a decision the engine reserves for the operator is announced once, then held - never settled by an autonomous builder and rubber-stamped by later gates.
 
 - **Added:** the fuse's three sockets — **routing** (an owed decision emits `OPERATOR-DECISION-HELD` on the `goal: stop` line and holds, in `said`/`flow` and the `scope-refine` §D stop-points), **attribution** (`architect`'s preflight now requires §D *resolved with an operator-attributed record* — cite-and-verify, not merely empty), and **derivation** (a `status`/`board` "waiting on operator" axis derived from the recorded accept verdict, never stored).
 - **Added:** `impl` main-side decisions (unsatisfiable Approach, mid-flight scope-creep, soft-finding defer) no longer relax under a blanket autonomy grant — they classify as owed and hold/return; and `said` consumes a **named** advance decision only for its named class (a blanket grant never covers an owed decision).
@@ -173,12 +173,12 @@ Completeness durable-spec resolution for a `dir:` unit-home lane, plus emit-time
 
 ## [0.11.0] — 2026-09-14
 
-SAID-17 — the SAID-16 follow-ups (completeness executed-capture + built-floor, engine-word purge, plain-ASCII glyph gate).
+Follow-ups to the completeness and glyph work (completeness executed-capture + built-floor, engine-word purge, plain-ASCII glyph gate).
 
 - **Changed:** `said_completeness.py` now realizes the cli **oracle tier** — where a capture manifest declares a per-unit `cmd:`, it executes that command's own `--help` **read-only** (command-path + `--help` only; every invocation flag stripped; a flag is verified by a **two-witness** rule -- an options-section+column cluster corroborated by the `usage:` synopsis, so a flag named only in prose is not miscounted) and verifies the designed `Flags` against it; a manifest `built:` line cannot bluff an oracle element. A tool whose `--help` is not two-witness parseable (hand-formatted / truncated synopsis) falls to declared-evidence (manifest) with a WARN -- a documented coverage ceiling, not full author-independence. The completeness recipe row moves `said-capture: manifest` -> **`process-spawn`**. A non-cli (web) capture runs a front-declared probe as given (the front owns its read-only-ness; hermetic fixture shipped).
 - **Added:** a **built-floor** — an all-dropped (zero-built) manifest FAILs (`BUILT intersect DESIGNED` must be non-empty); a legitimate partial-drop still PASSes. Closes the vacuous-completeness hole.
-- **Changed:** the medium-agnostic engine (`uxtoc` / `architect` / `said_completeness.py`) carries **no incidental medium vocabulary** — `uxtoc` emits purely from the loaded grammar (the emit template lives in the grammar, discharging the SAID-05 §10.2 residual).
-- **Added:** an enforcing **plain-ASCII gate** (`docs/evaluation/plain-ascii/`) over `plugins/said/**` (R-SAID-08 realized; em-dash `U+2014` carved out); the shipped surface is purged of banned watermark glyphs.
+- **Changed:** the medium-agnostic engine (`uxtoc` / `architect` / `said_completeness.py`) carries **no incidental medium vocabulary** - `uxtoc` emits purely from the loaded grammar (the emit template lives in the grammar, so no engine-side emit template remains).
+- **Added:** an enforcing **plain-ASCII gate** (`docs/evaluation/plain-ascii/`) over `plugins/said/**` (the plain-ASCII rule enforced; em-dash `U+2014` carved out); the shipped surface is purged of banned watermark glyphs.
 
 ## [0.10.0] — 2026-09-13
 
@@ -193,7 +193,7 @@ Medium-agnostic uxtoc unit contract + no-seal completeness model. The design-out
 
 The uxtoc basis→contract lifecycle runs off a single source of truth (`toc.md`).
 - **Added:** `uxtoc` emits a `toc-checksum: total=<N>,<SCREEN-ID>=<n>,…` line on `output=`, counted by the new `element-projection.md` taxonomy (LOAD-WHOLE + VERIFY-TOKEN).
-- **Changed:** the completeness check parses `toc.md` directly and verifies the checksum (FAIL → "re-run uxtoc"); the `toc-elements.md` intermediate is retired (reverses SAID-08 decision (a)).
+- **Changed:** the completeness check parses `toc.md` directly and verifies the checksum (FAIL -> "re-run uxtoc"); the `toc-elements.md` intermediate is retired (one outline file, no second copy to drift).
 - **Added:** a hermetic web end-to-end fixture — outline → `architect` §AC fold → built manifest → `accept` recompute.
 - **Added:** a generative-composition note in `uxtoc`.
 - **Fixed:** `said:status` / `said:board` count a bulleted `- **Status:**` task line, not only the plain `**Status:**` form (`said_status.py` `STATUS_RE`).
