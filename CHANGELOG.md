@@ -2,6 +2,10 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.26.1] - 2026-11-05
+
+- **Changed:** the changelog states each earlier entry's mechanism on its own, with no internal feature id, rule id or decision pointer in the text. Documentation only: no skill, script or schema changes, and no upgrade step.
+
 ## [0.26.0] - 2026-11-04
 
 Two boards beside the features board, and a manager for the backlog: `/said:board backlog` and `/said:board todo` read the workspace backlog file and each lane's todo list through one grammar-driven reader, a row's priority and order are set from the page, and the new `said:backlog` skill is the one writer of backlog entries and idea records. The plugin ships 17 skills.
