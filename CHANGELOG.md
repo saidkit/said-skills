@@ -4,7 +4,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [0.26.1] - 2026-11-05
 
-- **Changed:** the changelog states each earlier entry's mechanism on its own, with no internal feature id, rule id or decision pointer in the text. Documentation only: no skill, script or schema changes, and no upgrade step.
+- **Changed:** the changelog states each earlier entry's mechanism on its own, with no internal feature id, rule id, repository name or decision pointer in the text. Documentation only: no skill, script or schema changes, and no upgrade step.
 
 ## [0.26.0] - 2026-11-04
 
@@ -134,7 +134,7 @@ Gate-independence hardening: no said Deliver/review gate is satisfiable by build
 
 ## [0.16.0] — 2026-09-22
 
-The anti-self-default backstop (socket 4): a decision a task *depends on* is now visible and attribution-checkable, so an autonomous builder under a blanket grant cannot self-default it and build the dependent work.
+The anti-self-default backstop (the fourth of its hardening points): a decision a task *depends on* is now visible and attribution-checkable, so an autonomous builder under a blanket grant cannot self-default it and build the dependent work.
 
 - **Added:** a task carries a write-once `**Blocked-on decision:** <id>` marker; its resolution is an append-only `## Decisions` ledger record (`- <id> resolved-by: user@<turn> -- "<verbatim quote>" -- <date> [supersedes: <prior>]`), authored by `architect` and `add-task` (explicit, never inferred) and written only by a main-context resolve step.
 - **Added:** `decision-gate.py`, a bundled **structural** checker — it PASSes only when the ledger record cites a user-role turn with a verbatim substring quote, a basis not in the self-default deny-list (grant / standing-autonomy / default / assistant / subagent / arm), postdating the marker; else HOLD. The semantic "decides, not merely mentions" check stays agent-side.
@@ -392,9 +392,9 @@ downstream skill.
 and serves List + Kanban views with a click-through deep-dive. One deterministic core, two
 surfaces — the web numbers match the terminal board exactly. `/said:board stop` kills it.
 
-Both ported from the `hypercommand` prototype. Their evaluation package (SUT-by-role harness,
-hermetic fixture, five-verification EVAL) and design docs live in the private `said-skills-docs`
-companion, not in the shipped plugin.
+Both ported from an earlier prototype. Their evaluation package (SUT-by-role harness,
+hermetic fixture, five-verification EVAL) and design docs live in a private
+companion repository, not in the shipped plugin.
 
 ## [0.2.0] — 2026-08-03
 
