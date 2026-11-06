@@ -2,7 +2,8 @@
 # Deterministic recompute for a lane's cli gate: the lane's own command line, then every evaluation harness.
 # Lane root = $SAID_ROOT (default: the current dir); docs root = the lane's SAID.docs-root: key.
 # Runs the SAID.commands: line from the lane root ("none" = a declared skip), then every
-# <docs-root>/evaluation/**/harness.sh (symlinks inside the tree are not followed) from its own directory,
+# <docs-root>/evaluation/**/harness.sh (symlinks inside the tree are not followed; the walk does not descend
+# below a folder under evaluation/ that holds a harness.sh: that unit's subtree is its data) from its own directory,
 # reached through the logical lane path, each under a timeout (a timeout is an undeclared failure).
 # A failing harness counts as EXPECTED only when every line-leading FAIL names an id declared for that unit
 # in <docs-root>/evaluation/EXPECTED-FAIL -- one "<unit-path> <id> <reason> [until <version>]" per line,
@@ -136,6 +137,8 @@ for d, dirs, files in os.walk(evaluation, followlinks=False):
     dirs.sort()
     if "harness.sh" in files:
         units.append(d)
+        if d != evaluation:
+            dirs[:] = []  # a unit's subtree is its data, never a unit of its own
 for d in sorted(units):
     unit = os.path.relpath(d, docs)
     env = {k: v for k, v in os.environ.items() if k != "SAID_GATE_OUT"}  # the record is this run's, never a child's

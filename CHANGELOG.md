@@ -11,6 +11,7 @@ Shorter session-role definitions: the supervisor in eight lines, one per moment 
 - **Changed:** each definition has a size cap: the supervisor at most 565 body words, the worker at most 350, and no clause in either over 35 words.
 - **Changed:** the README `### Session roles` section describes the two definitions in their new terms. It defines "the records" once (the project's specs, decisions and task logs), says where a worker's transcript lives (a `.jsonl` file under `~/.claude/projects/`), and maps the brief's macros: `said!!` and `flow!!` invoke `said:said` and `said:flow`, and `drive!!` is your own quality loop around them, defined in your `CLAUDE.md`.
 - **Changed:** the plugin's macro mentions use the double-bang spelling, `said!!` and `flow!!`, in the README and in the `said`, `flow` and `review-ux` skills, including the `said` skill's description. Earlier entries keep the spelling they were written with.
+- **Fixed:** the gate recompute (`skills/board/gate_recompute.sh`) does not descend below a folder under `evaluation/` that holds a `harness.sh`: that unit's subtree is its data, a recorded workspace tree included, never a unit of its own. A harness at the `evaluation/` root still runs and hides nothing below it.
 - **Migration:** update the plugin. A `CLAUDE.md` that defines the macros as `said!` and `flow!` keeps working, since the skills trigger on their own commands; rename them to `said!!` and `flow!!` to match the plugin's text and the supervisor's brief.
 
 ## [0.26.1] - 2026-11-05
