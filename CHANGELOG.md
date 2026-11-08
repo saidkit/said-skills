@@ -4,7 +4,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [0.27.1] - 2026-11-08
 
-- **Changed:** `agents/supervisor.md`, the reserved-calls line: the supervisor puts a held call to you in full the first time it mentions it, with the call's cite and its own proposal, and never lifts the call on its own reading of a record. The line covers the supervisor's own held calls as well as a worker's.
+- **Changed:** `agents/supervisor.md`, the reserved-calls line: the supervisor puts a held call to you in full the first time it mentions it, with the call's cite and its own proposal, and never lifts the call on its own reading of a record. The line now speaks of any held call, where it named a worker's held call before.
 - **Changed:** the supervisor's size cap is 567 body words (was 565); the worker's cap and the 35-word clause cap are unchanged.
 
 ## [0.27.0] - 2026-11-06
