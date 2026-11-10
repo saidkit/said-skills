@@ -119,6 +119,7 @@ Acceptance bullets (skill prefills; strip categories that don't apply):
   - [ ] <ComponentName> public props preserved (consumed by <ConsumerFeature>)
   - [ ] Quality gates green; no regression outside scope.
 Refs: [ADR/UX-spec/feature-spec paths this task CREATES or EDITS; empty otherwise]
+Covers: [the ids this task discharges, separated by ", "; none when it discharges none]
 Blocked-on question: [<id> | none -- an operator question this task depends on; explicit, never inferred]
 Priority: [High|Medium|Low; default Medium / High for bugs]
 ```
@@ -144,8 +145,9 @@ Before writing, validate the answers against template-tasks.md discipline. Rewri
   
   Typical task ends with 5–10 Acceptance bullets total. Bug tasks may be even leaner (Problem + Fix + Gotchas per template-tasks.md "depth varies").
 - **Refs: empty by default.** Only fill if the task creates or edits an ADR / UX-spec / feature-spec. Reading list ≠ Refs. Refs is the write-set; Reading list (+ Approach citations) is the read-set.
-- **Blocked-on question (optional field).** When the operator's answer names an operator question this task depends on (`Blocked-on question: <id>`), place `**Blocked-on question:** <id>` as a field after `**Refs:**` (a field, never a `###` section); `none` -> omit it. The id is engine-minted (a resolved §D id, else `Q-<n>`), explicit and never inferred from prose. A blocked task is held until it is lifted (`template-tasks.md`). The hold is lifted by one line in the log's `## Lifted holds` section, `- <id> lifted-by: user@WR-<seconds> -- "<verbatim quote>" -- <date> [supersedes: <prior>]`, that cites the operator's answer as a ruling recorded with the `ruled` skill in the work's `rulings.md` (example: `- Q-1 lifted-by: user@WR-1790160000 -- "use the Postgres advisory lock" -- 2026-09-23`). `user` is a fixed role word (the role of the cited answer); the person's name belongs to the ruling.
-- **Fast-track field.** When the feature has an open run (a `## Fast-track F<NN>` block with an empty `closed:`), the new task joins it: place `**Fast-track:** F<NN>` after `**Refs:**` (after `**Blocked-on question:**` when both are present), a field, never a `###` section. A feature with no open run gets no field.
+- **Covers:** one line right after `**Refs:**` naming the ids the task discharges, separated by `, `: ruling ids `WR-<seconds>`, ledger ids of the lane's decision ledger (`DL-`, `CL-`), todo and backlog line ids `@<ms>`, a UX rule as `<rules-file>#<rule-id>`, and source anchors `<file>#<heading-id>` (`scope.md#<heading-id>` on a lane without spec shards). A heading id is the heading's slug: lowercase, spaces to hyphens, punctuation dropped; never mint an id. Never a bare `R-` id: the earned rules a task applies go in its `Rules applied` line at close. A task that discharges no id writes `**Covers:** none`.
+- **Blocked-on question (optional field).** When the operator's answer names an operator question this task depends on (`Blocked-on question: <id>`), place `**Blocked-on question:** <id>` as a field after `**Covers:**` (a field, never a `###` section); `none` -> omit it. The id is engine-minted (a resolved §D id, else `Q-<n>`), explicit and never inferred from prose. A blocked task is held until it is lifted (`template-tasks.md`). The hold is lifted by one line in the log's `## Lifted holds` section, `- <id> lifted-by: user@WR-<seconds> -- "<verbatim quote>" -- <date> [supersedes: <prior>]`, that cites the operator's answer as a ruling recorded with the `ruled` skill in the work's `rulings.md` (example: `- Q-1 lifted-by: user@WR-1790160000 -- "use the Postgres advisory lock" -- 2026-09-23`). `user` is a fixed role word (the role of the cited answer); the person's name belongs to the ruling.
+- **Fast-track field.** When the feature has an open run (a `## Fast-track F<NN>` block with an empty `closed:`), the new task joins it: place `**Fast-track:** F<NN>` after `**Covers:**` (after `**Blocked-on question:**` when both are present), a field, never a `###` section. A feature with no open run gets no field.
 - **Status: `Todo (YYYY-MM-DD)`** with today's creation date.
 - **Fix / Deviations / Gotchas: HTML-comment placeholders.** Phase 3 close-of-task review fills them.
 
@@ -177,6 +179,7 @@ Use the canonical section order from template-tasks.md:
 **Status:** Todo (YYYY-MM-DD)
 **Priority:** <High|Medium|Low>
 **Refs:** <paths or empty>
+**Covers:** <ids or none>
 [optional] **Blocked-on question:** <id>
 [optional] **Fast-track:** F<NN>
 
@@ -250,6 +253,7 @@ Report to operator:
 - New task ID + title.
 - Tasks file path + new total task count.
 - Summary table updated (yes/no).
+- Uncovered ids: the `WR-` ids of the feature's `rulings.md` (in its `SAID.working:` folder; no file -> no ruling ids) and the `DL-` and `CL-` ids the companion spec (Step 0) cites that no task's `**Covers:**` names, listed, or `none`.
 
 **Auto-mode addendum to report** (when `auto` was set):
 - Step 3 outcome: Covered / Gap (flagged + stopped) / Contradicts (flagged + stopped) — any Gap/Contradicts names the `/said:architect propagate-new-info` action owed before `/said:impl`.
