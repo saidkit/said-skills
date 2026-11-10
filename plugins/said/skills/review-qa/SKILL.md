@@ -45,8 +45,8 @@ A fast-track run is a `## Fast-track F<NN>` block in the tasks log whose `closed
 
 - **What runs:** run quality gates (once) + Fix integrity + Refs conformance for the listed ids only; every other step is feature-mode's, except Step 0 #1-#2 (the run form's parse and status check). BLOCK when the log has no open `## Fast-track F<NN>` block (absent, or its `closed:` filled).
 - **Fix integrity adds two run lines per listed task:** the deferral line `fast-track F<NN>: review-ux, code review, review-qa, accept deferred to its close`, written by `impl`, compared byte for byte; and the line beginning `fast-track F<NN> code review:`, which `/said:said`'s run close (or the operator driving the close) writes into the task's `### Fix` after the task's code-review group is reviewed and before this gate runs. A missing or altered line is a FAIL for that task; a task in no code-review group has no such line: FAIL (the run stays open; the run close is re-issued with the task in a group, then this gate re-runs). Plan one row per task for them, `fix-claim/<task-id>/run-lines`.
-- **Semantic rows:** discharge a row a declared reviewer covers by the run's verdict, `docs/working/<feature-id>/review-<checker-id>-<feature-id>-F<NN>.md` (`verdict: PASS`), in place of the per-task one; absent or not `verdict: PASS`, the row reads as it does for a missing per-task verdict.
-- **Report:** In run-mode `<id>` is `<feature-id>-F<NN>` everywhere this skill writes it, except the gate record, which is keyed by the feature id (the Phase A plan, the `.full.md` redirect, the Phase C report): `docs/working/<feature-id>/review-qa-<feature-id>-F<NN>.md`. It is the run's gate report, never the feature's verdict; the feature's Deliver row runs feature-mode.
+- **Semantic rows:** discharge a row a declared reviewer covers by the run's verdict, `<SAID.working:>/review-<checker-id>-<feature-id>-F<NN>.md` (`verdict: PASS`), in place of the per-task one; absent or not `verdict: PASS`, the row reads as it does for a missing per-task verdict.
+- **Report:** In run-mode `<id>` is `<feature-id>-F<NN>` everywhere this skill writes it, except the gate record, which is keyed by the feature id (the Phase A plan, the `.full.md` redirect, the Phase C report): `<SAID.working:>/review-qa-<feature-id>-F<NN>.md`. It is the run's gate report, never the feature's verdict; the feature's Deliver row runs feature-mode.
 
 ## Common compositions
 
@@ -115,7 +115,7 @@ Procedure (above the gate-reviewer threshold, the `### Fix` and `Refs:` parsing 
 
 3. **Parse `Refs:` line** for additional cites beyond the checklist mappings — purely spec/doc edits (e.g., spec edits, project-doc edits) surface as WARN since they have no mechanical assertion.
 
-3. **Emit plan** to `docs/working/<feature-id>/review-qa-<task-id-or-feature-id>.md`:
+3. **Emit plan** to `<SAID.working:>/review-qa-<task-id-or-feature-id>.md`:
 
    ```
    ## Phase A plan — <id> (YYYY-MM-DD)
@@ -141,7 +141,7 @@ Procedure (above the gate-reviewer threshold, the `### Fix` and `Refs:` parsing 
    | <feat-id>.tasks.md:<line> (<task-id>) | <ADR-shortname> | (no mapping — WARN: operator-verify) |
    ```
 
-4. **STOP for operator review.** Brief status: "Phase A complete. <N> Fix claims + <M> Refs assertions (<K> mapped, <L> WARN) + 1 umbrella gate run planned. Plan at `docs/working/<feature-id>/review-qa-<id>.md`. Reply OK to execute (Phase B)."
+4. **STOP for operator review.** Brief status: "Phase A complete. <N> Fix claims + <M> Refs assertions (<K> mapped, <L> WARN) + 1 umbrella gate run planned. Plan at `<SAID.working:>/review-qa-<id>.md`. Reply OK to execute (Phase B)."
 
 ## Phase B — Execute
 
@@ -160,7 +160,7 @@ Procedure:
    - **Stale cites — one run per review, rows for the tasks in scope:** run `<skill-dir>/covers-read.py --task-file <tasks log> --root <lane-root> --working <SAID.working:> --rulings <SAID.working:>/rulings.md` (a missing rulings file makes every ruling id `missing`), adding `--todo <SAID.docs-root>todo.md` and `--backlog <SAID.docs-root>backlog.md` where each exists and `--ledger <file>` for each decision-ledger file the feature spec (`SAID.feature-spec:`) cites under `## Context to load`. Each `stale-cite: FAIL <task> <id> <why>` line of a task in scope is a FAIL row `stale-cite/<task-id>`; an `unchecked` id is a WARN (operator-verify); exit 2 is a HALT naming the error, never a pass. The `id:` and `matrix:` lines are evidence for the verbose redirect (step 6). Write its output to `<SAID.working:>/covers-<feature-id>.txt`; its `matrix:` lines cover every task of the log, in run-mode too, so the round's snapshot below is feature-wide.
    - **The round and the sign-off (where step 1 wrote a record):** run `python3 <skill-dir>/../board/gate_record.py round --root <lane-root> --record <record> --matrix-from <SAID.working:>/covers-<feature-id>.txt`, adding `--set <key>=<value>` for each figure the round has on record (`decisions`, `leaks`, `look`, `operator-min`, `rework-min`, `elapsed-min`, `tokens`; one token each, no comma or space; a figure not on record stays `-`): the same store replaces its round, a moved store appends the next. Then `gate_record.py check --root <lane-root> --record <record> --reads gate-recompute,matrix`: `current` is a PASS row `inspect/<feature-id>`; `Inspect owed: <read>, ...` is a FAIL row with that line; `gate owed` (the store moved after step 1) is a HALT: rerun step 1; exit 1 or 2 from `round`, and exit 2 from `check`, is a HALT naming its `refused:` or `error:` line.
 
-3. **Rule-set assertions.** For each rule in the composed rule set (per Phase A § 2), run its `verify:` action. (Above the gate-reviewer threshold, the reading of a semantic row no declared reviewer covers comes from the reviewer, Step 0 #5.) A **semantic** row on a lane whose declared reviewer (`SAID.reviewers:`) covers it is **discharged by that reviewer's recorded verdict for the task** (`docs/working/<feature-id>/review-<checker-id>-<task>.md`, `verdict: PASS`; in run-mode the run's verdict, **Run-mode**) — never left MANUAL-PENDING to the operator on such a lane; the row that proves the verdict exists is mechanical, the rows that read as its content are discharged together. PASS / FAIL based on assertion's exit code or expected condition. Some `verify:` actions are mechanical bash; some are semantic (read-and-assert) and require operator review on output -> MANUAL-PENDING; some carry default-SOFT-PASS semantics (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`) and fire only when conditions warrant.
+3. **Rule-set assertions.** For each rule in the composed rule set (per Phase A § 2), run its `verify:` action. (Above the gate-reviewer threshold, the reading of a semantic row no declared reviewer covers comes from the reviewer, Step 0 #5.) A **semantic** row on a lane whose declared reviewer (`SAID.reviewers:`) covers it is **discharged by that reviewer's recorded verdict for the task** (`<SAID.working:>/review-<checker-id>-<task>.md`, `verdict: PASS`; in run-mode the run's verdict, **Run-mode**) — never left MANUAL-PENDING to the operator on such a lane; the row that proves the verdict exists is mechanical, the rows that read as its content are discharged together. PASS / FAIL based on assertion's exit code or expected condition. Some `verify:` actions are mechanical bash; some are semantic (read-and-assert) and require operator review on output -> MANUAL-PENDING; some carry default-SOFT-PASS semantics (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`) and fire only when conditions warrant.
 
 4. **Refs without mapping:** spec / project-doc cites with no rule match -> WARN. Operator manually verifies. Never auto-PASS.
 
@@ -180,11 +180,11 @@ Procedure:
    | refs/<ADR-shortname> | <check description> | WARN | no mapping in docs/qa/feature-qa-checklist.md; operator-verify |
    ```
 
-6. **Verbose-output redirect.** If a re-check produces > ~20 lines of stdout/stderr (full test runner output, large diff, deep grep dump), redirect to `docs/working/<feature-id>/review-qa-<id>.full.md` under an anchor matching the check. Main report carries: `evidence: <one-line summary>; full output: review-qa-<id>.full.md § <anchor>`.
+6. **Verbose-output redirect.** If a re-check produces > ~20 lines of stdout/stderr (full test runner output, large diff, deep grep dump), redirect to `<SAID.working:>/review-qa-<id>.full.md` under an anchor matching the check. Main report carries: `evidence: <one-line summary>; full output: review-qa-<id>.full.md § <anchor>`.
 
 ## Phase C — Report
 
-Finalize `docs/working/<feature-id>/review-qa-<id>.md`:
+Finalize `<SAID.working:>/review-qa-<id>.md`:
 
 ```
 ## Review-QA verdict — <id> (YYYY-MM-DD)
