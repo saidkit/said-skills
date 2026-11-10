@@ -157,6 +157,7 @@ Procedure:
    - **File deletion / presence:** `! [ -e <path> ]` or `[ -e <path> ]` check. PASS / FAIL.
    - **Quality gate sub-claim** (e.g., "tsc clean"): already covered by umbrella above; mark per-claim verdict from umbrella result.
    - **Rules applied — once per Done task in scope, regardless of whether a line parsed** (it is not a claim re-check; an absent line is exactly the case it grades): run `<skill-dir>/earned-rules.py check --claude-md <lane-root>/CLAUDE.md --task-file <tasks log> --task-id <id> --adr-date 2026-09-08`; the verdict is its first word (PASS / WARN / FAIL) with its reason as evidence.
+   - **Stale cites — one run per review, rows for the tasks in scope:** run `<skill-dir>/covers-read.py --task-file <tasks log> --root <lane-root> --working <SAID.working>/<feature-id>/ --rulings <SAID.working>/<feature-id>/rulings.md` (a missing rulings file makes every ruling id `missing`), adding `--todo <SAID.docs-root>todo.md` and `--backlog <SAID.docs-root>backlog.md` where each exists and `--ledger <file>` for each decision-ledger file the feature spec (`SAID.feature-spec:`) cites under `## Context to load`. Each `stale-cite: FAIL <task> <id> <why>` line of a task in scope is a FAIL row `stale-cite/<task-id>`; an `unchecked` id is a WARN (operator-verify); exit 2 is a HALT naming the error, never a pass. The `id:` and `matrix:` lines are evidence for the verbose redirect (step 6).
 
 3. **Rule-set assertions.** For each rule in the composed rule set (per Phase A § 2), run its `verify:` action. (Above the gate-reviewer threshold, the reading of a semantic row no declared reviewer covers comes from the reviewer, Step 0 #5.) A **semantic** row on a lane whose declared reviewer (`SAID.reviewers:`) covers it is **discharged by that reviewer's recorded verdict for the task** (`docs/working/<feature-id>/review-<checker-id>-<task>.md`, `verdict: PASS`; in run-mode the run's verdict, **Run-mode**) — never left MANUAL-PENDING to the operator on such a lane; the row that proves the verdict exists is mechanical, the rows that read as its content are discharged together. PASS / FAIL based on assertion's exit code or expected condition. Some `verify:` actions are mechanical bash; some are semantic (read-and-assert) and require operator review on output -> MANUAL-PENDING; some carry default-SOFT-PASS semantics (e.g., `<RULE-LABEL>`, `<RULE-LABEL>`) and fire only when conditions warrant.
 
@@ -172,6 +173,7 @@ Procedure:
    | fix-claim/<task-id> | <claim — e.g., Tests N -> M> | PASS | actual: M (≥ claim); `<tests>` |
    | fix-claim/<task-id> | <claim — e.g., grep returns 0> | PASS | `<re-verify command>` -> 0 matches |
    | fix-claim/<task-id> | <claim — e.g., file deleted> | PASS | `! [ -e <path> ]` -> true |
+   | stale-cite/<task-id> | <id> cited in Covers | FAIL | <why: superseded, rejected, missing, outside, malformed> |
    | refs/<ADR-shortname> | <check description> | PASS | `<tests> <test-file>` -> N tests pass |
    | refs/<ADR-shortname> | <check description> | WARN | no mapping in docs/qa/feature-qa-checklist.md; operator-verify |
    ```
