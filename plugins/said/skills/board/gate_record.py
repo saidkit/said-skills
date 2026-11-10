@@ -6,7 +6,7 @@
   gate_record.py round    --root <lane-root> --record <record> --matrix-from <file> [--set <key>=<value>]...
 
 Line grammar, one kind per line, read by a line parser:
-  store: git <sha> | store: content <sha256>   first line; the store identity
+  store: git <sha> [dirty <sha256>] | store: content <sha256>   first line; the store identity
   gate-recompute: <unit> exit=<n> <PASS|EXPECTED|FAIL> [ids]   rows of the current store (gate_recompute.sh)
   skill-doctor: <file> open-P1=<n> reviewer=<id>               rows of the current store (gate_record_row.py)
   feature-review: <row>                                         rows of the current store
@@ -103,17 +103,53 @@ def entry(p, phys):
     return "%s\0%s\n" % (os.path.relpath(p, phys), digest)
 
 
+def git_dirty(phys, mounts, skip, own):
+    """Sorted entries of the mount paths that differ from HEAD (staged, unstaged, untracked, deleted)."""
+    spec = [m.strip("`'\"") or "." for m in mounts]
+    try:
+        top = subprocess.run(["git", "-C", phys, "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+        st = subprocess.run(["git", "--literal-pathspecs", "-C", phys, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames",
+                             "--"] + spec, capture_output=True)
+    except OSError as e:
+        raise Error("git status failed: %s" % e)
+    if top.returncode != 0 or st.returncode != 0:
+        raise Error("git status failed in %s" % phys)
+    top = os.path.realpath(top.stdout.strip())
+    entries = []
+    for rec in st.stdout.split(b"\0"):
+        if len(rec) < 4:
+            continue
+        p = os.path.join(top, os.fsdecode(rec[3:]))
+        real = os.path.realpath(p)
+        if real in own or (skip and inside(real, skip)) or not inside(os.path.abspath(p), phys):
+            continue
+        if os.path.islink(p) or (os.path.lexists(p) and not os.path.isdir(p)):
+            entries.append(entry(p, phys))
+        else:
+            entries.append("%s\0deleted\n" % os.path.relpath(p, phys))
+    return sorted(set(entries))
+
+
+def digest(entries):
+    h = hashlib.sha256()
+    for e in sorted(set(entries)):
+        h.update(e.encode("utf-8", "surrogateescape"))
+    return h.hexdigest()
+
+
 def identity(root, record=None):
-    """The store identity of the lane at root; the record file itself is never part of it."""
+    """The store identity of the lane at root; the record file itself is never part of it. In git it is the HEAD
+    sha, plus `dirty <sha256>` over the changed mount paths when the tree under the mounts differs from HEAD."""
     phys = os.path.realpath(os.path.abspath(root))
     sha = git_sha(phys)
-    if sha:
-        return "git " + sha
     working = (lane_key(phys, "working") or "").strip().strip("`'\"")
     work_top = working.split("<", 1)[0].strip().strip("/")
     skip = os.path.realpath(os.path.join(phys, work_top)) if work_top else None
     own = {os.path.realpath(record)} if record else set()
     mounts = mount_list(lane_key(phys, "mounts")) or ["."]
+    if sha:
+        dirty = git_dirty(phys, mounts, skip, own)
+        return "git %s dirty %s" % (sha, digest(dirty)) if dirty else "git " + sha
     entries = []
     for m in mounts:
         m = m.strip("`'\"")
@@ -137,10 +173,7 @@ def identity(root, record=None):
                 p = os.path.join(dp, f)
                 if p not in own:
                     entries.append(entry(p, phys))
-    h = hashlib.sha256()
-    for e in sorted(set(entries)):
-        h.update(e.encode("utf-8", "surrogateescape"))
-    return "content " + h.hexdigest()
+    return "content " + digest(entries)
 
 
 def load(path):
