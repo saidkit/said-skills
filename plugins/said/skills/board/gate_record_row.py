@@ -4,11 +4,12 @@
   gate_record_row.py --root <lane-root> --out <record> --file <path> --open-p1 <n> --reviewer <id>
 
 The row is `skill-doctor: <file> open-P1=<n> reviewer=<id>`, one per file: a second call for the same file
-replaces it. The record's `head:` is the HEAD of the physical lane root ("none" without git). An absent record, or
-one written at another head, becomes a record holding that head and this row alone: no `gate-recompute:` row is
-ever typed here, and a stale one is never carried to a new head. Exit 0 written, 1 refused value, 2 missing arguments.
+replaces it. The record is written through gate_record.py: its first line is the store identity of the physical
+lane root; a record written at another store keeps its round and matrix lines and drops its rows, so no
+`gate-recompute:` row is ever typed here and a stale one is never carried to a new store. Exit 0 written, 1 refused
+value, 2 missing arguments or a record or lane error (`error: <why>`, nothing written).
 """
-import argparse, os, re, subprocess, sys
+import argparse, os, re, sys
 
 ap = argparse.ArgumentParser()
 for a in ("root", "out", "file", "open-p1", "reviewer"):
@@ -19,25 +20,20 @@ if not re.fullmatch(r"\d+", a.open_p1):
 for name, val in (("file", a.file), ("reviewer", a.reviewer)):
     if not val or re.search(r"\s", val):
         sys.exit("refused: --%s is one token without whitespace" % name)
-phys = os.path.realpath(a.root)
-try:
-    sha = subprocess.run(["git", "-C", phys, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() or "none"
-except OSError:
-    sha = "none"
-lines = []
-try:
-    prior = open(a.out).read().split("\n")
-    if prior[0] == "head: %s" % sha:
-        lines = [l for l in prior[1:] if l]
-except OSError:
-    pass
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.dont_write_bytecode = True
+import gate_record  # noqa: E402  the one reader and writer of the record
+
 mine = "skill-doctor: %s " % a.file
-lines = [l for l in lines if not l.startswith(mine)]
-lines.append("skill-doctor: %s open-P1=%s reviewer=%s" % (a.file, a.open_p1, a.reviewer))
-os.makedirs(os.path.dirname(os.path.abspath(a.out)) or ".", exist_ok=True)
-tmp = a.out + ".tmp"
-with open(tmp, "w") as f:
-    f.write("head: %s\n" % sha)
-    for l in lines:
-        f.write(l + "\n")
-os.replace(tmp, a.out)
+
+
+def mutate(store, rows, history):
+    rows = [l for l in rows if not l.startswith(mine)]
+    return rows + ["skill-doctor: %s open-P1=%s reviewer=%s" % (a.file, a.open_p1, a.reviewer)], history
+
+
+try:
+    gate_record.update(a.out, os.path.realpath(os.path.abspath(a.root)), mutate)
+except (gate_record.Error, OSError) as e:
+    print("error: %s" % e)
+    sys.exit(2)

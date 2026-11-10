@@ -35,7 +35,8 @@ Exit 0 (the command line passes, no undeclared failure) = PASS.
 Run it yourself with `SAID_ROOT=<lane root> bash <plugin dir>/skills/board/gate_recompute.sh`, where
 `<plugin dir>` is the directory two levels above this agent file when `$SAID_PLUGIN_ROOT` is unset. Copy
 its `gate-recompute:` rows into the verdict body, or copy them from the feature's record
-`<SAID.working:>/gate-<feature-id>.md` when its `head:` equals HEAD; never type a row yourself.
+`<SAID.working:>/gate-<feature-id>.md` when `python3 <plugin dir>/skills/board/gate_record.py check --root <lane root>
+--record <that record> --reads gate-recompute` prints `current`; never type a row yourself.
 
 ## The L1 verdict it emits
 

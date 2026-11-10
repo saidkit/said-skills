@@ -9,14 +9,15 @@
 # in <docs-root>/evaluation/EXPECTED-FAIL -- one "<unit-path> <id> <reason> [until <version>]" per line,
 # exact token match, a line past its version counts as undeclared. Nothing is inferred from wording.
 # Prints one "gate-recompute: <unit-path> exit=<n> <PASS|EXPECTED|FAIL> [ids]" row per harness.
-# Exit 0 iff the command line passes and no harness fails undeclared; 2 = a missing lane key; 3 = a nested run
+# Exit 0 iff the command line passes and no harness fails undeclared; 2 = a missing lane key, or the record
+# could not be written (`error: <why>`); 3 = a nested run
 # of the same lane (a harness that recomputes another lane, e.g. a fixture, is allowed).
 # "until" compares with the lane's own plugin version (its validate target, else <lane>/.claude-plugin).
-# SAID_GATE_OUT=<file>: also write the run's record there -- "head: <sha>" (HEAD of the physical lane root,
-# "none" without git) then every row above, in print order; written whole at exit (a halt or a kill leaves no
-# record); unset, nothing is written and stdout is unchanged. The `skill-doctor: <file> open-P1=<n> reviewer=<id>`
-# rows a reviewer wrote through gate_record_row.py survive a rerun at the same head and are dropped at a moved one;
-# the gate-recompute rows are always replaced whole.
+# SAID_GATE_OUT=<file>: also write the run's record there through gate_record.py -- the store identity of the
+# physical lane root, then every row above, in print order; written at exit (a halt or a kill leaves no record);
+# unset, nothing is written and stdout is unchanged. The other rows of the current store (a reviewer's
+# `skill-doctor:` rows from gate_record_row.py, `feature-review:` rows) survive a rerun at the same store and are
+# dropped at a moved one; the round and matrix lines are always kept; the gate-recompute rows are replaced whole.
 # Env: SAID_ROOT (lane root), SAID_PLUGIN_ROOT (this plugin),
 #      SAID_RECOMPUTE_TIMEOUT (seconds per harness, default 120), SAID_GATE_OUT (record file, optional)
 lane_root="$(cd "${SAID_ROOT:-$PWD}" 2>/dev/null && pwd -P)"
@@ -41,26 +42,23 @@ def row(text):
 
 
 def write_record(path):
-    # the record is the script's, never a session's: head sha from the physical root, then the rows
-    phys = os.path.realpath(root)
+    # the record is the script's, never a session's: the store identity of the physical root, then the rows
+    board = os.path.join(os.path.realpath(plugin_root), "skills", "board")
+    if not os.path.isfile(os.path.join(board, "gate_record.py")):
+        print("error: no gate_record.py under %s (SAID_PLUGIN_ROOT names another plugin copy)" % board)
+        sys.exit(2)
+    sys.path.insert(0, board)
+    sys.dont_write_bytecode = True
+    import gate_record
+
+    def mutate(store, kept, history):  # another store's rows are already dropped; history always kept
+        return rows + [l for l in kept if not l.startswith("gate-recompute: ")], history
+
     try:
-        sha = subprocess.run(["git", "-C", phys, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() or "none"
-    except OSError:
-        sha = "none"
-    kept = []  # a reviewer's rows stand only at the head they were written for
-    try:
-        prior = open(path).read().split("\n")
-        if prior[0] == "head: %s" % sha:
-            kept = [l for l in prior[1:] if l.startswith("skill-doctor: ")]
-    except OSError:
-        pass
-    os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        f.write("head: %s\n" % sha)
-        for r in rows + kept:
-            f.write(r + "\n")
-    os.replace(tmp, path)
+        gate_record.update(path, os.path.realpath(root), mutate)
+    except (gate_record.Error, OSError) as e:
+        print("error: the record was not written: %s" % e)
+        sys.exit(2)
 
 
 def key(text, name):

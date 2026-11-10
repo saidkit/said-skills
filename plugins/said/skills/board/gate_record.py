@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+"""The feature's gate record, the Inspect record: its store identity, its rows, its rounds and its sign-off.
+
+  gate_record.py identity --root <lane-root> [--record <record>]
+  gate_record.py check    --root <lane-root> --record <record> --reads <read>[,<read>...]
+  gate_record.py round    --root <lane-root> --record <record> --matrix-from <file> [--set <key>=<value>]...
+
+Line grammar, one kind per line, read by a line parser:
+  store: git <sha> | store: content <sha256>   first line; the store identity
+  gate-recompute: <unit> exit=<n> <PASS|EXPECTED|FAIL> [ids]   rows of the current store (gate_recompute.sh)
+  skill-doctor: <file> open-P1=<n> reviewer=<id>               rows of the current store (gate_record_row.py)
+  feature-review: <row>                                         rows of the current store
+  round: n=<k>, store=<identity>, <key>=<value>, ...            one per round, kept across stores
+  matrix@<k>: <task> | covers: <c> | rules-applied: <r> | reviewer: <v>   round k's snapshot, kept across stores
+An old first line `head: <sha>` reads as `git <sha>` and is rewritten as `store:` at the next write; `head: none`
+matches no store. Rows of a moved store are dropped at the next write; round and matrix lines never are.
+
+identity: `git <HEAD sha>` where the physical lane root is in git, else `content <sha256>` over every file under
+  the lane's `SAID.mounts:` (the lane root when `none` or absent), by relative path and bytes, leaving out the
+  `SAID.working:` tree, the record itself, `.git` and `__pycache__`; a mount that is a file counts as that file; a
+  symlink counts by its target text and is never followed. A mount that is missing, leaves the lane root or lies
+  inside the working tree is a lane error.
+check: `current` (exit 0); `gate owed` (exit 1) when the record is absent or its store is not the current one
+  (an unreadable record is a read error, never overwritten);
+  `Inspect owed: <read>, ...` (exit 1) when a named read has no well-formed rows at the current store. Reads:
+  gate-recompute (its rows: `<unit> exit=<n> <status> ...` or `<unit> skip (<reason>)`), matrix (the current store's round and its snapshot, every cell non-empty),
+  feature-review (its rows).
+round: writes this store's round row and the snapshot from the `matrix: ` lines of --matrix-from (covers-read.py
+  output; `-` reads stdin). The same store replaces its own round; a moved store appends round n+1. Keys:
+  decisions, leaks, look, operator-min, rework-min, elapsed-min, tokens; a value is one token of printable ASCII
+  without a comma or a space; a key not given is `-`.
+A refused round value prints `refused: <why>` and writes nothing (exit 1); exit 2 = a usage, read or lane error
+(`error: <why>`).
+"""
+import hashlib
+import os
+import subprocess
+import sys
+import tempfile
+
+sys.dont_write_bytecode = True
+ROW_KINDS = ("gate-recompute: ", "skill-doctor: ", "feature-review: ")
+ROUND_KEYS = ("decisions", "leaks", "look", "operator-min", "rework-min", "elapsed-min", "tokens")
+READS = ("gate-recompute", "matrix", "feature-review")
+STATUSES = ("PASS", "EXPECTED", "FAIL")
+
+
+class Error(Exception):
+    pass
+
+
+class Refused(Error):
+    """A value the record does not take: exit 1, nothing written."""
+
+
+def lane_key(root, name):
+    """The value of `SAID.<name>:` in the lane's `## Lane` block, or None."""
+    try:
+        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8-sig") as fh:
+            text = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return None
+    in_lane = False
+    for line in text.split("\n"):
+        if line.startswith("## "):
+            in_lane = line[3:].strip().startswith("Lane")
+            continue
+        s = line.strip().lstrip("-* ").strip()
+        if in_lane and s.startswith("SAID.%s:" % name):
+            return s[len("SAID.%s:" % name):].strip()
+    return None
+
+
+def mount_list(value):
+    """The `SAID.mounts:` list, read whole: `[a/, b/]`, `none` or absent (None) -> paths."""
+    if value is None or value == "none":
+        return []
+    v = value.strip()
+    if v.startswith("[") and v.endswith("]"):
+        v = v[1:-1]
+    return [m.strip() for m in v.split(",") if m.strip()]
+
+
+def git_sha(phys):
+    try:
+        r = subprocess.run(["git", "-C", phys, "rev-parse", "HEAD"], capture_output=True, text=True)
+    except OSError:
+        return None
+    sha = r.stdout.strip()
+    return sha if r.returncode == 0 and sha else None
+
+
+def inside(path, top):
+    return path == top or path.startswith(top + os.sep)
+
+
+def entry(p, phys):
+    if os.path.islink(p):
+        digest = "link:" + os.readlink(p)
+    else:
+        with open(p, "rb") as fh:
+            digest = hashlib.sha256(fh.read()).hexdigest()
+    return "%s\0%s\n" % (os.path.relpath(p, phys), digest)
+
+
+def identity(root, record=None):
+    """The store identity of the lane at root; the record file itself is never part of it."""
+    phys = os.path.realpath(os.path.abspath(root))
+    sha = git_sha(phys)
+    if sha:
+        return "git " + sha
+    working = (lane_key(phys, "working") or "").strip().strip("`'\"")
+    work_top = working.split("<", 1)[0].strip().strip("/")
+    skip = os.path.realpath(os.path.join(phys, work_top)) if work_top else None
+    own = {os.path.realpath(record)} if record else set()
+    mounts = mount_list(lane_key(phys, "mounts")) or ["."]
+    entries = []
+    for m in mounts:
+        m = m.strip("`'\"")
+        joined = os.path.join(phys, m)
+        top = os.path.realpath(joined)
+        if not inside(top, phys):
+            raise Error("mount %s leaves the lane root" % m)
+        if not os.path.lexists(joined):
+            raise Error("mount %s does not exist" % m)
+        if skip and inside(top, skip):
+            raise Error("mount %s lies inside the SAID.working: tree" % m)
+        if not os.path.isdir(joined):
+            if os.path.realpath(joined) not in own:
+                entries.append(entry(joined.rstrip("/"), phys))
+            continue
+        for dp, dn, fn in os.walk(top):
+            linked = [d for d in dn if os.path.islink(os.path.join(dp, d))]
+            dn[:] = sorted(d for d in dn if d not in (".git", "__pycache__") and d not in linked
+                           and os.path.join(dp, d) != skip)
+            for f in sorted(fn) + sorted(linked):
+                p = os.path.join(dp, f)
+                if p not in own:
+                    entries.append(entry(p, phys))
+    h = hashlib.sha256()
+    for e in sorted(set(entries)):
+        h.update(e.encode("utf-8", "surrogateescape"))
+    return "content " + h.hexdigest()
+
+
+def load(path):
+    """(store identity or None, rows, history) of a record; None when the record is absent."""
+    try:
+        with open(path, encoding="utf-8-sig") as fh:
+            lines = [ln.rstrip("\r") for ln in fh.read().split("\n")]
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError) as e:
+        raise Error("cannot read the record %s (left as it is): %s" % (path, e))
+    first = lines[0] if lines else ""
+    if first.startswith("store: "):
+        store = first[len("store: "):].strip()
+    elif first.startswith("head: "):
+        old = first[len("head: "):].strip()
+        store = None if old in ("", "none") else "git " + old
+    else:
+        store = None
+    rows = [ln for ln in lines[1:] if ln.startswith(ROW_KINDS)]
+    history = [ln for ln in lines[1:] if ln.startswith("round: ") or (ln.startswith("matrix@") and ": " in ln)]
+    return store, rows, history
+
+
+def write(path, store, rows, history):
+    """Write the whole record atomically: a fresh temp file in its folder, flushed to disk, then renamed over it."""
+    folder = os.path.dirname(os.path.abspath(path))
+    os.makedirs(folder, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".gate-record-", dir=folder)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write("store: %s\n" % store)
+            for ln in rows + history:
+                fh.write(ln + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        mask = os.umask(0)
+        os.umask(mask)
+        os.chmod(tmp, 0o666 & ~mask)
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
+def update(path, root, mutate):
+    """Rewrite the record at the current store: rows of another store dropped, history kept, mutate(rows, history)."""
+    store = identity(root, path)
+    prior = load(path)
+    rows, history = [], []
+    if prior is not None:
+        rows = prior[1] if prior[0] == store else []
+        history = prior[2]
+    rows, history = mutate(store, rows, history)
+    write(path, store, rows, history)
+    return store
+
+
+def round_fields(line):
+    """{key: value} of a `round: ` line."""
+    out = {}
+    for pair in line[len("round: "):].split(", "):
+        k, sep, v = pair.partition("=")
+        if sep:
+            out[k] = v
+    return out
+
+
+def matrix_ok(line):
+    body = line.split(": ", 1)[1] if ": " in line else ""
+    cells = body.split(" | ")
+    if len(cells) != 4 or not cells[0].strip():
+        return False
+    for cell, label in zip(cells[1:], ("covers:", "rules-applied:", "reviewer:")):
+        if not cell.startswith(label) or not cell[len(label):].strip():
+            return False
+    return True
+
+
+def gate_row_ok(line):
+    """`<unit> exit=<n> <status> [ids]` (the unit may hold spaces) or a declared `<unit> skip (<reason>)`."""
+    body = line[len("gate-recompute: "):]
+    unit, sep, reason = body.partition(" skip (")
+    if sep:
+        return bool(unit.strip()) and reason.endswith(")") and bool(reason[:-1].strip())
+    parts = body.split()
+    for i, p in enumerate(parts):
+        if p.startswith("exit="):
+            return i > 0 and p[5:].lstrip("-").isdigit() and i + 1 < len(parts) and parts[i + 1] in STATUSES
+    return False
+
+
+def check(root, path, reads):
+    for r in reads:
+        if r not in READS:
+            raise Error("unknown read %s" % r)
+    rec = load(path)
+    if rec is None or rec[0] is None or rec[0] != identity(root, path):
+        return 1, "gate owed"
+    store, rows, history = rec
+    owed = []
+    for r in reads:
+        if r == "gate-recompute":
+            mine = [ln for ln in rows if ln.startswith("gate-recompute: ")]
+            ok = bool(mine) and all(gate_row_ok(ln) for ln in mine)
+        elif r == "feature-review":
+            ok = any(ln.startswith("feature-review: ") and ln[len("feature-review: "):].strip() for ln in rows)
+        else:
+            rounds = [round_fields(ln) for ln in history if ln.startswith("round: ")]
+            last = rounds[-1] if rounds else {}
+            snap = [ln for ln in history if ln.startswith("matrix@%s: " % last.get("n", "?"))]
+            ok = last.get("store") == store and bool(snap) and all(matrix_ok(ln) for ln in snap)
+        if not ok:
+            owed.append(r)
+    if owed:
+        return 1, "Inspect owed: " + ", ".join(owed)
+    return 0, "current"
+
+
+def read_matrix(src):
+    try:
+        if src == "-":
+            text = sys.stdin.read()
+        else:
+            with open(src, encoding="utf-8") as fh:
+                text = fh.read()
+    except (OSError, UnicodeDecodeError) as e:
+        raise Error("cannot read --matrix-from %s: %s" % (src, e))
+    return [ln.rstrip("\r")[len("matrix: "):] for ln in text.split("\n") if ln.startswith("matrix: ")]
+
+
+def value_ok(v):
+    return bool(v) and v.isascii() and v.isprintable() and not any(c in v for c in ", ")
+
+
+def do_round(root, path, src, sets):
+    given = {}
+    for s in sets:
+        k, sep, v = s.partition("=")
+        if not sep or k not in ROUND_KEYS:
+            raise Refused("unknown round key %s (keys: %s)" % (k, ", ".join(ROUND_KEYS)))
+        if not value_ok(v):
+            raise Refused("value of %s is not one token without a comma or a space" % k)
+        given[k] = v
+    snapshot = read_matrix(src)
+
+    def mutate(store, rows, history):
+        rounds = [round_fields(ln) for ln in history if ln.startswith("round: ")]
+        last = rounds[-1] if rounds else None
+        if last and last.get("store") == store and last.get("n", "").isdigit():
+            n = int(last["n"])
+            history = [ln for ln in history if not (ln.startswith("matrix@%d: " % n)
+                       or (ln.startswith("round: ") and round_fields(ln).get("n") == str(n)))]
+        else:
+            n = max([int(r["n"]) for r in rounds if r.get("n", "").isdigit()] or [0]) + 1
+        pairs = ["n=%d" % n, "store=%s" % store] + ["%s=%s" % (k, given.get(k, "-")) for k in ROUND_KEYS]
+        history = history + ["round: " + ", ".join(pairs)] + ["matrix@%d: %s" % (n, m) for m in snapshot]
+        return rows, history
+
+    update(path, root, mutate)
+
+
+def parse(argv):
+    if not argv or argv[0] not in ("identity", "check", "round"):
+        raise Error("usage: " + __doc__.strip().splitlines()[2].strip() + " | check ... | round ...")
+    cmd, opts, sets, i = argv[0], {}, [], 1
+    while i < len(argv):
+        k = argv[i]
+        if i + 1 >= len(argv) or k not in ("--root", "--record", "--reads", "--matrix-from", "--set"):
+            raise Error("usage: unknown or incomplete option %s" % k)
+        if k == "--set":
+            sets.append(argv[i + 1])
+        else:
+            opts[k[2:]] = argv[i + 1]
+        i += 2
+    need = {"identity": ("root",), "check": ("root", "record", "reads"), "round": ("root", "record", "matrix-from")}[cmd]
+    for k in need:
+        if k not in opts:
+            raise Error("usage: %s needs --%s" % (cmd, k))
+    if not os.path.isdir(opts["root"]):
+        raise Error("not a directory: --root %s" % opts["root"])
+    opts["root"] = os.path.realpath(os.path.abspath(opts["root"]))
+    if "record" in opts:
+        opts["record"] = os.path.abspath(opts["record"])
+    return cmd, opts, sets
+
+
+def main(argv):
+    try:
+        cmd, o, sets = parse(argv)
+        if cmd == "identity":
+            print("store: " + identity(o["root"], o.get("record")))
+            return 0
+        if cmd == "check":
+            code, text = check(o["root"], o["record"], [r for r in o["reads"].split(",") if r])
+            print(text)
+            return code
+        do_round(o["root"], o["record"], o["matrix-from"], sets)
+        return 0
+    except Refused as e:
+        print("refused: %s" % e)
+        return 1
+    except (Error, OSError) as e:
+        print("error: %s" % e)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
