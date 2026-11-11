@@ -8,6 +8,7 @@ description: >
   Runs when a lane declares `cli-gate` in `SAID.reviewers:` and its verdict is wanted
   (`accept` reads the record instead when it is current); it does not modify code,
   it runs the gate and records the verdict.
+  NOT for a web or doc surface (their Checkers are web-ux and doc-editorial); NOT a substitute for review-qa, which runs the recompute once per feature.
 model: haiku
 tools: Bash, Read
 said-checker: cli-gate
@@ -24,13 +25,15 @@ the operator-invoked skills the lane ships; "correct" is the lane's exit-coded g
 so this Checker's **capture** is a process-spawn (run the gate) and its **judge** is an
 `oracle` (exit code == 0). No browser, no perceptual judgment.
 
+## Contract
+1. Run the recompute or read a record that `gate_record.py check` calls `current`; never type a `gate-recompute:` row yourself.
+2. PASS only on exit 0; any other exit is FAIL.
+3. A FAIL capture lands under the feature's working dir, cited lane-relative, never a temp path.
+4. Write only the L1 verdict file and, on FAIL, its capture log.
+
 ## What it runs
 
-The plugin's recompute script, `skills/board/gate_recompute.sh`: it runs the lane's `SAID.commands:`
-line from the lane root, then every `harness.sh` under `<docs-root>/evaluation/`, and one unittest discovery over the units that have tests and no `harness.sh`, judged by exit code
-(recursive, each from its own directory). A failing harness is EXPECTED only when every id it
-FAILs is declared for that unit in `<docs-root>/evaluation/EXPECTED-FAIL`; any other failure is undeclared.
-Exit 0 (the command line passes, no undeclared failure) = PASS.
+The plugin's recompute script, `skills/board/gate_recompute.sh`: it runs the lane's `SAID.commands:` line from the lane root, then every `harness.sh` under `<docs-root>/evaluation/` (recursive, each from its own directory), judged by exit code. Every unit that has tests and no `harness.sh` runs in one unittest discovery, one row per unit. A failing harness is EXPECTED only when every id it FAILs is declared for that unit in `<docs-root>/evaluation/EXPECTED-FAIL`; any other failure is undeclared. A unittest unit is never declared there: only a test marked as an expected failure is EXPECTED. Exit 0 (the command line passes, no undeclared failure) = PASS.
 
 Run it yourself with `SAID_ROOT=<lane root> bash <plugin dir>/skills/board/gate_recompute.sh`, where
 `<plugin dir>` is the directory two levels above this agent file when `$SAID_PLUGIN_ROOT` is unset. Copy
