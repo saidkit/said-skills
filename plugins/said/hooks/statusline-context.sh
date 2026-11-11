@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Statusline command: renders "<model>, ctx <n>%" and writes the session's context usage to
+# Statusline command: renders "<model> <effort>, ctx <n>%" (no effort when the input has none) and writes the session's context usage to
 # <SCRATCH_ROOT>/<cwd-slug>/<session_id>/scratchpad/context.json (valid JSON, null for a missing value),
 # the only place a skill can read context size from. Optional install: point settings.json "statusLine" here.
 # Env: SCRATCH_ROOT root of the per-session scratchpads (default: /private/tmp/claude-<uid>, else /tmp/claude-<uid>)
@@ -34,5 +34,8 @@ if path and re.fullmatch(r"[A-Za-z0-9_-]+", sid) and os.path.commonpath([root, p
         pass
 model = (d.get("model") or {}).get("display_name") or ""
 pct = "?" if used is None else ("%g" % used)
-sys.stdout.write("%s, ctx %s%%" % (model, pct))
+eff = d.get("effort")
+eff = eff.get("level") if isinstance(eff, dict) else None
+eff = eff if isinstance(eff, str) and re.fullmatch(r"[a-z]{1,10}", eff) else ""
+sys.stdout.write("%s, ctx %s%%" % (" ".join(x for x in (model, eff) if x), pct))
 ' 2>/dev/null
