@@ -28,6 +28,10 @@
 # dropped at a moved one; the round and matrix lines are always kept; the gate-recompute rows are replaced whole.
 # Env: SAID_ROOT (lane root), SAID_PLUGIN_ROOT (this plugin),
 #      SAID_RECOMPUTE_TIMEOUT (seconds per harness, default 120), SAID_GATE_OUT (record file, optional)
+#      SAID_GATE_UNITS (optional): the unit paths to run, relative to the lane root, separated by spaces or
+#      newlines; every other unit prints `gate-recompute: <unit-path> skipped (not selected)` and is not run.
+#      Unset runs every unit; a name that is no unit is a halt (exit 2). A skipped row is not a pass: a record
+#      holding one is not a full-run record.
 lane_root="$(cd "${SAID_ROOT:-$PWD}" 2>/dev/null && pwd -P)"
 case ":${SAID_GATE_RECOMPUTE_ACTIVE:-}:" in
   *":$lane_root:"*)
@@ -149,6 +153,19 @@ for d, dirs, files in os.walk(evaluation, followlinks=False):
         test_units.append(d)  # unittest unit, run with the others in one interpreter
         dirs[:] = []
 
+selected = [u.rstrip("/") for u in os.environ.get("SAID_GATE_UNITS", "").split()]  # empty: every unit runs
+
+
+def chosen(d):
+    """True when the unit at d runs: no selection, or its path (lane-root or docs-root relative) is named."""
+    return not selected or os.path.relpath(d, root) in selected or os.path.relpath(d, docs) in selected
+
+
+unknown = [n for n in selected if not any(n in (os.path.relpath(d, root), os.path.relpath(d, docs)) for d in units + test_units)]
+if unknown:
+    print("gate-recompute: halt -- SAID_GATE_UNITS names no unit: %s" % " ".join(unknown))
+    sys.exit(2)
+run_units = [d for d in test_units if chosen(d)]
 RUNNER = r'''
 import json, os, sys, unittest
 ev, out, units = sys.argv[1], sys.argv[2], sys.argv[3:]
@@ -208,14 +225,14 @@ save(None)
 '''
 
 test_rows = {}
-if test_units:
+if run_units:
     import tempfile
     fd, res = tempfile.mkstemp(prefix="gate-recompute-")
     os.close(fd)
-    env = {k: v for k, v in os.environ.items() if k not in ("SAID_GATE_OUT", "HARNESS_ONLY", "UPDATE_GOLDENS")}
+    env = {k: v for k, v in os.environ.items() if k not in ("SAID_GATE_OUT", "SAID_GATE_UNITS", "HARNESS_ONLY", "UPDATE_GOLDENS")}
     env["REQUIRE_BROWSER"] = "1"  # a gate with no browser fails the browser checks, never skips them
-    budget = timeout * len(test_units)
-    p = subprocess.Popen([sys.executable, "-I", "-B", "-c", RUNNER, evaluation, res] + test_units, cwd=evaluation, env=env,
+    budget = timeout * len(run_units)
+    p = subprocess.Popen([sys.executable, "-I", "-B", "-c", RUNNER, evaluation, res] + run_units, cwd=evaluation, env=env,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          start_new_session=True)
     timed_out = False
@@ -233,7 +250,7 @@ if test_units:
     for f in (res, res + ".tmp"):
         if os.path.exists(f):
             os.remove(f)
-    for d in test_units:
+    for d in run_units:
         unit = os.path.relpath(d, docs)
         if timed_out and (d == running or (running is None and d not in got)):
             test_rows[d] = ("gate-recompute: %s exit=124 FAIL timeout-%ds" % (unit, budget), 1)
@@ -250,11 +267,14 @@ if test_units:
 
 for d in sorted(units + test_units):
     unit = os.path.relpath(d, docs)
+    if not chosen(d):
+        row("gate-recompute: %s skipped (not selected)" % unit)  # neither a pass nor a fail
+        continue
     if d in test_rows:
         row(test_rows[d][0])
         fail |= test_rows[d][1]
         continue
-    env = {k: v for k, v in os.environ.items() if k != "SAID_GATE_OUT"}  # the record is this run's, never a child's
+    env = {k: v for k, v in os.environ.items() if k not in ("SAID_GATE_OUT", "SAID_GATE_UNITS")}  # the record is this run's, never a child's
     env["PWD"] = d  # keep the logical path: harnesses resolve their root from it
     try:
         p = subprocess.Popen(["bash", "./harness.sh"], cwd=d, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,

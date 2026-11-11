@@ -23,7 +23,7 @@ identity: `git <HEAD sha>` where the physical lane root is in git, else `content
 check: `current` (exit 0); `gate owed` (exit 1) when the record is absent or its store is not the current one
   (an unreadable record is a read error, never overwritten);
   `Inspect owed: <read>, ...` (exit 1) when a named read has no well-formed rows at the current store. Reads:
-  gate-recompute (its rows: `<unit> exit=<n> <status> ...` or `<unit> skip (<reason>)`), matrix (the current store's round and its snapshot, every cell non-empty),
+  gate-recompute (its rows: `<unit> exit=<n> <status> ...`, `<unit> skip (<reason>)` or `<unit> skipped (not selected)`), matrix (the current store's round and its snapshot, every cell non-empty),
   feature-review (its rows).
 round: writes this store's round row and the snapshot from the `matrix: ` lines of --matrix-from (covers-read.py
   output; `-` reads stdin). The same store replaces its own round; a moved store appends round n+1. Keys:
@@ -255,8 +255,12 @@ def matrix_ok(line):
 
 
 def gate_row_ok(line):
-    """`<unit> exit=<n> <status> [ids]` (the unit may hold spaces) or a declared `<unit> skip (<reason>)`."""
+    """`<unit> exit=<n> <status> [ids]` (the unit may hold spaces), a declared `<unit> skip (<reason>)`, or a unit left
+    out of a selected run, `<unit> skipped (not selected)`."""
     body = line[len("gate-recompute: "):]
+    left_out = " skipped (not selected)"
+    if body.endswith(left_out):
+        return bool(body[:-len(left_out)].strip())
     unit, sep, reason = body.partition(" skip (")
     if sep:
         return bool(unit.strip()) and reason.endswith(")") and bool(reason[:-1].strip())
