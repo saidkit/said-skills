@@ -5,6 +5,12 @@
 # <docs-root>/evaluation/**/harness.sh (symlinks inside the tree are not followed; the walk does not descend
 # below a folder under evaluation/ that holds a harness.sh: that unit's subtree is its data) from its own directory,
 # reached through the logical lane path, each under a timeout (a timeout is an undeclared failure).
+# A unittest unit -- a folder with __init__.py and test_*.py files, no harness.sh, not below another unit -- is
+# not run alone: every such unit runs in one python3 interpreter (each discovered from its folder with the
+# evaluation folder as top level, so its load_tests applies), under REQUIRE_BROWSER=1, with a timeout of the
+# per-harness seconds times the number of such units. Its row is PASS, EXPECTED with the ids of its expected
+# failures, or FAIL with the ids of its failing tests (an unexpected success fails); an id is the test's
+# check_id attribute, else its unittest id. EXPECTED-FAIL applies to harness.sh units only.
 # A failing harness counts as EXPECTED only when every line-leading FAIL names an id declared for that unit
 # in <docs-root>/evaluation/EXPECTED-FAIL -- one "<unit-path> <id> <reason> [until <version>]" per line,
 # exact token match, a line past its version counts as undeclared. Nothing is inferred from wording.
@@ -130,15 +136,107 @@ try:
 except OSError:
     pass
 
-units = []
+units, test_units = [], []
 for d, dirs, files in os.walk(evaluation, followlinks=False):
     dirs.sort()
     if "harness.sh" in files:
         units.append(d)
         if d != evaluation:
             dirs[:] = []  # a unit's subtree is its data, never a unit of its own
-for d in sorted(units):
+    elif d != evaluation and "__init__.py" in files and any(f.startswith("test_") and f.endswith(".py") for f in files):
+        test_units.append(d)  # unittest unit, run with the others in one interpreter
+        dirs[:] = []
+
+RUNNER = r'''
+import json, os, sys, unittest
+ev, out, units = sys.argv[1], sys.argv[2], sys.argv[3:]
+
+
+def cid(t):
+    m = getattr(t, getattr(t, "_testMethodName", ""), None)
+    return getattr(m, "check_id", None) or "".join(str(t.id()).split())  # one token per id on the row
+
+
+class Result(unittest.TestResult):
+    def __init__(self):
+        super().__init__()
+        self.rows = {}
+
+    def put(self, kind, test):
+        self.rows.setdefault(self.unit, {"FAIL": [], "EXPECTED": []})[kind].append(cid(test))
+
+    def addError(self, test, err):
+        super().addError(test, err)
+        self.put("FAIL", test)
+
+    def addFailure(self, test, err):
+        super().addFailure(test, err)
+        self.put("FAIL", test)
+
+    def addUnexpectedSuccess(self, test):
+        super().addUnexpectedSuccess(test)
+        self.put("FAIL", test)
+
+    def addExpectedFailure(self, test, err):
+        super().addExpectedFailure(test, err)
+        self.put("EXPECTED", test)
+
+
+r = Result()
+for u in units:
+    r.unit = u
+    r.rows.setdefault(u, {"FAIL": [], "EXPECTED": []})
+    try:
+        suite = unittest.defaultTestLoader.discover(u, top_level_dir=ev)
+    except Exception as e:  # a unit that cannot be discovered fails as a whole
+        r.rows[u]["FAIL"].append("discover:" + type(e).__name__)
+        continue
+    suite.run(r)
+with open(out, "w") as f:
+    json.dump(r.rows, f)
+'''
+
+test_rows = {}
+if test_units:
+    import tempfile
+    fd, res = tempfile.mkstemp(prefix="gate-recompute-")
+    os.close(fd)
+    env = {k: v for k, v in os.environ.items() if k not in ("SAID_GATE_OUT", "HARNESS_ONLY", "UPDATE_GOLDENS")}
+    env["REQUIRE_BROWSER"] = "1"  # a gate with no browser fails the browser checks, never skips them
+    budget = timeout * len(test_units)
+    p = subprocess.Popen([sys.executable, "-I", "-B", "-c", RUNNER, evaluation, res] + test_units, cwd=evaluation, env=env,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+    try:
+        p.wait(timeout=budget)
+        got = json.load(open(res))
+    except subprocess.TimeoutExpired:
+        os.killpg(p.pid, signal.SIGKILL)
+        p.wait()
+        got = None
+    except (OSError, ValueError):
+        got = {}
+    finally:
+        os.remove(res)
+    for d in test_units:
+        unit = os.path.relpath(d, docs)
+        if got is None:
+            test_rows[d] = ("gate-recompute: %s exit=124 FAIL timeout-%ds" % (unit, budget), 1)
+        elif d not in got:
+            test_rows[d] = ("gate-recompute: %s exit=%d FAIL no-result" % (unit, p.returncode or 1), 1)
+        elif got[d]["FAIL"]:
+            test_rows[d] = ("gate-recompute: %s exit=1 FAIL %s" % (unit, " ".join(got[d]["FAIL"])), 1)
+        elif got[d]["EXPECTED"]:
+            test_rows[d] = ("gate-recompute: %s exit=0 EXPECTED %s" % (unit, " ".join(got[d]["EXPECTED"])), 0)
+        else:
+            test_rows[d] = ("gate-recompute: %s exit=0 PASS" % unit, 0)
+
+for d in sorted(units + test_units):
     unit = os.path.relpath(d, docs)
+    if d in test_rows:
+        row(test_rows[d][0])
+        fail |= test_rows[d][1]
+        continue
     env = {k: v for k, v in os.environ.items() if k != "SAID_GATE_OUT"}  # the record is this run's, never a child's
     env["PWD"] = d  # keep the logical path: harnesses resolve their root from it
     try:

@@ -64,7 +64,7 @@ Bound by one **meta-invariant**: *leg 3 is derived from leg 1, pre-committed, ar
 | `web` | a person | list / form / shell / field rules | `web-ux` — browser capture, comparative judge |
 | `api` | a developer | REST shape, error envelope, pagination, versioning | schema-conformance oracle over an http-call capture |
 | `mcp` | an agent | tool naming, input schema, idempotency, error shape | handshake + schema-probe oracle |
-| `cli` | an operator | flags, exit codes, output format, `--help` | `cli-gate` — process-spawn capture, oracle judge; recomputes the lane's command line plus every `docs/evaluation/**/harness.sh` by exit code, known failures declared in `docs/evaluation/EXPECTED-FAIL` |
+| `cli` | an operator | flags, exit codes, output format, `--help` | `cli-gate` — process-spawn capture, oracle judge; recomputes the lane's command line plus every `docs/evaluation/**/harness.sh`, and one unittest discovery over the units that have tests and no `harness.sh`, by exit code, known failures declared in `docs/evaluation/EXPECTED-FAIL` |
 
 **The load-bearing guard:** a lane declares `SAID.surface:` (the medium) and `SAID.reviewers:` (the Checkers). The gate (`said:review-ux`) **resolves the declared reviewers and runs each** — it does **not** branch on the medium; each Checker owns its own capture + judge (browser / http-call / process-spawn ...), so an API lane is gated by its schema Checker, never Playwright-walked, reported "env-blocked", and shipped unverified. The design step (`said:architect`) reads `SAID.surface:` to author requirements against the medium — **config in the per-project binding; adding a reviewer / medium is a dropped Checker file, not a new skill per surface**.
 

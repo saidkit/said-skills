@@ -27,7 +27,7 @@ so this Checker's **capture** is a process-spawn (run the gate) and its **judge*
 ## What it runs
 
 The plugin's recompute script, `skills/board/gate_recompute.sh`: it runs the lane's `SAID.commands:`
-line from the lane root, then every `harness.sh` under `<docs-root>/evaluation/`, judged by exit code
+line from the lane root, then every `harness.sh` under `<docs-root>/evaluation/`, and one unittest discovery over the units that have tests and no `harness.sh`, judged by exit code
 (recursive, each from its own directory). A failing harness is EXPECTED only when every id it
 FAILs is declared for that unit in `<docs-root>/evaluation/EXPECTED-FAIL`; any other failure is undeclared.
 Exit 0 (the command line passes, no undeclared failure) = PASS.

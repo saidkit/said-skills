@@ -15,7 +15,7 @@ Procedure (first read the tasks log for an open fast-track run listing this task
 
 2. **Quality gate -- `per profile.gate`:**
    - Run `<quality-gates-umbrella>` as Step 0 #8 bound it (the profile's resolution: `SAID.commands:`, else a Makefile or package.json target). If the profile bound no umbrella but bound the parts, chain `<typecheck> && <tests> && <lint>`; if it left them unbound there is no lane command: say so in the close report, never invent one.
-   - Then run every `docs/evaluation/<unit>/harness.sh` the task body names (its Reading list or Acceptance), in the order the task names them, one at a time, each after `cd` into its own directory. Named harnesses run whether or not a lane command is bound.
+   - Then run every `docs/evaluation/<unit>/harness.sh` the task body names (its Reading list or Acceptance), in the order the task names them, one at a time, each after `cd` into its own directory, and, for a named unit that has tests and no `harness.sh`, its unittest discovery (`python3 -m unittest discover -s docs/evaluation/<unit> -t docs/evaluation`). Named harnesses run whether or not a lane command is bound.
    - A task naming none runs the lane command only and the close report says so.
    - Never `board/gate_recompute.sh` at task close: the full recompute runs once at `review-qa`.
    - Per-merge build commands (e.g., `make build`) and project-specific test scoping are project conventions invoked via the resolved targets, not skill-driven literals. If any gate fails -> STOP and report; fix; rerun. Don't close on red.
