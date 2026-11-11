@@ -2,6 +2,12 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.28.0] - 2026-11-11
+
+- **Added:** the environment variable `SAID_UPGRADE_TIMEOUT` shortens the bound of the upgrade check's remote read (`skills/setup/setup_versions.py`): a number of seconds above 0 and at most 10; unset or any other value keeps the 10 second bound. A timeout inside the read now prints the same `timed out after <bound> s` as the join of the read.
+- **Added:** the environment variable `SAID_GATE_UNITS` limits the gate recompute (`skills/board/gate_recompute.sh`) to the unit paths it names, relative to the lane root or to the docs root and separated by spaces or newlines. Every other unit prints `gate-recompute: <unit-path> skipped (not selected)`, is not run and does not change the exit code; a name that is no unit halts with exit 2. A record holding a skipped row is a partial record: a `review-qa` task-mode or run-mode close may write one, `accept` at a task or run close reads it and names the skipped units, and the feature-mode `accept` and `debrief` read it as `gate owed` until a full run.
+- **Changed:** the SessionStart re-anchor hook runs in one Python process (`hooks/reanchor.py`, started by `hooks/reanchor.sh`) instead of six, about a third faster at a /clear or a compaction, with the same output and exit codes; a missing `python3` or a failure inside the hook prints nothing and exits 0. **Added:** the statusline script prints the session's reasoning effort between the model name and the comma (`<model> high, ctx 14%`) when Claude Code supplies `effort.level` (lowercase letters, at most 10); without it the line is unchanged.
+
 ## [0.27.1] - 2026-11-08
 
 - **Changed:** `agents/supervisor.md`, the reserved-calls line: the supervisor puts a held call to you in full the first time it mentions it, with the call's cite and its own proposal, and never lifts the call on its own reading of a record. The line now speaks of any held call, where it named a worker's held call before.
