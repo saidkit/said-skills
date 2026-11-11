@@ -88,4 +88,4 @@ and has no recompute).
 ## Charter
 
 Read-only over the lane's own gate output; it never writes `docs/ux` or any sibling-owned artifact —
-it reports a verdict, like every Checker (the S01 charter boundary).
+it reports a verdict, like every Checker.
