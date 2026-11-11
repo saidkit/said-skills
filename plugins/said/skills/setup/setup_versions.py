@@ -25,7 +25,8 @@ looked for by name under the lane root, the lane-registry root above it and that
 With no local checkout, the kit playbooks are read from the repository's `upgrade/` folder on
 github.com instead: 10 seconds for the whole read, 64 KiB per file, 50 files at most; any failure
 prints its cause and `0 playbooks found`. SAID_UPGRADE_API and SAID_UPGRADE_RAW replace the listing
-and file base URLs (https://api.github.com, https://raw.githubusercontent.com).
+and file base URLs (https://api.github.com, https://raw.githubusercontent.com); SAID_UPGRADE_TIMEOUT,
+a number of seconds above 0 and at most 10, shortens the whole-read bound (any other value keeps 10).
 A starter's release is the first `## <starter>@<semver>` heading of its CHANGELOG.md. A starter not
 found prints `starter <id> not in workspace` with the paths tried; the kit half still prints. An
 owed playbook whose floor is above the installed plugin is marked `blocked by plugin`; an unknown
@@ -335,6 +336,16 @@ REMOTE_LIST_CAP = 1 << 20    # bytes of the folder listing
 REMOTE_FILES = 50            # .md entries of the listing; more fails the read
 SEAM_API = ("SAID_UPGRADE_API", "https://api.github.com")              # the listing base
 SEAM_RAW = ("SAID_UPGRADE_RAW", "https://raw.githubusercontent.com")   # the file base
+SEAM_TIMEOUT = "SAID_UPGRADE_TIMEOUT"  # a shorter whole-read bound in seconds
+
+
+def remote_timeout():
+    """SAID_UPGRADE_TIMEOUT when it is a number above 0 and at most REMOTE_TIMEOUT, else REMOTE_TIMEOUT."""
+    try:
+        v = float(os.environ.get(SEAM_TIMEOUT, ""))
+    except ValueError:
+        return REMOTE_TIMEOUT
+    return v if 0 < v <= REMOTE_TIMEOUT else REMOTE_TIMEOUT
 
 
 class _SameOrigin(urllib.request.HTTPRedirectHandler):
@@ -413,11 +424,12 @@ def remote_cause(e):
 
 def remote_load(repo_url):
     """(cause or None, Loaded) for the kit playbooks read from the repository; the whole read ends
-    within REMOTE_TIMEOUT seconds or fails as timed out."""
+    within remote_timeout() seconds or fails as timed out."""
     m = REMOTE_HOST_RE.match(repo_url)
     if not m:
         return "the repository is not a github.com URL", Loaded()
-    deadline = time.monotonic() + REMOTE_TIMEOUT
+    bound = remote_timeout()
+    deadline = time.monotonic() + bound
     box = {}
 
     def work():
@@ -428,10 +440,11 @@ def remote_load(repo_url):
 
     t = threading.Thread(target=work, daemon=True)
     t.start()
-    t.join(REMOTE_TIMEOUT)
+    t.join(bound)
     if "texts" in box:
         return None, load_texts(box["texts"])
-    return box.get("cause", "timed out after %d s" % REMOTE_TIMEOUT), Loaded()
+    cause = box.get("cause", "timed out")
+    return ("timed out after %g s" % bound if cause == "timed out" else cause), Loaded()  # one wording
 
 
 def bounded_output(cmd):
