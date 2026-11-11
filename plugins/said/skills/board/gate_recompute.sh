@@ -10,7 +10,9 @@
 # evaluation folder as top level, so its load_tests applies), under REQUIRE_BROWSER=1, with a timeout of the
 # per-harness seconds times the number of such units. Its row is PASS, EXPECTED with the ids of its expected
 # failures, or FAIL with the ids of its failing tests (an unexpected success fails); an id is the test's
-# check_id attribute, else its unittest id. EXPECTED-FAIL applies to harness.sh units only.
+# check_id attribute, else its unittest id (a failing subTest fails its test). Results are kept after each unit:
+# the unit that crashes the interpreter is FAIL no-result (timeout-Ns when it hangs), the units after it
+# FAIL not-run. EXPECTED-FAIL applies to harness.sh units only.
 # A failing harness counts as EXPECTED only when every line-leading FAIL names an id declared for that unit
 # in <docs-root>/evaluation/EXPECTED-FAIL -- one "<unit-path> <id> <reason> [until <version>]" per line,
 # exact token match, a line past its version counts as undeclared. Nothing is inferred from wording.
@@ -37,7 +39,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 exec python3 - "${SAID_ROOT:-$PWD}" "${SAID_PLUGIN_ROOT:-$here/../..}" "${SAID_RECOMPUTE_TIMEOUT:-120}" <<'PY'
 import json, os, re, signal, subprocess, sys
 
-root, plugin_root, timeout = sys.argv[1], sys.argv[2], int(sys.argv[3])
+root, plugin_root, timeout = os.path.abspath(sys.argv[1]), sys.argv[2], int(sys.argv[3])  # relative SAID_ROOT
 ID = re.compile(r"^[A-Za-z][A-Za-z0-9._-]*$")
 rows = []  # every row printed, for the record
 
@@ -181,19 +183,28 @@ class Result(unittest.TestResult):
         super().addExpectedFailure(test, err)
         self.put("EXPECTED", test)
 
+    def addSubTest(self, test, subtest, err):  # a failing subTest never reaches addFailure
+        super().addSubTest(test, subtest, err)
+        if err is not None and cid(test) not in self.rows[self.unit]["FAIL"]:
+            self.put("FAIL", test)
+
+
+def save(running):  # after each unit, so a crash or a kill keeps the finished units' rows
+    with open(out + ".tmp", "w") as f:
+        json.dump({"rows": r.rows, "running": running}, f)
+    os.replace(out + ".tmp", out)
+
 
 r = Result()
 for u in units:
+    save(u)  # u has no row yet: a crash inside it leaves it unfinished
     r.unit = u
-    r.rows.setdefault(u, {"FAIL": [], "EXPECTED": []})
+    r.rows[u] = {"FAIL": [], "EXPECTED": []}
     try:
-        suite = unittest.defaultTestLoader.discover(u, top_level_dir=ev)
-    except Exception as e:  # a unit that cannot be discovered fails as a whole
-        r.rows[u]["FAIL"].append("discover:" + type(e).__name__)
-        continue
-    suite.run(r)
-with open(out, "w") as f:
-    json.dump(r.rows, f)
+        unittest.defaultTestLoader.discover(u, top_level_dir=ev).run(r)
+    except BaseException as e:  # a unit that cannot be discovered or run fails as a whole
+        r.rows[u]["FAIL"].append("unit:" + type(e).__name__)
+save(None)
 '''
 
 test_rows = {}
@@ -207,23 +218,29 @@ if test_units:
     p = subprocess.Popen([sys.executable, "-I", "-B", "-c", RUNNER, evaluation, res] + test_units, cwd=evaluation, env=env,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          start_new_session=True)
+    timed_out = False
     try:
         p.wait(timeout=budget)
-        got = json.load(open(res))
     except subprocess.TimeoutExpired:
         os.killpg(p.pid, signal.SIGKILL)
         p.wait()
-        got = None
-    except (OSError, ValueError):
-        got = {}
-    finally:
-        os.remove(res)
+        timed_out = True
+    try:
+        saved = json.load(open(res))
+        got, running = saved["rows"], saved["running"]
+    except (OSError, ValueError, KeyError, TypeError):
+        got, running = {}, None
+    for f in (res, res + ".tmp"):
+        if os.path.exists(f):
+            os.remove(f)
     for d in test_units:
         unit = os.path.relpath(d, docs)
-        if got is None:
+        if timed_out and (d == running or (running is None and d not in got)):
             test_rows[d] = ("gate-recompute: %s exit=124 FAIL timeout-%ds" % (unit, budget), 1)
-        elif d not in got:
+        elif d == running or (d not in got and running is None):
             test_rows[d] = ("gate-recompute: %s exit=%d FAIL no-result" % (unit, p.returncode or 1), 1)
+        elif d not in got:  # after the unit that crashed or hung
+            test_rows[d] = ("gate-recompute: %s exit=1 FAIL not-run" % unit, 1)
         elif got[d]["FAIL"]:
             test_rows[d] = ("gate-recompute: %s exit=1 FAIL %s" % (unit, " ".join(got[d]["FAIL"])), 1)
         elif got[d]["EXPECTED"]:
