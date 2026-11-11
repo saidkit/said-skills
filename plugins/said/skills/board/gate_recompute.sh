@@ -32,6 +32,9 @@
 #      newlines; every other unit prints `gate-recompute: <unit-path> skipped (not selected)` and is not run.
 #      Unset runs every unit; a name that is no unit is a halt (exit 2). A skipped row is not a pass: a record
 #      holding one is not a full-run record.
+#      An entry may be `<unit-path>:<slice>,<slice>` for a unit that declares SLICES in its __init__.py: only those
+#      slices run (a bare entry is the whole unit), the unit's row reads `<unit-path>:<slices> exit=...` and each
+#      left-out slice prints `<unit-path>:<slice> skipped (not selected)`. An undeclared slice is a halt (exit 2).
 lane_root="$(cd "${SAID_ROOT:-$PWD}" 2>/dev/null && pwd -P)"
 case ":${SAID_GATE_RECOMPUTE_ACTIVE:-}:" in
   *":$lane_root:"*)
@@ -41,7 +44,7 @@ esac
 export SAID_GATE_RECOMPUTE_ACTIVE="${SAID_GATE_RECOMPUTE_ACTIVE:+$SAID_GATE_RECOMPUTE_ACTIVE:}$lane_root"
 here="$(cd "$(dirname "$0")" && pwd)"
 exec python3 - "${SAID_ROOT:-$PWD}" "${SAID_PLUGIN_ROOT:-$here/../..}" "${SAID_RECOMPUTE_TIMEOUT:-120}" <<'PY'
-import json, os, re, signal, subprocess, sys
+import ast, json, os, re, signal, subprocess, sys
 
 root, plugin_root, timeout = os.path.abspath(sys.argv[1]), sys.argv[2], int(sys.argv[3])  # relative SAID_ROOT
 ID = re.compile(r"^[A-Za-z][A-Za-z0-9._-]*$")
@@ -153,18 +156,72 @@ for d, dirs, files in os.walk(evaluation, followlinks=False):
         test_units.append(d)  # unittest unit, run with the others in one interpreter
         dirs[:] = []
 
-selected = [u.rstrip("/") for u in os.environ.get("SAID_GATE_UNITS", "").split()]  # empty: every unit runs
+entries = [e.rstrip("/") for e in os.environ.get("SAID_GATE_UNITS", "").split()]  # empty: every unit runs
+selected = []  # unit names as typed
+wanted = {}  # unit dir -> the slices asked for (None: the whole unit, a bare entry wins over a sliced one)
+
+
+def spellings(d):
+    return (os.path.relpath(d, root), os.path.relpath(d, docs))  # lane-root and docs-root relative
+
+
+for e in entries:
+    name, sep, sl = e.partition(":")
+    selected.append(name)
+    for d in units + test_units:
+        if name in spellings(d):
+            if not sep:
+                wanted[d] = None
+            elif wanted.get(d, []) is not None:
+                wanted[d] = wanted.get(d, []) + [x for x in sl.split(",") if x] + ([] if sl else [""])
 
 
 def chosen(d):
     """True when the unit at d runs: no selection, or its path (lane-root or docs-root relative) is named."""
-    return not selected or os.path.relpath(d, root) in selected or os.path.relpath(d, docs) in selected
+    return not selected or d in wanted
 
 
-unknown = [n for n in selected if not any(n in (os.path.relpath(d, root), os.path.relpath(d, docs)) for d in units + test_units)]
+def declared_slices(d):
+    """The slice names a unit declares as SLICES in its __init__.py, in order; [] when it declares none."""
+    try:
+        with open(os.path.join(d, "__init__.py"), encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+    except (OSError, SyntaxError, ValueError):
+        return []
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "SLICES" for t in node.targets):
+            try:
+                return [str(k) for k in ast.literal_eval(node.value)]
+            except (ValueError, TypeError):
+                return []
+    return []
+
+
+unknown = [n for n in selected if not any(n in spellings(d) for d in units + test_units)]
 if unknown:
     print("gate-recompute: halt -- SAID_GATE_UNITS names no unit: %s" % " ".join(unknown))
     sys.exit(2)
+badslice = []
+ran_slices = {}  # unit dir -> the slices to run, in the unit's declared order
+for d in test_units + units:
+    if wanted.get(d) is None:
+        continue
+    have = declared_slices(d) if d in test_units else []
+    miss = [x for x in wanted[d] if x not in have]
+    if miss:
+        badslice.append("%s:%s" % (os.path.relpath(d, docs), ",".join(x or "(none)" for x in miss)))
+    else:
+        ran_slices[d] = [x for x in have if x in wanted[d]]
+if badslice:
+    print("gate-recompute: halt -- SAID_GATE_UNITS names no slice: %s" % " ".join(badslice))
+    sys.exit(2)
+
+
+def label(d):
+    """A unit's row name: its docs-relative path, with the slices that ran when it was sliced."""
+    return os.path.relpath(d, docs) + (":" + ",".join(ran_slices[d]) if d in ran_slices else "")
+
+
 run_units = [d for d in test_units if chosen(d)]
 RUNNER = r'''
 import json, os, sys, unittest
@@ -213,7 +270,12 @@ def save(running):  # after each unit, so a crash or a kill keeps the finished u
 
 
 r = Result()
-for u in units:
+for arg in units:
+    u, _, only = arg.partition("\x1f")  # a sliced unit: its path, then the slices to run
+    if only:
+        os.environ["HARNESS_ONLY"] = only
+    else:
+        os.environ.pop("HARNESS_ONLY", None)
     save(u)  # u has no row yet: a crash inside it leaves it unfinished
     r.unit = u
     r.rows[u] = {"FAIL": [], "EXPECTED": []}
@@ -232,7 +294,7 @@ if run_units:
     env = {k: v for k, v in os.environ.items() if k not in ("SAID_GATE_OUT", "SAID_GATE_UNITS", "HARNESS_ONLY", "UPDATE_GOLDENS")}
     env["REQUIRE_BROWSER"] = "1"  # a gate with no browser fails the browser checks, never skips them
     budget = timeout * len(run_units)
-    p = subprocess.Popen([sys.executable, "-I", "-B", "-c", RUNNER, evaluation, res] + run_units, cwd=evaluation, env=env,
+    p = subprocess.Popen([sys.executable, "-I", "-B", "-c", RUNNER, evaluation, res] + [d + ("\x1f" + ",".join(ran_slices[d]) if d in ran_slices else "") for d in run_units], cwd=evaluation, env=env,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          start_new_session=True)
     timed_out = False
@@ -251,7 +313,7 @@ if run_units:
         if os.path.exists(f):
             os.remove(f)
     for d in run_units:
-        unit = os.path.relpath(d, docs)
+        unit = label(d)
         if timed_out and (d == running or (running is None and d not in got)):
             test_rows[d] = ("gate-recompute: %s exit=124 FAIL timeout-%ds" % (unit, budget), 1)
         elif d == running or (d not in got and running is None):
@@ -266,13 +328,16 @@ if run_units:
             test_rows[d] = ("gate-recompute: %s exit=0 PASS" % unit, 0)
 
 for d in sorted(units + test_units):
-    unit = os.path.relpath(d, docs)
+    unit = label(d)
     if not chosen(d):
         row("gate-recompute: %s skipped (not selected)" % unit)  # neither a pass nor a fail
         continue
     if d in test_rows:
         row(test_rows[d][0])
         fail |= test_rows[d][1]
+        for x in declared_slices(d):
+            if d in ran_slices and x not in ran_slices[d]:
+                row("gate-recompute: %s:%s skipped (not selected)" % (os.path.relpath(d, docs), x))  # a left-out slice
         continue
     env = {k: v for k, v in os.environ.items() if k not in ("SAID_GATE_OUT", "SAID_GATE_UNITS")}  # the record is this run's, never a child's
     env["PWD"] = d  # keep the logical path: harnesses resolve their root from it
