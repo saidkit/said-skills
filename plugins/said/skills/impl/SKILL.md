@@ -1,8 +1,8 @@
 ---
 name: impl
 description: >
-  SAID/Phase 3 (Implement) driver — drives one architected task from `Status: Todo`
-  to `Status: Done` through Phase A (Classify + Inventory), Phase B (Implement
+  SAID/Act driver — drives one architected task from `Status: Todo`
+  to `Status: Done` through Phase A (Classify + Inventory), Phase B (Build
   rule-by-rule, test-first), Phase C (Verify + close-of-task 5-step). Triggered ONLY
   by the explicit command "/said:impl <task-id|feature-id> [<task-id> ...]"; a bare
   feature-id runs whole-feature mode. Two SKILL-level fan-out forms
@@ -11,7 +11,7 @@ description: >
   additions — that's `/said:add-task`. NOT for spec authoring — that's `/said:architect`.
 ---
 
-# Feature Impl — Phase 3 (Implement): Per-Task Driver
+# Feature Impl — Act: Per-Task Driver
 
 ## Contract
 
@@ -79,7 +79,7 @@ Don't load source UX specs upfront — the task body's Reading list `(full read)
 
 Procedure: `Read ${CLAUDE_SKILL_DIR}/references/phase-a.md` (Contract rule 1) and follow it.
 
-## Phase B — Implement
+## Phase B — Build
 
 > **Stance: turn `[ ]` into `[x]` rule-by-rule. Test-first by default — the red is `per profile.red`, and the `## Earned rules` briefing comes before every unit (Contract rule 3); declarative-test or no-test for a carve-out `per profile.carve-out`, declared. One rule, one confirmation in chat. NO batching. NO "I'll defer X to a Pass 2" thinking. `<typecheck>` after every changed file.**
 

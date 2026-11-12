@@ -1,11 +1,11 @@
 ---
 name: review-ux
 description: >
-  SAID/Phase 3 (Implement) per-task verification gate for <PROJECT> feature work.
+  SAID/Act per-task verification gate for <PROJECT> feature work.
   Resolves the lane's `SAID.reviewers:` and runs the surface's agent-form Checker on a just-completed task: the `web-ux` Checker (the Playwright-driven `said:review-ux-agent` against the surface's UX checklist) or, on a doc lane, confirms the round's `doc-editorial` verdict, returning a structured pass/fail report. Triggered ONLY by the explicit command "/said:review-ux <task-id>" — or "/said:review-ux <feature-id>" for a feature-scope read on a lane whose Checker supports it, or "/said:review-ux <feature-id> fast-track F<NN>" at a fast-track run's close — never auto-selected.
 ---
 
-# Feature Review UX — Phase 3 (Implement) per-task Verification Gate
+# Feature Review UX — Act per-task Verification Gate
 
 Run the surface's agent-form Checker on a just-completed feature task, **before** the task is closed in the FEATURE.tasks.md log file. On a `web` lane that is the `said:review-ux-agent`: it reads `docs/ux/feature-ux-checklist.md`, filters rules by screen shape, runs each `verify:` action, and returns a structured report.
 
@@ -30,7 +30,7 @@ The editorial read happens once per round: the said or flow feature-review step 
 
 1. **Per task.** `/said:review-ux <task-id>` on a doc lane runs nothing: print `review-ux: doc-editorial is read once per round, at the feature-review step; nothing to run per task` and stop. The task close does not wait on it.
 2. **Feature scope.** Confirm that the round's verdict `<SAID.working:>/review-doc-editorial-<feature-id>.md` exists, then report its path and its `verdict:` line at the shared Step 3 (Present the report). A missing file is a FAIL of this gate (the round's feature-review step has not run), never a silent pass.
-3. **Writes no Eval artifact.** The Deliver-time Eval belongs to the orchestrator (`said:said`).
+3. **Writes no Eval artifact.** The Inspect-time Eval belongs to the orchestrator (`said:said`).
 
 ## Run scope (fast-track)
 

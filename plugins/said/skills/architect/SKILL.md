@@ -1,7 +1,7 @@
 ---
 name: architect
 description: >
-  SAID/Phase 2 (Architect) — turns a refined `scope.md` (Phase 1 output)
+  SAID/Act, the Architect step — turns a refined `scope.md` (Phase 1 output)
   into a feature spec + append-only tasks log via three-pass authoring
   (gather -> author -> plan). The spec is a recreation contract: a fresh
   implementer reading the spec alone must be able to rebuild the feature
@@ -11,9 +11,9 @@ description: >
   direct task append per `docs/features/template-tasks.md` discipline.
 ---
 
-# Feature Architect — Phase 2 (Architect): Spec + Tasks Authoring
+# Feature Architect — Act, the Architect step: Spec + Tasks Authoring
 
-This skill turns Phase 1's refined `scope.md` into the two artifacts Phase 3 (Implement) consumes: a feature spec at `docs/features/<feature>.md` and an append-only tasks log at `docs/features/<feature>.tasks.md`. Phase 1 is the input boundary (read `said:scope-grill` / `said:scope-refine` outputs); Phase 3 is the output boundary (`/said:impl` consumes what this skill writes).
+This skill turns Phase 1's refined `scope.md` into the two artifacts the rest of Act (`/said:impl`) consumes: a feature spec at `docs/features/<feature>.md` and an append-only tasks log at `docs/features/<feature>.tasks.md`. Phase 1 is the input boundary (read `said:scope-grill` / `said:scope-refine` outputs); Phase 3 is the output boundary (`/said:impl` consumes what this skill writes).
 
 The skill itself is the orchestrator — there is NO separate agent. You — the main agent — drive three sequential passes (**gather** -> **author** -> **plan**) within ONE invocation.
 
@@ -46,7 +46,7 @@ Resolve inputs and ground in calibration sources before the operator interaction
 1. **Resolve scope-path.**
    - Path given as arg -> verify with `ls <path>`. If missing, BLOCK and ask operator.
    - No path given -> list the `scope.md` files the `SAID.working:` value names (a path holding `<id>`), with `*` for `<id>` (no `SAID.working:` key on the `## Lane` block -> HALT); if exactly one, use it; if multiple or zero, ASK the operator which feature.
-2. **Verify §D resolved (empty, or resolved WITH an operator-attributed record).** Read scope.md, locate `## §D`. It passes when EITHER (a) it is empty (or every item explicitly marked "defer to Phase 2 (Architect)" with reasoning), OR (b) it is **resolved WITH an operator-attributed record** -- every open item carries a resolution that cites an operator/user turn, and you apply **cite-and-verify**: verify the cited turn is an operator/user role AND actually carries a decision for that item (role alone is foolable; the role-labelled transcript is the gate-readable source; no marker is trusted in its place). A resolution whose cite is fabricated, roleless, or only mentions the item without deciding it FAILs -> BLOCK; an UNresolved §D (open items, no attributed resolution) BLOCKs (the fallback). The gate checks WHO resolved §D, not merely that it looks resolved. (The decision-signal check -- "decides, not merely mentions" -- is owed a RED-first adversarial harness.)
+2. **Verify §D resolved (empty, or resolved WITH an operator-attributed record).** Read scope.md, locate `## §D`. It passes when EITHER (a) it is empty (or every item explicitly marked "defer to the Architect step" with reasoning), OR (b) it is **resolved WITH an operator-attributed record** -- every open item carries a resolution that cites an operator/user turn, and you apply **cite-and-verify**: verify the cited turn is an operator/user role AND actually carries a decision for that item (role alone is foolable; the role-labelled transcript is the gate-readable source; no marker is trusted in its place). A resolution whose cite is fabricated, roleless, or only mentions the item without deciding it FAILs -> BLOCK; an UNresolved §D (open items, no attributed resolution) BLOCKs (the fallback). The gate checks WHO resolved §D, not merely that it looks resolved. (The decision-signal check -- "decides, not merely mentions" -- is owed a RED-first adversarial harness.)
 3. **Resolve surface.** Read `SAID.surface:` from the `## Lane` block (the medium; required — an omitted key HALTs, never a last-resort default).
 4. **Derive feature name.** Take the leaf segment of the working dir (`docs/working/<feature>/scope.md` -> `<feature>`). Confirm with operator only if ambiguous.
 5. **Resolve output paths.**
@@ -258,7 +258,7 @@ Pause for operator review. Brief: "Spec authored at `<path>` (`<n>` lines). Read
 
 ## Pass 3 — Plan
 
-> **Stance: decompose work into tasks. Each task = "what to build" + "how done is judged". ZERO implementation methodology. ZERO step-lists. Code samples only when the sample IS the load-bearing decision (a doc patch literal, an end-state folder layout). The spec is the contract; tasks are the implementation backlog. Phase 3 (Implement) reads tasks; Phase 2 (this skill) only WRITES them, never plans methodology.**
+> **Stance: decompose work into tasks. Each task = "what to build" + "how done is judged". ZERO implementation methodology. ZERO step-lists. Code samples only when the sample IS the load-bearing decision (a doc patch literal, an end-state folder layout). The spec is the contract; tasks are the implementation backlog. `/said:impl` reads tasks; the Architect step (this skill) only WRITES them, never plans methodology.**
 
 Procedure:
 
@@ -298,7 +298,7 @@ Per-task authoring rules (HARD — violations require rework):
   - **Cite applicable frozen rules inline** when relevant — anchors only, no verbatim paraphrase. Example: "Reshape onto the `<shape>` rule bundle per `<ux-spec> #NN, #MM`" (rule ids from the loaded registry). Implementer opens the cited specs per Reading list `(full read)`.
   - **Alternatives considered** subsection ONLY when a rejected option was reasonable to a cold reader. Skip otherwise.
   - **Code samples** ONLY when the sample IS the load-bearing decision (a `CLAUDE.md` patch literal, an end-state folder layout). Default to prose pointing at upstream ADR/UX-spec.
-- **Reading list:** Per-task delta from spec's Context-to-load. Don't duplicate. Cite additional files / ADR-IDs / UX-spec-frozen-items the task specifically needs beyond the umbrella context. **Flag `(full read)` on UX specs whose frozen rules are cited in Approach** — implementer re-opens the source at Phase 3 (Implement) start, not CLAUDE.md summaries.
+- **Reading list:** Per-task delta from spec's Context-to-load. Don't duplicate. Cite additional files / ADR-IDs / UX-spec-frozen-items the task specifically needs beyond the umbrella context. **Flag `(full read)` on UX specs whose frozen rules are cited in Approach** — implementer re-opens the source when `/said:impl` starts, not CLAUDE.md summaries.
 - **Acceptance:** Observable bullets — how "done" is judged. Cite spec / ADR / UX-spec anchors; never restate. Conformance content folds in as observable bullets, skip any that don't apply:
   - **Frozen-rule conformance** (when task touches surface-governed shapes): cite spec + rule ids from the loaded registry, not verbatim text. Example: `- [ ] <ux-spec> #NN, #MM satisfied (per screen shape)`.
   - **Wire contract** (when a `web`/`api` task introduces or changes a wire method): one bullet per load-bearing endpoint. Example: `- [ ] GET /endpoint — response schema matches captured bytes (per the surface's wire-probe)`.
@@ -324,7 +324,7 @@ Report to operator:
 
 Hard exit. The skill writes spec + tasks; that's the entire Phase 2 output. Implementation is Phase 3's job.
 
-Suggested next step for the operator: "Phase 3 (Implement) starts here. Run `/said:impl <feature-id>` to drive every `Status: Todo` task in order (whole-feature mode), or `/said:impl <task-id>` for a single task. Each task closes through `/said:review-ux` at Phase C (visual-surface features only)."
+Suggested next step for the operator: "Act continues here. Run `/said:impl <feature-id>` to drive every `Status: Todo` task in order (whole-feature mode), or `/said:impl <task-id>` for a single task. Each task closes through `/said:review-ux` at Phase C (visual-surface features only)."
 
 ## Structural boundaries
 

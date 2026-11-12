@@ -1,7 +1,7 @@
 ---
 name: add-task
 description: >
-  SAID/Phase 2 (Architect) — appends a new task entry to an existing
+  SAID/Act, the Architect step — appends a new task entry to an existing
   feature's append-only tasks log. Distills `/said:architect` Pass 3
   authoring into a standalone single-pass skill, intended for tasks
   discovered mid-implementation: bugs surfaced by code review or runtime,
@@ -20,7 +20,7 @@ description: >
   — that's `/said:impl`.
 ---
 
-# Feature Add Task — Phase 2 (Architect): Append a Task
+# Feature Add Task — Act, the Architect step: Append a Task
 
 This skill appends a new task entry to an existing `<feature>.tasks.md` file. It exists because tasks routinely surface mid-implementation — bugs caught at runtime, scope-creep additions, follow-ups from close-of-task leak scans — and the discipline for authoring them deserves enforcement (template-tasks.md authoring rules, no step-lists in Approach, code samples only when load-bearing, condensed Refs discipline). Manual append-only editing technically works, but loses the enforcement.
 
@@ -135,7 +135,7 @@ Before writing, validate the answers against template-tasks.md discipline. Rewri
 - **Approach: cite frozen-rule anchors inline** when the task touches surface-governed shapes. Use the rule ids the loaded registry routed at Step 0.SC. Example: "Reshape per the routed rules — cite ids (e.g. `<ux-spec> #NN, #MM`)." Anchors only — no verbatim paraphrase. Implementer opens the source via Reading list `(full read)`.
 - **Approach: no implementation-detail leakage — but name the write-target.** Function signatures, exhaustive file enumerations, code samples that aren't load-bearing -> cut and cite the upstream ADR/UX-spec/spec section. **Do name the unit(s) / file(s) the task edits** — its write-target — as a key decision: a task-level fan-out derives each task's write-set from `Refs:` ∪ the files under the lane's mounts that the Approach names, so a what-to-build that names no target cannot be partitioned and falls to the serial set. Naming the write-target is not enumerating every touched file. A code sample is load-bearing only when the sample ITSELF carries a decision the prose can't (e.g., end-state folder layout for a data-layer-only feature; a literal doc-patch wording).
 - **Alternatives considered: only when reasonable.** If the operator listed an alternative that no cold reader would have picked, drop it (per template's bloat-scan rule).
-- **Reading list: per-task DELTA only.** If the operator cited files already in the spec's Context-to-load, cut the duplicates — the spec covers the umbrella; the task cites only what's specifically additional. **Flag `(full read)` on UX specs whose anchors are cited in Approach** — implementer re-opens the source at Phase 3 (Implement) start, not CLAUDE.md summaries.
+- **Reading list: per-task DELTA only.** If the operator cited files already in the spec's Context-to-load, cut the duplicates — the spec covers the umbrella; the task cites only what's specifically additional. **Flag `(full read)` on UX specs whose anchors are cited in Approach** — implementer re-opens the source when `/said:impl` starts, not CLAUDE.md summaries.
 - **Acceptance: observable bullets, conformance content folds in.** Cite spec / ADR / UX-spec anchors; never restate. Skip every category that doesn't apply:
   - Frozen-rule conformance (when task touches surface-governed shapes): `- [ ] <ux-spec> #NN, #MM satisfied (per the loaded registry)`.
   - Wire contract (when a task changes a wire method): `- [ ] GET /endpoint — response schema matches captured bytes (per the surface's wire probe)`.
@@ -216,7 +216,7 @@ Insert a `---` separator before the new task block (matching the calibration tar
 
 ## Fast-track runs
 
-A fast-track run defers a named set of tasks' per-task Deliver gates (review-ux, the code review, review-qa, accept) to one close over the set. Its switch is a recorded, operator-confirmed skip of per-task gates, the same class `debrief` records as a Gate-skip line: the block records the operator's words; there is no transcript check and no ruling lookup. Both forms run in the main context only, like every write to the log. Of the preflight, the fast-track forms run Step 0 items 1-3 and 5 (feature id, tasks file, companion spec, and item 5's read of the log in full, without its task-id computation); they parse no other flag and read no lane registry. Task ids given to the open form are normalized to UPPERCASE, as the feature id is.
+A fast-track run defers a named set of tasks' per-task Inspect gates (review-ux, the code review, review-qa, accept) to one close over the set. Its switch is a recorded, operator-confirmed skip of per-task gates, the same class `debrief` records as a Gate-skip line: the block records the operator's words; there is no transcript check and no ruling lookup. Both forms run in the main context only, like every write to the log. Of the preflight, the fast-track forms run Step 0 items 1-3 and 5 (feature id, tasks file, companion spec, and item 5's read of the log in full, without its task-id computation); they parse no other flag and read no lane registry. Task ids given to the open form are normalized to UPPERCASE, as the feature id is.
 
 **Open: `fast-track "<task ids>"`.** Skip Steps 1-3 (no task entry is authored). Append, after a `---` separator:
 

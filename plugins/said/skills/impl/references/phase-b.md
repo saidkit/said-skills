@@ -1,8 +1,8 @@
-# impl — Phase B procedure (Implement) + Step 0.SC + the anti-patterns
+# impl — Phase B procedure (Build) + Step 0.SC + the anti-patterns
 
 Read from the spine (`SKILL.md` Contract rule 1) at the moment it names; every rule here is standing for the whole phase.
 
-## Phase B — Implement
+## Phase B — Build
 
 > **Stance: turn `[ ]` into `[x]` rule-by-rule. Test-first by default — the red is `per profile.red`, and the `## Earned rules` briefing comes before every unit (Contract rule 3); declarative-test or no-test for a carve-out `per profile.carve-out`, declared. One rule, one confirmation in chat. NO batching. NO "I'll defer X to a Pass 2" thinking. `<typecheck>` after every changed file.**
 

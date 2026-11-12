@@ -1,7 +1,7 @@
 ---
 name: uxtoc
 description: >
-  SAID/Phase 2 (Architect) - descriptive table-of-contents
+  SAID/Act, the Architect step - descriptive table-of-contents
   for spec artifacts. Reads a scope.md, feature spec, unit spec, or
   feature working dir and emits a hierarchical outline (units -> containers
   -> elements, each element's attributes flattened to short nested bullets),
@@ -9,7 +9,7 @@ description: >
   evaluation, no rule comparison, no gap flagging, no recommendations.
   Multi-unit features render one outline section per unit.
   Used at two positions: EARLY on a thin scope.md or unit stub to seed
-  a design, or LATE on an authored spec to inspect it - same emit -> spot ->
+  a design, or LATE on an authored spec to re-read it - same emit -> spot ->
   edit -> re-run loop (the design-seed use is detailed in the body). On a
   dir: unit-home lane that loop runs on the durable per-unit file; the
   feature toc.md there is a thin index, not the edit surface. Triggered ONLY by the
@@ -174,6 +174,6 @@ The skill is designed for rapid spec editing - emit -> spot -> edit -> re-emit. 
 A *composition* of skills, outside `uxtoc` (adds no `uxtoc` behavior):
 1. **Mirror exemplars** - run `uxtoc` on reference units for their outlines.
 2. **Ideate by analogy** - draft a new unit's spec from them with a separate ideation skill, **outside** `uxtoc`.
-3. **Mirror the draft** - run `uxtoc` on it to inspect.
+3. **Mirror the draft** - run `uxtoc` on it to re-read it.
 
 Name no specific ideation skill as a dependency; `uxtoc` still only mirrors a spec (never generates, ranks, or evaluates).
