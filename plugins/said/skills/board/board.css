@@ -5,12 +5,12 @@
   --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --bg:var(--paper);--surface:#fff;--panel:#F2F2EE;--border:rgba(10,11,13,.11);--track:rgba(10,11,13,.11);
   --text:var(--ink);--muted:rgba(10,11,13,.58);--faint:rgba(10,11,13,.38);--accent:var(--cobalt);--accent-deep:#2C3CC4;
-  --ph-scope:rgba(10,11,13,.30);--ph-architect:rgba(10,11,13,.58);--ph-implement:var(--cobalt);
-  --ph-delivery:#2C3CC4;--ph-closed:var(--ok);--warn:var(--alert);}
+  --ph-scope:rgba(10,11,13,.30);--ph-act:var(--cobalt);
+  --ph-inspect:#2C3CC4;--ph-debrief:#1E2A8A;--ph-closed:var(--ok);--warn:var(--alert);}
 [data-theme="dark"]{--bg:#15171B;--surface:#1D2025;--panel:#191C21;--border:rgba(250,250,247,.14);--track:rgba(250,250,247,.15);
   --text:var(--paper);--muted:rgba(250,250,247,.60);--faint:rgba(250,250,247,.40);--accent:#6579FF;--accent-deep:#4658E6;
-  --ph-scope:rgba(250,250,247,.32);--ph-architect:rgba(250,250,247,.60);--ph-implement:#6579FF;
-  --ph-delivery:#4658E6;--ph-closed:#2ECC8F;--warn:#FF6B6B;}
+  --ph-scope:rgba(250,250,247,.32);--ph-act:#6579FF;
+  --ph-inspect:#4658E6;--ph-debrief:#8F9BFF;--ph-closed:#2ECC8F;--warn:#FF6B6B;}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;
   font:14px/1.5 var(--font-ui);letter-spacing:-.011em;-webkit-font-smoothing:antialiased}
@@ -52,8 +52,8 @@ body[data-view="kanban"] #kanbanwrap{display:flex}
 #featbar .kanban-only{display:none}body[data-view="kanban"] #featbar .kanban-only{display:flex}
 .kanban{flex:1;display:flex;gap:14px;overflow-x:auto;padding:16px 18px;align-items:stretch}
 .kcol{flex:1 1 0;min-width:212px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:12px;max-height:100%}
-.kcol[data-phase="Scope"]{--kc:var(--ph-scope)}.kcol[data-phase="Architect"]{--kc:var(--ph-architect)}
-.kcol[data-phase="Implement"]{--kc:var(--ph-implement)}.kcol[data-phase="Deliver"]{--kc:var(--ph-delivery)}
+.kcol[data-phase="Scope"]{--kc:var(--ph-scope)}.kcol[data-phase="Act"]{--kc:var(--ph-act)}
+.kcol[data-phase="Inspect"]{--kc:var(--ph-inspect)}.kcol[data-phase="Debrief"]{--kc:var(--ph-debrief)}
 .kcol[data-phase="Closed"]{--kc:var(--ph-closed)}
 .kcol-h{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;border-bottom:1px solid var(--border);
   border-top:3px solid var(--kc,var(--border));border-radius:12px 12px 0 0}
@@ -91,8 +91,8 @@ body.drawer-open #backdrop{opacity:1;visibility:visible}
 .row:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 3px 10px rgba(16,24,40,.08)}
 .row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .row.selected{border-color:var(--accent);box-shadow:0 0 0 1.5px var(--accent)}
-.row[data-phase="Implement"]{--bd:var(--ph-implement)} .row[data-phase="Deliver"]{--bd:var(--ph-delivery)}
-.row[data-phase="Architect"]{--bd:var(--ph-architect)} .row[data-phase="Scope"]{--bd:var(--ph-scope)}
+.row[data-phase="Act"]{--bd:var(--ph-act)} .row[data-phase="Inspect"]{--bd:var(--ph-inspect)}
+.row[data-phase="Debrief"]{--bd:var(--ph-debrief)} .row[data-phase="Scope"]{--bd:var(--ph-scope)}
 .row[data-phase="Closed"]{--bd:var(--ph-closed)}
 .rid{font-weight:650;font-size:13px}.rid.big{font-size:22px;font-weight:750}
 .mid{display:flex;align-items:center;gap:9px;min-width:0}
@@ -126,7 +126,7 @@ body.drawer-open #backdrop{opacity:1;visibility:visible}
 .task summary::-webkit-details-marker{display:none}
 .task summary:hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
 .t-dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-.t-done .t-dot{background:var(--ph-closed)}.t-todo .t-dot{background:var(--ph-implement)}
+.t-done .t-dot{background:var(--ph-closed)}.t-todo .t-dot{background:var(--ph-act)}
 .t-canceled .t-dot{background:var(--muted)}.t-backlog .t-dot{background:var(--ph-scope)}
 .t-id{font-size:12px;color:var(--accent);white-space:nowrap}
 .t-title{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -193,21 +193,21 @@ footer a{color:var(--accent);text-decoration:none}
 .shipped{color:var(--ph-closed)}
 .empty-state code{font-family:var(--font-mono)}
 /* Phase pill — the brand ramp (neutral -> cobalt -> green), never daisyUI's semantic hues.
-   Outlined by default; the live phase (Implement) is the one that earns a fill. */
+   Outlined by default; the live phase (Act) is the one that earns a fill. */
 .ph{display:inline-flex;align-items:center;font-family:var(--font-mono);font-size:10px;line-height:1;
   letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;white-space:nowrap;border-radius:999px;
   border:1px solid var(--pc,var(--border));color:var(--pc,var(--muted));background:transparent}
 .ph[data-phase="Scope"]{--pc:var(--ph-scope)}
-.ph[data-phase="Architect"]{--pc:var(--ph-architect)}
-.ph[data-phase="Implement"]{--pc:var(--ph-implement);background:var(--ph-implement);color:var(--paper);border-color:var(--ph-implement)}
-.ph[data-phase="Deliver"]{--pc:var(--ph-delivery)}
+.ph[data-phase="Act"]{--pc:var(--ph-act);background:var(--ph-act);color:var(--paper);border-color:var(--ph-act)}
+.ph[data-phase="Inspect"]{--pc:var(--ph-inspect)}
+.ph[data-phase="Debrief"]{--pc:var(--ph-debrief)}
 .ph[data-phase="Closed"]{--pc:var(--ph-closed)}
 .d-head .ph{font-size:11px;padding:5px 10px}
 /* Task status — bold, and colour-matched to its own dot so label and dot never disagree.
    600 is the heaviest JetBrains Mono weight loaded; 700 would render as faux-bold. */
 .t-status{font-weight:600}
 .task.t-done .t-status{color:var(--ph-closed)}
-.task.t-todo .t-status{color:var(--ph-implement)}
+.task.t-todo .t-status{color:var(--ph-act)}
 .task.t-backlog .t-status{color:var(--ph-scope)}
 .task.t-canceled .t-status{color:var(--faint)}
 .task.t-canceled .t-dot{background:var(--faint)}   /* dimmest of the set — the title is struck through too */
@@ -243,9 +243,9 @@ body[data-view="backlog"] #backlogwrap{display:flex}
 .bl-item .t-title{font-size:13px}
 .bl-item.t-done .t-title{color:var(--muted)}
 .bl-item.t-done .t-dot{background:var(--ph-closed)}
-.bl-item.t-todo .t-dot{background:var(--ph-implement)}
+.bl-item.t-todo .t-dot{background:var(--ph-act)}
 .bl-item.t-done .t-status{color:var(--ph-closed)}
-.bl-item.t-todo .t-status{color:var(--ph-implement)}
+.bl-item.t-todo .t-status{color:var(--ph-act)}
 .bl-item.t-none .t-status{color:var(--faint)}
 .bl-add,.bl-conn{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .bl-conn{padding-top:6px;border-top:1px solid var(--border);margin-top:6px}

@@ -2,7 +2,7 @@
 name: board
 description: >
   SAID board, the one observe skill: where every feature sits in the SAID phase chain
-  (Scope -> Architect -> Implement -> Deliver -> Closed), what is stalled or waiting, and the command
+  (Scope -> Act -> Inspect -> Debrief -> Closed), what is stalled or waiting, and the command
   that advances each, derived from on-disk artifacts; beside it the backlog board and the lane todo
   board. The local web page is the default surface; `--cli` prints the terminal board and `--json`
   the data. Triggered ONLY by "/said:board [backlog | todo] [<feature-id>] [--cli | --json] [--lanes]
@@ -103,7 +103,7 @@ python3 <skill-dir>/serve.py stop [--port <n>]
 
 The script gives facts; you give the reading. After showing its output:
 
-- Interpret a flag: `⚠ Nd idle` on Implement -> name the likely stall (an open gate? a blocked task?); `! integrity` -> point at the drift (Summary Table vs parsed sections); `waiting:` -> name the operator question it waits on.
+- Interpret a flag: `⚠ Nd idle` on Act -> name the likely stall (an open gate? a blocked task?); `! integrity` -> point at the drift (Summary Table vs parsed sections); `waiting:` -> name the operator question it waits on.
 - Answer follow-ups from `--json` (stalest, oldest-started, most Todo) — reason over the data.
 
 ## The reviewer-set enforcement gate
@@ -117,16 +117,17 @@ Per registry feature-id, glob `<id>*` so sub-phased specs (`<id>-<slug>.md`) and
 **Phase — ordered checks, first match wins.** Order matters: a `Closed` feature also has `Todo == 0`, so check the footer before the count. Never key phase on `Todo == 0` alone.
 
 1. `## Debrief close` footer in a `<id>*.tasks.md` -> **Closed**
-2. spec + tasks, `Status: Todo` count `== 0`, no footer -> **Deliver** — the post-Implement gate + debrief window (`/said:flow` names this same phase *Deliver*)
-3. spec + tasks, `Status: Todo` count `> 0` -> **Implement**
-4. `<working>/<id>/scope.md` exists, no spec -> **Architect**
-5. no scope.md, no spec -> **Scope** — append `, not started` when the working dir is absent or empty
+2. spec + tasks, `Status: Todo` count `== 0`, no footer, `<working>/<id>/debrief.md` present -> **Debrief**
+3. spec + tasks, `Status: Todo` count `== 0`, no footer, no `debrief.md` -> **Inspect** — the gate window after the last task (`/said:flow` and `/said:said` name these same phases)
+4. spec + tasks, `Status: Todo` count `> 0` -> **Act**
+5. `<working>/<id>/scope.md` or a spec exists, no tasks -> **Act**, sub-state `architect step: scope.md, no spec` or `architect step: spec, no tasks`
+6. no scope.md, no spec -> **Scope** — append `, not started` when the working dir is absent or empty
 
 **Task rollup.** Count `**Status:** <X>` across the tasks log: Done / Todo / Canceled / Backlog.
 Denominator = `Done + Todo` (Canceled + Backlog shown but excluded from the bar). If a `## Summary
 Table` exists, cross-check its rows vs the parsed counts; on mismatch emit a one-line **data-integrity** note — parsed `Status:` lines win, the table is a convenience index that can go stale.
 
-**Gate sub-ticks** (meaningful at Deliver/Closed), from working-dir artifacts, a run's `-F<NN>.md` report excluded: `review-qa*.md`->qa; ->ux: `review-ux*.md`, or, when the lane's `## Lane` block declares Checkers in `SAID.reviewers:`, a `review-<checker-id>-<feature-id>*.md` for every one (the feature id right after the exact Checker id, so `cli` never ticks from a `cli-gate` file; one declared Checker's file alone does not tick; any verdict, PASS or FAIL: presence only; validation is the reviewer gate's), `accept*.md`->accept, `debrief.md`->debrief-started, `## Debrief close` footer->debrief-done. Render `✓` present, `○` pending, `-` n/a (`ux -` for a no-UI feature — absence of a UX gate is not a failure).
+**Gate sub-ticks** (meaningful at Inspect, Debrief and Closed), from working-dir artifacts, a run's `-F<NN>.md` report excluded: `review-qa*.md`->qa; ->ux: `review-ux*.md`, or, when the lane's `## Lane` block declares Checkers in `SAID.reviewers:`, a `review-<checker-id>-<feature-id>*.md` for every one (the feature id right after the exact Checker id, so `cli` never ticks from a `cli-gate` file; one declared Checker's file alone does not tick; any verdict, PASS or FAIL: presence only; validation is the reviewer gate's), `accept*.md`->accept, `debrief.md`->debrief-started, `## Debrief close` footer->debrief-done. Render `✓` present, `○` pending, `-` n/a (`ux -` for a no-UI feature — absence of a UX gate is not a failure).
 
 **Waiting on an operator question.** A separate axis from the gate ticks: a tick shows only that a file is present, never that it passed. A feature waits on one of two derived sources, the first that applies:
 1. The accept file: the newest `accept-*.md` in `<working>/<id>/` by modification time (a run's `-F<NN>` report excluded) whose last `Verdict:` line, bulleted (`- Verdict: ...`) or not, outside a code fence, reads exactly `MANUAL-PENDING` -> reason `accept MANUAL-PENDING`. The `accept` tick stays present; the wait says it has not passed.
@@ -139,11 +140,11 @@ Render the reason as `waiting: <reason>` in the feature's roster flags and as `W
 `idle` = today - max(last task-date, git last-activity), `age` = today - started.
 
 **Staleness.** Non-`Closed` only: `⚠ <idle>d idle` when idle exceeds the phase threshold — default
-**Implement/Deliver 7d, Scope/Architect 14d** (tunable; state the value used). `Closed` carries no staleness. No git -> say so, fall back to in-file dates; never fabricate an activity date.
+**Act, Inspect and Debrief 7d; Scope and Act's architect step 14d** (tunable; state the value used). `Closed` carries no staleness. No git -> say so, fall back to in-file dates; never fabricate an activity date.
 
 **Blockers** (cross-lane; usually empty single-lane). A task whose Approach / Out-of-scope names an open crossing (`*-handover-*.md` with no reply / no `## Reply`) -> `⛔ blocked: <task> -> <crossing>`.
 
-**Next action — by phase.** Scope -> `/said:scope-refine <handoff>` (or `/said:scope-grill <id>` if the input is thin/empty), Architect -> `/said:architect <working>/<id>/scope.md`, Implement -> `/said:impl <id>`, Deliver -> the next un-run of `/said:review-qa <id>` -> `/said:review-ux <id>` -> `/said:accept <id>` -> `/said:debrief <id>`, Closed -> none.
+**Next action — by phase.** Scope -> `/said:scope-refine <handoff>` (or `/said:scope-grill <id>` if the input is thin/empty), Act -> `/said:architect <working>/<id>/scope.md` in the architect step, else `/said:impl <id>`, Inspect and Debrief -> the next un-run of `/said:review-qa <id>` -> `/said:review-ux <id>` -> `/said:accept <id>` -> `/said:debrief <id>`, Closed -> none.
 
 **On probe disagreement**, trust the `## <id>` section over the Summary Table, and say so.
 
@@ -151,7 +152,7 @@ Render the reason as `waiting: <reason>` in the feature's roster flags and as `W
 
 ### Roster — default, no argument
 
-A monospace block (fenced, so columns align), sorted **attention-first**: Implement -> Deliver -> Architect -> Scope -> Closed; within a phase, most-idle first.
+A monospace block (fenced, so columns align), sorted **attention-first**: Act -> Inspect -> Debrief -> Scope -> Closed; within a phase, most-idle first.
 
 ```
 SAID status, <PROJECT>, <n> lane(s), <today>
@@ -163,7 +164,7 @@ legacy: <prefixes> — <one-line why, where they live>
 !  <data-integrity notes, if any>
 ```
 
-- **bar** = 9 cells, `█` x round(9 x done/denominator), `░` for the rest. No denominator yet (Scope/Architect) -> `,,,,,,,,,` — "no work counted," not "0% done."
+- **bar** = 9 cells, `█` x round(9 x done/denominator), `░` for the rest. No denominator yet (Scope, or Act's architect step) -> `,,,,,,,,,` — "no work counted," not "0% done."
 - **flags** = `⚠ Nd idle`, `waiting: <reason>` and/or `⛔ blocked: ...`; `Closed` rows may show the gate ticks instead.
 - One line per feature. Never list legacy features per-row.
 
@@ -172,9 +173,9 @@ legacy: <prefixes> — <one-line why, where they live>
 Markdown (keep `file:line` paths clickable) — the "position in the SAID cycle" view:
 
 - **Pipeline** — an arrow sequence with the current stop marked:
-  `Scope ✓ -> Architect ✓ -> Implement ● -> Deliver ○ -> Closed ○` (`✓` done, `●` current, `○` ahead).
+  `Scope ✓ -> Act ✓ -> Inspect ● -> Debrief ○ -> Closed ○` (`✓` done, `●` current, `○` ahead).
   Never a box-drawn diagram.
-- **Deliver** line (at/after Deliver): `review-qa ✓, review-ux -, accept ○, debrief ○`.
+- **Gates** line (at Inspect and after): `review-qa ✓, review-ux -, accept ○, debrief ○`.
 - **Tasks** — rollup (`Done N, Todo M, Canceled K`), then the open items:
   `<id>-<nn>, <title>, <status-date>`. Canceled/Backlog folded under a count.
 - **Dates** — started, last activity, age, idle (with the threshold applied).

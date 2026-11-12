@@ -2,7 +2,7 @@
 """said_status.py — deterministic SAID feature-state analyzer.
 
 Read-only. Reconstructs every feature's position in the SAID phase chain
-(Scope -> Architect -> Implement -> Deliver -> Closed) by INSPECTING on-disk
+(Scope -> Act -> Inspect -> Debrief -> Closed) by INSPECTING on-disk
 artifacts, and emits either JSON (a stable data interface) or a rendered
 terminal roster / single-feature deep-dive. Stores nothing.
 
@@ -41,12 +41,14 @@ RUN_REPORT_RE = re.compile(r"-F\d{2,}\.md$")  # a run's report, never a feature-
 TASK_ID_RE = re.compile(r"[A-Z]+-?\d+(?:-[A-Za-z0-9]+)+")  # HEADER_RE's id: a `tasks:` token counts only if it is one
 
 # attention-first ordering; staleness thresholds (days idle) per phase
-PHASE_RANK = {"Implement": 0, "Deliver": 1, "Architect": 2, "Scope": 3, "Closed": 4}
+PHASE_RANK = {"Act": 0, "Inspect": 1, "Debrief": 2, "Scope": 3, "Closed": 4}
 # a `**Priority:**` head line: `[#A]`, a bare letter or High/Medium/Low, then an optional minted id token that ends the line
 PRIORITY_WORDS = {"high": "A", "medium": "B", "low": "C"}
 PRIO_RANK = {"A": 0, "B": 1, "C": 2}
 HEAD_LINES = 40  # the lines of a spec the priority reader looks at
-STALE_DEFAULT = {"Implement": 7, "Deliver": 7, "Architect": 14, "Scope": 14}
+STALE_DEFAULT = {"Act": 7, "Inspect": 7, "Debrief": 7, "Scope": 14}
+ARCHITECT_STEP = "architect step: "  # the sub-state of Act before tasks exist
+STALE_ARCHITECT_STEP = 14
 
 GLYPH = {"done": "█", "empty": "░", "none": ",",
          "ok": "✓", "pending": "○", "warn": "⚠", "block": "⛔"}
@@ -291,16 +293,16 @@ def gate_ticks(workdir, reviewers=(), fid=None):
             "accept": has("accept*.md"), "debrief_started": os.path.isfile(os.path.join(workdir, "debrief.md"))}
 
 
-def classify(has_spec, has_tasks, todo, footer, has_scope, dir_has_content):
+def classify(has_spec, has_tasks, todo, footer, has_scope, dir_has_content, debrief_started=False):
     """Ordered phase probe — first match wins. Never keys on todo==0 alone."""
     if footer:
         return "Closed", None
     if has_tasks and todo == 0:
-        return "Deliver", None
+        return ("Debrief" if debrief_started else "Inspect"), None
     if has_tasks and todo > 0:
-        return "Implement", None
+        return "Act", None
     if has_scope or has_spec:
-        return "Architect", ("spec, no tasks" if has_spec else "scope.md, no spec")
+        return "Act", ARCHITECT_STEP + ("spec, no tasks" if has_spec else "scope.md, no spec")
     if dir_has_content:
         return "Scope", "scope pending"
     return "Scope", "not started"
@@ -343,11 +345,11 @@ def next_action(fid, phase, workdir, gates, sub, doc=False):
         return "/said:add-task %s (one task per FAIL row of %s-%s.md)" % (fid, "review-doc-editorial" if doc else "review-feature", fid)
     if phase == "Scope":
         return "/said:scope-refine %s" % workdir if sub == "scope pending" else "/said:scope-grill %s" % fid
-    if phase == "Architect":
-        return "/said:architect %s" % os.path.join(workdir, "scope.md")
-    if phase == "Implement":
+    if phase == "Act":
+        if (sub or "").startswith(ARCHITECT_STEP):
+            return "/said:architect %s" % os.path.join(workdir, "scope.md")
         return "/said:impl %s" % fid
-    if phase == "Deliver":
+    if phase in ("Inspect", "Debrief"):  # a gate still unrecorded comes before the debrief
         if not gates["qa"]:
             return "/said:review-qa %s" % fid
         if not gates["accept"]:
@@ -449,7 +451,7 @@ def _sortkey(f):
 
 def waiting_reason(workdir):
     """Derive 'waiting on an operator question' from durable SAID artifacts ONLY
-    (derive, never store): the recorded Deliver-gate verdicts under the feature's working
+    (derive, never store): the recorded Inspect-gate verdicts under the feature's working
     dir. A run-engine hold recorded outside the lane's working dir is out of scope
     -- operator-visible, not analyzer-visible. Returns a short reason or None."""
     try:
@@ -651,9 +653,10 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
         t = parse_tasks(tasks) if tasks else {"counts": {"Done": 0, "Todo": 0, "Canceled": 0, "Backlog": 0},
                                               "dates": [], "todo_items": [], "footer": False, "integrity": None}
         c = t["counts"]
-        phase, sub = classify(bool(specs), bool(tasks), c["Todo"], t["footer"], scope, dir_content)
-        if phase == "Deliver" and dir_content and feature_review_failed(root, workdir, fid):
-            phase, sub = "Implement", "feature review FAIL"  # a failed feature review: Deliver does not start
+        phase, sub = classify(bool(specs), bool(tasks), c["Todo"], t["footer"], scope, dir_content,
+                              os.path.isfile(os.path.join(workdir, "debrief.md")))
+        if phase in ("Inspect", "Debrief") and dir_content and feature_review_failed(root, workdir, fid):
+            phase, sub = "Act", "feature review FAIL"  # a failed feature review: Inspect does not start
         gates = gate_ticks(workdir, reviewers, fid) if os.path.isdir(workdir) else {"qa": False, "ux": False, "accept": False, "debrief_started": False}
 
         started = t["dates"][0] if t["dates"] else None
@@ -667,7 +670,8 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
         last_activity = max([d for d in (last_task, git_last, wt_last) if d], default=None)
         idle = days_between(last_activity, today) if last_activity else None
         age = days_between(started, today) if started else None
-        threshold = stale_days if stale_days is not None else STALE_DEFAULT.get(phase)
+        threshold = stale_days if stale_days is not None else (
+            STALE_ARCHITECT_STEP if (sub or "").startswith(ARCHITECT_STEP) else STALE_DEFAULT.get(phase))
         stale = bool(phase != "Closed" and idle is not None and threshold is not None and idle > threshold)
 
         fname = feature_name(specs[0] if specs else None)
@@ -896,7 +900,7 @@ def render_roster(data, stale_only=False):
 
 
 def _feature_block(f, lane_label=None):
-    seq = ["Scope", "Architect", "Implement", "Deliver", "Closed"]
+    seq = ["Scope", "Act", "Inspect", "Debrief", "Closed"]
     cur = f["phase"]
     ci = seq.index(cur) if cur in seq else -1
     pipe = []
