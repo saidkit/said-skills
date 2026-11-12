@@ -37,12 +37,18 @@ import os
 import subprocess
 import sys
 import tempfile
+import unicodedata
 
 sys.dont_write_bytecode = True
 ROW_KINDS = ("gate-recompute: ", "skill-doctor: ", "feature-review: ")
 ROUND_KEYS = ("decisions", "leaks", "look", "operator-min", "rework-min", "elapsed-min", "tokens")
 READS = ("gate-recompute", "matrix", "feature-review")
 STATUSES = ("PASS", "EXPECTED", "FAIL")
+
+
+FR_MARKERS = ("reviewer-gate:", "verdict:", "goal:", "feature-review:", "feature review owed", "gate owed",
+              "inspect owed", "store:", "gate-recompute:", "skill-doctor:", "round:", "matrix@", "operator-question-held")
+FR_LINE_CAP = 300  # the validator's longest row is under 200 characters
 
 
 FR_GROUP_NAMES = ("Covers", "Uncovered rulings", "Uncovered requirements", "Earned rules", "Captures", "Other defects")
@@ -53,8 +59,12 @@ def feature_review_problem(lines):
     `feature-review: verdict | PASS|FAIL | not-read=<n>` first, then for each of the six groups in order either one
     `feature-review: <group> | none` line or rows `feature-review: <group> | <id> | <PASS|FAIL|NOT-READ|N/A> | <text>`,
     no control characters, and a verdict and a not-read count that agree with the rows."""
-    if not lines or any(any(ord(c) < 32 or c == "\x7f" for c in ln) for ln in lines):
-        return "no lines, or a control character in one"
+    if not lines or any(any(unicodedata.category(c) in ("Cc", "Cf", "Zl", "Zp") for c in ln) for ln in lines):
+        return "no lines, or a control, format or line-break character in one"
+    if any(len(ln) > FR_LINE_CAP for ln in lines):
+        return "a line is longer than %d characters" % FR_LINE_CAP
+    if any(m in ln[len("feature-review: "):].lower() for ln in lines for m in FR_MARKERS):
+        return "an authoritative marker in a row"
     head = lines[0].split(" | ")
     if len(head) != 3 or head[0] != "feature-review: verdict" or head[1] not in ("PASS", "FAIL") \
             or not head[2].startswith("not-read=") or not head[2][9:].isdigit():
@@ -326,6 +336,8 @@ def check(root, path, reads):
             ok = bool(mine) and all(gate_row_ok(ln) for ln in mine)
         elif r == "feature-review":
             ok = any(ln.startswith("feature-review: verdict | PASS | ") for ln in rows)  # a FAIL verdict is owed until its rows are fixed
+            if not ok and any(ln.startswith("feature-review: verdict | FAIL | ") for ln in rows):
+                r = "feature-review FAIL"  # its own owed line: the FAIL rows go to tasks, the reviewer is not rerun
         else:
             rounds = [round_fields(ln) for ln in history if ln.startswith("round: ")]
             last = rounds[-1] if rounds else {}

@@ -1630,8 +1630,8 @@ FR_GROUPS = (
     ("Captures", ("item", "where built", "verdict")),
     ("Other defects", ("defect", "path:line", "verdict")),
 )
-FR_MARKERS = ("reviewer-gate:", "verdict:", "goal:", "feature-review:", "feature review owed", "gate owed",
-              "inspect owed", "store:", "gate-recompute:", "skill-doctor:", "round:", "matrix@", "operator-question-held")
+FR_FILE_CAP = 1024 * 1024  # a verdict file longer than this is owed, never read whole
+FR_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
 class FeatureReviewRefused(Exception):
@@ -1641,12 +1641,13 @@ class FeatureReviewRefused(Exception):
 def _fr_clean(text, cap):
     """A cell shown on a row: control, format and line-break characters dropped, pipes and backslashes replaced,
     authoritative markers neutralized (one pass, case-insensitive), then cut to cap characters."""
+    import gate_record
     text = "".join(ch for ch in text if unicodedata.category(ch) not in ("Cc", "Cf", "Zl", "Zp"))
     text = text.replace("|", "[pipe]").replace("\\", "[backslash]")
     low = "".join(ch.lower() if len(ch.lower()) == 1 else ch for ch in text)  # same length as text
     out, i = [], 0
     while i < len(text):
-        hit = next((m for m in FR_MARKERS if low.startswith(m, i)), None)
+        hit = next((m for m in gate_record.FR_MARKERS if low.startswith(m, i)), None)
         if hit:
             out.append(text[i] + "[x]" + text[i + 1:i + len(hit)])
             i += len(hit)
@@ -1663,7 +1664,7 @@ def _fr_cells(line):
     return [c.strip() for c in line[1:-1].split("|")]
 
 
-def _fr_parse(text, head_sha, workdir):
+def _fr_parse(text, head_sha, workdir, verdict_path=""):
     """(verdict, [(group, cells)]) of a reviewer's verdict text, or raise FeatureReviewRefused(why)."""
     lines = text.split("\n")
     if len(lines) < 7:
@@ -1685,6 +1686,8 @@ def _fr_parse(text, head_sha, workdir):
     full = os.path.realpath(os.path.join(wd, ref)) if ref and "\x00" not in ref else ""
     if not ref or os.path.isabs(ref) or not full.startswith(wd + os.sep) or not os.path.isfile(full):
         raise FeatureReviewRefused("capture-evidence-ref is not a relative regular file inside the working dir")
+    if verdict_path and (full == os.path.realpath(verdict_path) or os.path.exists(verdict_path) and os.path.samefile(full, verdict_path)):
+        raise FeatureReviewRefused("capture-evidence-ref names the verdict file itself, not a capture")
     if head["verdict"] not in ("PASS", "FAIL"):
         raise FeatureReviewRefused("verdict is neither PASS nor FAIL")
     rows, group, cols, state, want, got = [], None, (), "", 0, 0
@@ -1742,47 +1745,56 @@ def _fr_parse(text, head_sha, workdir):
     return head["verdict"], rows
 
 
-def run_feature_review(a):
-    """CLI dispatch for --feature-review: validate <workdir>/review-feature-<id>.md; print the verdict line and
-    one row line per row (exit 0), or the FAIL row and `feature review owed: <why>` (exit 1)."""
+def feature_review_output(root, workdir, feature):
+    """(rc, lines) of the feature-review validator: rc 0 and the verdict line then one row line per row; rc 1 and the
+    FAIL header row then `feature review owed: <why>`; rc 2 and one `error: <why>` line. The one function behind
+    `--feature-review` and `gate_record_row.py --kind feature-review`, so a row is only ever one this produced."""
     import gate_record
-    if not a.workdir or not a.feature:
-        print("error: --feature-review needs --workdir and a feature id (--feature)")
-        return 2
-    if os.sep in a.feature or a.feature in (".", "..") or "\x00" in a.feature:
-        print("error: --feature is a feature id")
-        return 2
-    path = os.path.join(a.workdir, "review-feature-%s.md" % a.feature)
+    if not workdir or not feature:
+        return 2, ["error: --feature-review needs --workdir and a feature id (--feature)"]
+    if not FR_ID.fullmatch(feature) or feature.endswith("."):
+        return 2, ["error: --feature is a feature id"]
+    path = os.path.join(workdir, "review-feature-%s.md" % feature)
     try:
-        ident = gate_record.identity(os.path.realpath(os.path.abspath(a.root)))
+        ident = gate_record.identity(os.path.realpath(os.path.abspath(root)))
     except gate_record.Error as e:
-        print("error: %s" % e)
-        return 2
+        return 2, ["error: %s" % e]
     toks = ident.split()
     sha = toks[1] if len(toks) > 1 else ""
     try:
         try:
-            if not os.path.realpath(path).startswith(os.path.realpath(a.workdir) + os.sep):
+            real = os.path.realpath(path)
+            if not real.startswith(os.path.realpath(workdir) + os.sep):
                 raise FeatureReviewRefused("the verdict file resolves outside the working dir")
-            with open(path, encoding="utf-8") as fh:
-                text = fh.read()
+            if not os.path.isfile(real):
+                raise FeatureReviewRefused("no readable review-feature-%s.md in the working dir" % feature)
+            with open(real, encoding="utf-8") as fh:
+                text = fh.read(FR_FILE_CAP + 1)
         except (OSError, UnicodeError):
-            raise FeatureReviewRefused("no readable review-feature-%s.md in the working dir" % a.feature)
-        verdict, rows = _fr_parse(text, sha, a.workdir)
+            raise FeatureReviewRefused("no readable review-feature-%s.md in the working dir" % feature)
+        if len(text) > FR_FILE_CAP:
+            raise FeatureReviewRefused("the verdict file is too large (over %d bytes)" % FR_FILE_CAP)
+        verdict, rows = _fr_parse(text, sha, workdir, path)
     except FeatureReviewRefused as e:
-        print("feature-review: header | FAIL | %s" % e)
-        print("feature review owed: %s" % e)
-        return 1
-    print("feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ")))
+        return 1, ["feature-review: header | FAIL | %s" % e, "feature review owed: %s" % e]
+    out = ["feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ"))]
     for group, _cols in FR_GROUPS:
         if not any(g == group for g, _ in rows):
-            print("feature-review: %s | none" % group)
+            out.append("feature-review: %s | none" % group)
             continue
         for g, cells in rows:
             if g == group:
                 ev = cells[1] if group == "Earned rules" else cells[-2]
-                print("feature-review: %s | %s | %s | %s" % (group, _fr_clean(cells[0], 40), cells[-1], _fr_clean(ev, 80)))
-    return 0
+                out.append("feature-review: %s | %s | %s | %s" % (group, _fr_clean(cells[0], 40), cells[-1], _fr_clean(ev, 80)))
+    return 0, out
+
+
+def run_feature_review(a):
+    """CLI dispatch for --feature-review: print what feature_review_output returns; exit 0, 1 (owed) or 2 (error)."""
+    rc, lines = feature_review_output(a.root, a.workdir, a.feature)
+    for ln in lines:
+        print(ln)
+    return rc
 
 
 def main():
