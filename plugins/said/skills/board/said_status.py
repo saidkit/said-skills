@@ -1768,12 +1768,13 @@ def feature_review_output(root, workdir, feature):
                 raise FeatureReviewRefused("the verdict file resolves outside the working dir")
             if not os.path.isfile(real):
                 raise FeatureReviewRefused("no readable review-feature-%s.md in the working dir" % feature)
-            with open(real, encoding="utf-8") as fh:
-                text = fh.read(FR_FILE_CAP + 1)
+            with open(real, "rb") as fh:
+                raw = fh.read(FR_FILE_CAP + 1)
+            if len(raw) > FR_FILE_CAP:
+                raise FeatureReviewRefused("the verdict file is too large (over %d bytes)" % FR_FILE_CAP)
+            text = raw.decode("utf-8")
         except (OSError, UnicodeError):
             raise FeatureReviewRefused("no readable review-feature-%s.md in the working dir" % feature)
-        if len(text) > FR_FILE_CAP:
-            raise FeatureReviewRefused("the verdict file is too large (over %d bytes)" % FR_FILE_CAP)
         verdict, rows = _fr_parse(text, sha, workdir, path)
     except FeatureReviewRefused as e:
         return 1, ["feature-review: header | FAIL | %s" % e, "feature review owed: %s" % e]

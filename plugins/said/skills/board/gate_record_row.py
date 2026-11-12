@@ -16,7 +16,13 @@ a record, lane or validator error (`error: <why>`, nothing written).
 """
 import argparse, os, re, sys
 
-ap = argparse.ArgumentParser()
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        print("error: %s" % message)  # the line the skills promise on stdout, exit 2
+        sys.exit(2)
+
+
+ap = Parser()
 ap.add_argument("--kind", choices=("skill-doctor", "feature-review"), default="skill-doctor")
 ap.add_argument("--workdir")
 ap.add_argument("--feature")
@@ -35,6 +41,11 @@ if fr:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     sys.dont_write_bytecode = True
     import gate_record as _gr  # noqa: E402
+    try:
+        seen_at = _gr.identity(os.path.realpath(os.path.abspath(a.root)), a.out)  # the store the rows are validated at
+    except (_gr.Error, OSError) as e:
+        print("error: %s" % e)
+        sys.exit(2)
     import said_status as _ss  # noqa: E402
     rc, lines = _ss.feature_review_output(a.root, a.workdir, a.feature)
     if rc == 2:
@@ -45,13 +56,16 @@ if fr:
         sys.exit(1)
     why = _gr.feature_review_problem(lines)
     if why:
-        sys.exit("refused: the validator output is not a feature-review record (%s)" % why)
+        print("feature review owed: the validator output is not a feature-review record (%s)" % why)
+        sys.exit(1)
     new_rows = lines
-elif not re.fullmatch(r"\d+", a.open_p1):
-    sys.exit("refused: --open-p1 is a count")
+elif not re.fullmatch(r"[0-9]+", a.open_p1):
+    print("refused: --open-p1 is a count")
+    sys.exit(1)
 for name, val in (() if fr else (("file", a.file), ("reviewer", a.reviewer))):
-    if not val or re.search(r"\s", val):
-        sys.exit("refused: --%s is one token without whitespace" % name)
+    if not val or not val.isascii() or re.search(r"\s", val) or any(ord(c) < 32 or ord(c) == 127 for c in val):
+        print("refused: --%s is one ASCII token without whitespace" % name)
+        sys.exit(1)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.dont_write_bytecode = True
 import gate_record  # noqa: E402  the one reader and writer of the record
@@ -67,7 +81,10 @@ def mutate(store, rows, history):
 
 
 try:
-    gate_record.update(a.out, os.path.realpath(os.path.abspath(a.root)), mutate)
+    gate_record.update(a.out, os.path.realpath(os.path.abspath(a.root)), mutate, expect=seen_at if fr else None)
+except gate_record.Moved as e:
+    print("feature review owed: %s" % e)
+    sys.exit(1)
 except (gate_record.Error, OSError) as e:
     print("error: %s" % e)
     sys.exit(2)

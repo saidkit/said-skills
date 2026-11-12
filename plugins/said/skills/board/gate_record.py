@@ -103,6 +103,10 @@ class Refused(Error):
     """A value the record does not take: exit 1, nothing written."""
 
 
+class Moved(Refused):
+    """The lane's store changed after the caller validated what it writes: nothing is written, the step is owed."""
+
+
 def lane_key(root, name):
     """The value of `SAID.<name>:` in the lane's `## Lane` block, or None."""
     try:
@@ -270,9 +274,12 @@ def write(path, store, rows, history):
         raise
 
 
-def update(path, root, mutate):
-    """Rewrite the record at the current store: rows of another store dropped, history kept, mutate(rows, history)."""
+def update(path, root, mutate, expect=None):
+    """Rewrite the record at the current store: rows of another store dropped, history kept, mutate(rows, history).
+    With `expect` (the identity the caller validated its rows at), a store that differs now is Moved: nothing is written."""
     store = identity(root, path)
+    if expect is not None and store != expect:
+        raise Moved("the lane's store changed while the rows were validated (%s, now %s)" % (expect, store))
     prior = load(path)
     rows, history = [], []
     if prior is not None:
@@ -335,8 +342,10 @@ def check(root, path, reads):
             mine = [ln for ln in rows if ln.startswith("gate-recompute: ")]
             ok = bool(mine) and all(gate_row_ok(ln) for ln in mine)
         elif r == "feature-review":
-            ok = any(ln.startswith("feature-review: verdict | PASS | ") for ln in rows)  # a FAIL verdict is owed until its rows are fixed
-            if not ok and any(ln.startswith("feature-review: verdict | FAIL | ") for ln in rows):
+            mine = [ln for ln in rows if ln.startswith("feature-review: ")]
+            sound = feature_review_problem(mine) is None  # a hand-edited or inconsistent set is never current
+            ok = sound and mine[0].startswith("feature-review: verdict | PASS | ")  # a FAIL verdict is owed until its rows are fixed
+            if sound and not ok:
                 r = "feature-review FAIL"  # its own owed line: the FAIL rows go to tasks, the reviewer is not rerun
         else:
             rounds = [round_fields(ln) for ln in history if ln.startswith("round: ")]
