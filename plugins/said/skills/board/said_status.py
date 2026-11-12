@@ -1686,6 +1686,8 @@ def _fr_parse(text, head_sha, workdir, verdict_path=""):
     full = os.path.realpath(os.path.join(wd, ref)) if ref and "\x00" not in ref else ""
     if not ref or os.path.isabs(ref) or not full.startswith(wd + os.sep) or not os.path.isfile(full):
         raise FeatureReviewRefused("capture-evidence-ref is not a relative regular file inside the working dir")
+    if os.path.getsize(full) == 0:
+        raise FeatureReviewRefused("capture-evidence-ref names an empty file")
     if verdict_path and (full == os.path.realpath(verdict_path) or os.path.exists(verdict_path) and os.path.samefile(full, verdict_path)):
         raise FeatureReviewRefused("capture-evidence-ref names the verdict file itself, not a capture")
     if head["verdict"] not in ("PASS", "FAIL"):
@@ -1747,6 +1749,40 @@ def _fr_parse(text, head_sha, workdir, verdict_path=""):
     return head["verdict"], rows
 
 
+FR_RULE_ID = re.compile(r"(?<![A-Za-z])R-[A-Z]+-[A-Z0-9-]+")  # the earned-rules id token
+
+
+def _fr_rule_ids(root):
+    """The rule ids of the lane's `## Earned rules` section (the review-qa checker's grammar), [] when it has none."""
+    try:
+        with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8-sig") as fh:
+            lines = fh.read().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return []
+    start = next((i for i, l in enumerate(lines) if l.startswith("## Earned rules")), None)
+    if start is None:
+        return []
+    ids = []
+    for l in lines[start + 1:]:
+        if l.startswith("## "):
+            break
+        m = FR_RULE_ID.search(l) if l.startswith("- ") else None
+        if m and m.group(0) not in ids:
+            ids.append(m.group(0))
+    return ids
+
+
+def _fr_workdir_ok(root, workdir, feature):
+    """True when workdir is the lane's `SAID.working:` dir of this feature."""
+    import gate_record
+    value = (gate_record.lane_key(root, "working") or "").strip().strip("`'\"")
+    if not value:
+        return False
+    for token in ("<id>", "<feature-id>", "<feature>"):
+        value = value.replace(token, feature)
+    return os.path.realpath(os.path.join(root, value)) == os.path.realpath(workdir)
+
+
 def feature_review_output(root, workdir, feature):
     """(rc, lines) of the feature-review validator: rc 0 and the verdict line then one row line per row; rc 1 and the
     FAIL header row then `feature review owed: <why>`; rc 2 and one `error: <why>` line. The one function behind
@@ -1756,6 +1792,9 @@ def feature_review_output(root, workdir, feature):
         return 2, ["error: --feature-review needs --workdir and a feature id (--feature)"]
     if not FR_ID.fullmatch(feature) or feature.endswith("."):
         return 2, ["error: --feature is a feature id"]
+    root = os.path.realpath(os.path.abspath(root))
+    if not _fr_workdir_ok(root, workdir, feature):
+        return 2, ["error: --workdir is not the lane's SAID.working: dir of %s" % feature]
     path = os.path.join(workdir, "review-feature-%s.md" % feature)
     try:
         ident = gate_record.identity(os.path.realpath(os.path.abspath(root)))
@@ -1778,6 +1817,17 @@ def feature_review_output(root, workdir, feature):
         except (OSError, UnicodeError):
             raise FeatureReviewRefused("no readable review-feature-%s.md in the working dir" % feature)
         verdict, rows = _fr_parse(text, sha, workdir, path)
+        if toks and toks[0] == "git":
+            try:
+                dirty = gate_record.git_dirty(root, ["."], os.path.realpath(workdir), set())
+            except gate_record.Error as e:
+                return 2, ["error: %s" % e]
+            if dirty:
+                raise FeatureReviewRefused("%d uncommitted file(s) outside the working dir" % len(dirty))
+        have = {m.group(0) for g, c in rows if g == "Earned rules" for m in [FR_RULE_ID.search(c[0])] if m}
+        missing = [r for r in _fr_rule_ids(root) if r not in have]
+        if missing:
+            raise FeatureReviewRefused("Earned rules has no row for %s" % ", ".join(missing[:8]))
     except FeatureReviewRefused as e:
         return 1, ["feature-review: header | FAIL | %s" % e, "feature review owed: %s" % e]
     out = ["feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ"))]
