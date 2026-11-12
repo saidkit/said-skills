@@ -332,10 +332,15 @@ def feature_review_failed(root, workdir, fid):
         return False
 
 
-def next_action(fid, phase, workdir, gates, sub):
+def _fr_doc_lane(root):
+    import gate_record
+    return gate_record.fr_doc_lane(root)
+
+
+def next_action(fid, phase, workdir, gates, sub, doc=False):
     workdir = os.path.normpath(workdir)
-    if sub == "feature review FAIL":
-        return "/said:add-task %s (one task per FAIL row of review-feature-%s.md)" % (fid, fid)
+    if sub == "feature review FAIL":  # doc: the lane kind, so the action names the verdict that lane writes
+        return "/said:add-task %s (one task per FAIL row of %s-%s.md)" % (fid, "review-doc-editorial" if doc else "review-feature", fid)
     if phase == "Scope":
         return "/said:scope-refine %s" % workdir if sub == "scope pending" else "/said:scope-grill %s" % fid
     if phase == "Architect":
@@ -679,7 +684,8 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
             "gates": gates, "debrief_closed": t["footer"],
             "started": started, "last_activity": last_activity,
             "age_days": age, "idle_days": idle, "stale": stale, "threshold": threshold,
-            "next": next_action(fid, phase, relpath(workdir, root), gates, sub),
+            "next": next_action(fid, phase, relpath(workdir, root), gates, sub,
+                                doc=sub == "feature review FAIL" and _fr_doc_lane(root)),
             "integrity": t["integrity"],
             "fast_track_open": [r for r in parse_runs(tasks) if r["open"]],
             "waiting": (waiting_reason(workdir) if os.path.isdir(workdir) else None) or waiting_on_question(tasks, os.path.join(workdir, "rulings.md"), root),
@@ -1137,6 +1143,11 @@ def _governs_surface(meta, surface):
 
 def _lane_mounts(root):
     """The whole SAID.mounts: value on the lane block's own key list, or None."""
+    return lane_block_key(root, "mounts")
+
+
+def lane_block_key(root, name):
+    """The whole value of `SAID.<name>:` on the lane block's own key list (lane_block_lines, at the key column), or None."""
     try:
         with open(os.path.join(root, "CLAUDE.md"), encoding="utf-8-sig", errors="replace") as fh:
             block = lane_block_lines(fh.read())
@@ -1147,7 +1158,7 @@ def _lane_mounts(root):
     keyed = [ln for ln in block if re.match(r"^\s*[-*]?\s*SAID\.[\w-]+:", ln)]
     col = key_column(keyed[0]) if keyed else 0
     for ln in keyed:  # the whole value of the key's own line, so only the bare word reads as none
-        m = re.match(r"^\s*[-*]?\s*SAID\.mounts:[ \t]*(.*?)[ \t]*$", ln)
+        m = re.match(r"^\s*[-*]?\s*SAID\.%s:[ \t]*(.*?)[ \t]*$" % re.escape(name), ln)
         if m and key_column(ln) == col:
             return m.group(1)
     return None
@@ -1656,9 +1667,12 @@ def _fr_cells(line):
     return [c.strip() for c in line[1:-1].split("|")]
 
 
-def _fr_parse(text, head_sha, workdir, verdict_path=""):
-    """(verdict, [(group, cells)]) of a reviewer's verdict text, or raise FeatureReviewRefused(why)."""
-    from gate_record import FR_GROUPS  # the verdict's groups and columns, one place; lazy: the analyzer runs without it
+def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False):
+    """(verdict, [(group, cells)]) of a reviewer's verdict text, or raise FeatureReviewRefused(why); doc: a doc lane's
+    verdict, checker-id doc-editorial and the seventh group Editorial."""
+    import gate_record  # the verdict's groups and columns, one place; lazy: the analyzer runs without it
+    FR_GROUPS = gate_record.fr_groups(doc)
+    checker = "doc-editorial" if doc else "feature-reviewer"
     lines = text.split("\n")
     if len(lines) < 7:
         raise FeatureReviewRefused("the header is shorter than five lines and a blank line")
@@ -1670,8 +1684,8 @@ def _fr_parse(text, head_sha, workdir, verdict_path=""):
         head[key] = v.strip()
     if lines[5].strip():
         raise FeatureReviewRefused("no blank line after the five header lines")
-    if head["checker-id"] != "feature-reviewer":
-        raise FeatureReviewRefused("checker-id is not feature-reviewer")
+    if head["checker-id"] != checker:
+        raise FeatureReviewRefused("checker-id is not %s" % checker)
     if not head_sha or head["target-sha"] != head_sha:
         raise FeatureReviewRefused("target-sha is not the current head")
     ref = head["capture-evidence-ref"]
@@ -1693,7 +1707,7 @@ def _fr_parse(text, head_sha, workdir, verdict_path=""):
                 raise FeatureReviewRefused("group %s has no rows and no `none` line" % group)
             got = 0
             if want >= len(FR_GROUPS) or line != "## " + FR_GROUPS[want][0]:
-                raise FeatureReviewRefused("heading `%s` is not the next of the six groups" % _fr_clean(line, 40))
+                raise FeatureReviewRefused("heading `%s` is not the next of the %d groups" % (_fr_clean(line, 40), len(FR_GROUPS)))
             group, cols = FR_GROUPS[want]
             state = "open"
             want += 1
@@ -1733,7 +1747,7 @@ def _fr_parse(text, head_sha, workdir, verdict_path=""):
     if state in ("open", "head") or state in ("rows", "closed") and not got:
         raise FeatureReviewRefused("group %s has no rows and no `none` line" % group)
     if want != len(FR_GROUPS):
-        raise FeatureReviewRefused("only %d of the six groups are present" % want)
+        raise FeatureReviewRefused("only %d of the %d groups are present" % (want, len(FR_GROUPS)))
     fails = sum(1 for _, c in rows if c[-1] == "FAIL")
     if head["verdict"] == "PASS" and fails:
         raise FeatureReviewRefused("verdict PASS with %d FAIL row(s)" % fails)
@@ -1842,14 +1856,14 @@ def _fr_owed(why):
     return 1, ["feature-review: header | FAIL | %s" % why, "feature review owed: %s" % why]
 
 
-def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decision_ids=(), dirty=lambda: 0):
+def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decision_ids=(), dirty=lambda: 0, doc=False):
     """(rc, lines) of a verdict text with no file or git read of its own: parse it against the head sha, then
     `dirty()` (the count of uncommitted files outside the working dir), a row per rule id and a Covers or Uncovered
     decisions row per decision id; rc 0 and the row lines, or rc 1 and the owed lines. feature_review_output reads
     the file, the store and the records, then calls this."""
     import gate_record
     try:
-        verdict, rows = _fr_parse(text, sha, workdir, verdict_path)
+        verdict, rows = _fr_parse(text, sha, workdir, verdict_path, doc)
         n = dirty()
         if n:
             raise FeatureReviewRefused("%d uncommitted file(s) outside the working dir" % n)
@@ -1864,13 +1878,13 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
     except FeatureReviewRefused as e:
         return _fr_owed(e)
     out = ["feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ"))]
-    for group, _cols in gate_record.FR_GROUPS:
+    for group, _cols in gate_record.fr_groups(doc):
         if not any(g == group for g, _ in rows):
             out.append("feature-review: %s | none" % group)
             continue
         for g, cells in rows:
             if g == group:
-                ev = cells[1] if group == "Earned rules" else cells[-2]
+                ev = cells[1] if group in ("Earned rules", gate_record.FR_EDITORIAL[0]) else cells[-2]
                 out.append("feature-review: %s | %s | %s | %s" % (group, _fr_clean(cells[0], 40), cells[-1], _fr_clean(ev, 80)))
     return 0, out
 
@@ -1891,7 +1905,9 @@ def feature_review_output(root, workdir, feature, decisions=()):
         dec = _fr_decision_ids(decisions or ())
     except ValueError as e:
         return 2, ["error: %s" % _fr_clean(str(e), 200)]
-    path = os.path.join(workdir, "review-feature-%s.md" % feature)
+    doc = gate_record.fr_doc_lane(root)
+    name = ("review-doc-editorial-%s.md" if doc else "review-feature-%s.md") % feature  # the name the reviewer gate reads
+    path = os.path.join(workdir, name)
     try:
         ident = gate_record.identity(os.path.realpath(os.path.abspath(root)))
     except gate_record.Error as e:
@@ -1903,18 +1919,18 @@ def feature_review_output(root, workdir, feature, decisions=()):
         if not real.startswith(os.path.realpath(workdir) + os.sep):
             return _fr_owed("the verdict file resolves outside the working dir")
         if not os.path.isfile(real):
-            return _fr_owed("no readable review-feature-%s.md in the working dir" % feature)
+            return _fr_owed("no readable %s in the working dir" % name)
         with open(real, "rb") as fh:
             raw = fh.read(FR_FILE_CAP + 1)
         if len(raw) > FR_FILE_CAP:
             return _fr_owed("the verdict file is too large (over %d bytes)" % FR_FILE_CAP)
         text = raw.decode("utf-8")
     except (OSError, UnicodeError):
-        return _fr_owed("no readable review-feature-%s.md in the working dir" % feature)
+        return _fr_owed("no readable %s in the working dir" % name)
     wd = os.path.realpath(workdir)
     dirty = (lambda: len(gate_record.git_dirty(root, ["."], wd, set()))) if toks and toks[0] == "git" else (lambda: 0)
     try:
-        return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty)
+        return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc)
     except gate_record.Error as e:
         return 2, ["error: %s" % e]
 

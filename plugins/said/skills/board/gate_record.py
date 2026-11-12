@@ -60,18 +60,30 @@ FR_GROUPS = (  # the six groups of a feature-review verdict and their table colu
     ("Captures", ("item", "where built", "verdict")),
     ("Other defects", ("defect", "path:line", "verdict")),
 )
-FR_GROUP_NAMES = tuple(g for g, _cols in FR_GROUPS)
+FR_EDITORIAL = ("Editorial", ("attack or checklist row", "path:line", "finding", "fix shape", "verdict"))  # doc lane only
 
 
-def feature_review_problem(lines):
+def fr_groups(doc=False):
+    """The groups of a verdict, in order: the six on every lane, Editorial seventh on a doc lane."""
+    return FR_GROUPS + ((FR_EDITORIAL,) if doc else ())
+
+
+def fr_doc_lane(root):
+    """True when the lane's `SAID.surface:` is doc: its verdict is review-doc-editorial-<id>.md with seven groups."""
+    import said_status  # the engine's one lane-block reader; lazy: said_status imports this module
+    return (said_status.lane_block_key(root, "surface") or "").strip().strip("`'\"") == "doc"
+
+
+def feature_review_problem(lines, doc=False):
     """Why these lines are not the validator's output (`said_status.py --feature-review`), or None: one verdict line
-    `feature-review: verdict | PASS|FAIL | not-read=<n>` first, then for each of the six groups in order either one
+    `feature-review: verdict | PASS|FAIL | not-read=<n>` first, then for each group of fr_groups(doc) in order either one
     `feature-review: <group> | none` line or rows `feature-review: <group> | <id> | <PASS|FAIL|NOT-READ|N/A> | <text>`,
     no control characters, and a verdict and a not-read count that agree with the rows."""
     if not lines or any(any(unicodedata.category(c) in ("Cc", "Cf", "Zl", "Zp") for c in ln) for ln in lines):
         return "no lines, or a control, format or line-break character in one"
     if any(len(ln) > FR_LINE_CAP for ln in lines):
         return "a line is longer than %d characters" % FR_LINE_CAP
+    names = tuple(g for g, _cols in fr_groups(doc))
     if any(m in ln[len("feature-review: "):].lower() for ln in lines for m in FR_MARKERS):
         return "an authoritative marker in a row"
     head = lines[0].split(" | ")
@@ -84,11 +96,11 @@ def feature_review_problem(lines):
         if not ln.startswith("feature-review: "):
             return "a line is not a feature-review line"
         cells = ln[len("feature-review: "):].split(" | ")
-        if len(cells) == 2 and cells[1] == "none" and cells[0] in FR_GROUP_NAMES:
+        if len(cells) == 2 and cells[1] == "none" and cells[0] in names:
             group = cells[0]
         elif len(cells) == 4 and cells[1].strip().lower() == "none":  # `none` is a line, not a row
             return "a `none` row in a group"
-        elif len(cells) == 4 and cells[0] in FR_GROUP_NAMES and cells[1] and cells[3] and cells[2] in (
+        elif len(cells) == 4 and cells[0] in names and cells[1] and cells[3] and cells[2] in (
                 ("PASS", "FAIL", "NOT-READ", "N/A") if cells[0] == "Earned rules" else ("PASS", "FAIL", "NOT-READ")):
             group = cells[0]
             fails += cells[2] == "FAIL"
@@ -99,8 +111,8 @@ def feature_review_problem(lines):
             seen.append(group)
         elif group in [s for s in seen[:-1]]:
             return "group rows out of order"
-    if tuple(seen) != FR_GROUP_NAMES:
-        return "the six groups are not each present once, in order"
+    if tuple(seen) != names:
+        return "the %d groups are not each present once, in order" % len(names)
     if head[1] == "PASS" and fails or head[1] == "FAIL" and not fails or int(head[2][9:]) != nots:
         return "the verdict or the not-read count disagrees with the rows"
     return None
@@ -354,7 +366,7 @@ def check(root, path, reads):
             ok = bool(mine) and all(gate_row_ok(ln) for ln in mine)
         elif r == "feature-review":
             mine = [ln for ln in rows if ln.startswith("feature-review: ")]
-            sound = feature_review_problem(mine) is None  # a hand-edited or inconsistent set is never current
+            sound = feature_review_problem(mine, fr_doc_lane(root)) is None  # a hand-edited or inconsistent set is never current
             ok = sound and mine[0].startswith("feature-review: verdict | PASS | ")  # a FAIL verdict is owed until its rows are fixed
             if sound and not ok:
                 r = "feature-review FAIL"  # its own owed line: the FAIL rows go to tasks, the reviewer is not rerun

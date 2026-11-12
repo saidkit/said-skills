@@ -62,7 +62,7 @@ if fr:
     if rc == 1:
         print("\n".join(lines))
         sys.exit(1)
-    why = _gr.feature_review_problem(lines)
+    why = _gr.feature_review_problem(lines, _gr.fr_doc_lane(os.path.realpath(os.path.abspath(a.root))))
     if why:
         print("feature review owed: the validator output is not a feature-review record (%s)" % why)
         sys.exit(1)
