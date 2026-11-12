@@ -24,7 +24,7 @@ check: `current` (exit 0); `gate owed` (exit 1) when the record is absent or its
   (an unreadable record is a read error, never overwritten);
   `Inspect owed: <read>, ...` (exit 1) when a named read has no well-formed rows at the current store. Reads:
   gate-recompute (its rows: `<unit> exit=<n> <status> ...`, `<unit> skip (<reason>)` or `<unit> skipped (not selected)`), matrix (the current store's round and its snapshot, every cell non-empty),
-  feature-review (its rows).
+  feature-review (a `verdict | PASS` row).
 round: writes this store's round row and the snapshot from the `matrix: ` lines of --matrix-from (covers-read.py
   output; `-` reads stdin). The same store replaces its own round; a moved store appends round n+1. Keys:
   decisions, leaks, look, operator-min, rework-min, elapsed-min, tokens; a value is one token of printable ASCII
@@ -43,6 +43,46 @@ ROW_KINDS = ("gate-recompute: ", "skill-doctor: ", "feature-review: ")
 ROUND_KEYS = ("decisions", "leaks", "look", "operator-min", "rework-min", "elapsed-min", "tokens")
 READS = ("gate-recompute", "matrix", "feature-review")
 STATUSES = ("PASS", "EXPECTED", "FAIL")
+
+
+FR_GROUP_NAMES = ("Covers", "Uncovered rulings", "Uncovered requirements", "Earned rules", "Captures", "Other defects")
+
+
+def feature_review_problem(lines):
+    """Why these lines are not the validator's output (`said_status.py --feature-review`), or None: one verdict line
+    `feature-review: verdict | PASS|FAIL | not-read=<n>` first, then for each of the six groups in order either one
+    `feature-review: <group> | none` line or rows `feature-review: <group> | <id> | <PASS|FAIL|NOT-READ|N/A> | <text>`,
+    no control characters, and a verdict and a not-read count that agree with the rows."""
+    if not lines or any(any(ord(c) < 32 or c == "\x7f" for c in ln) for ln in lines):
+        return "no lines, or a control character in one"
+    head = lines[0].split(" | ")
+    if len(head) != 3 or head[0] != "feature-review: verdict" or head[1] not in ("PASS", "FAIL") \
+            or not head[2].startswith("not-read=") or not head[2][9:].isdigit():
+        return "the first line is not a verdict line"
+    fails = nots = 0
+    seen = []
+    for ln in lines[1:]:
+        if not ln.startswith("feature-review: "):
+            return "a line is not a feature-review line"
+        cells = ln[len("feature-review: "):].split(" | ")
+        if len(cells) == 2 and cells[1] == "none" and cells[0] in FR_GROUP_NAMES:
+            group = cells[0]
+        elif len(cells) == 4 and cells[0] in FR_GROUP_NAMES and cells[1] and cells[3] and cells[2] in (
+                ("PASS", "FAIL", "NOT-READ", "N/A") if cells[0] == "Earned rules" else ("PASS", "FAIL", "NOT-READ")):
+            group = cells[0]
+            fails += cells[2] == "FAIL"
+            nots += cells[2] == "NOT-READ"
+        else:
+            return "a line is not a group row"
+        if not seen or seen[-1] != group:
+            seen.append(group)
+        elif group in [s for s in seen[:-1]]:
+            return "group rows out of order"
+    if tuple(seen) != FR_GROUP_NAMES:
+        return "the six groups are not each present once, in order"
+    if head[1] == "PASS" and fails or head[1] == "FAIL" and not fails or int(head[2][9:]) != nots:
+        return "the verdict or the not-read count disagrees with the rows"
+    return None
 
 
 class Error(Exception):
@@ -285,7 +325,7 @@ def check(root, path, reads):
             mine = [ln for ln in rows if ln.startswith("gate-recompute: ")]
             ok = bool(mine) and all(gate_row_ok(ln) for ln in mine)
         elif r == "feature-review":
-            ok = any(ln.startswith("feature-review: ") and ln[len("feature-review: "):].strip() for ln in rows)
+            ok = any(ln.startswith("feature-review: verdict | PASS | ") for ln in rows)  # a FAIL verdict is owed until its rows are fixed
         else:
             rounds = [round_fields(ln) for ln in history if ln.startswith("round: ")]
             last = rounds[-1] if rounds else {}

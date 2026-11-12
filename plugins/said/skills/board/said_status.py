@@ -318,8 +318,24 @@ def relpath(p, root):
     return os.path.normpath(p) if r.startswith(os.pardir) else r
 
 
+def feature_review_failed(root, workdir, fid):
+    """True when the feature's gate record, current at the lane's store, holds a feature-review verdict FAIL
+    (derived from the record on every read, never stored)."""
+    try:
+        import gate_record
+        path = os.path.join(workdir, "gate-%s.md" % fid)
+        rec = gate_record.load(path)
+        if rec is None or rec[0] is None or rec[0] != gate_record.identity(root, path):
+            return False
+        return any(ln.startswith("feature-review: verdict | FAIL |") for ln in rec[1])
+    except Exception:  # an unreadable record or an identity error is not a FAIL; the gates report it
+        return False
+
+
 def next_action(fid, phase, workdir, gates, sub):
     workdir = os.path.normpath(workdir)
+    if sub == "feature review FAIL":
+        return "/said:add-task %s (one task per FAIL row of review-feature-%s.md)" % (fid, fid)
     if phase == "Scope":
         return "/said:scope-refine %s" % workdir if sub == "scope pending" else "/said:scope-grill %s" % fid
     if phase == "Architect":
@@ -631,6 +647,8 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
                                               "dates": [], "todo_items": [], "footer": False, "integrity": None}
         c = t["counts"]
         phase, sub = classify(bool(specs), bool(tasks), c["Todo"], t["footer"], scope, dir_content)
+        if phase == "Deliver" and dir_content and feature_review_failed(root, workdir, fid):
+            phase, sub = "Implement", "feature review FAIL"  # a failed feature review: Deliver does not start
         gates = gate_ticks(workdir, reviewers, fid) if os.path.isdir(workdir) else {"qa": False, "ux": False, "accept": False, "debrief_started": False}
 
         started = t["dates"][0] if t["dates"] else None
@@ -1603,6 +1621,170 @@ def run_reviewer_gate(a):
     return 0 if passed else 1
 
 
+FR_KEYS = ("checker-id", "target-sha", "capture-evidence-ref", "verdict", "timestamp")
+FR_GROUPS = (
+    ("Covers", ("id", "requirement", "where built", "verdict")),
+    ("Uncovered rulings", ("ruling", "requirement", "where built", "verdict")),
+    ("Uncovered requirements", ("requirement", "where built", "verdict")),
+    ("Earned rules", ("rule", "evidence", "differs from Rules applied", "verdict")),
+    ("Captures", ("item", "where built", "verdict")),
+    ("Other defects", ("defect", "path:line", "verdict")),
+)
+FR_MARKERS = ("reviewer-gate:", "verdict:", "goal:", "feature-review:", "feature review owed", "gate owed",
+              "inspect owed", "store:", "gate-recompute:", "skill-doctor:", "round:", "matrix@", "operator-question-held")
+
+
+class FeatureReviewRefused(Exception):
+    pass
+
+
+def _fr_clean(text, cap):
+    """A cell shown on a row: control, format and line-break characters dropped, pipes and backslashes replaced,
+    authoritative markers neutralized (one pass, case-insensitive), then cut to cap characters."""
+    text = "".join(ch for ch in text if unicodedata.category(ch) not in ("Cc", "Cf", "Zl", "Zp"))
+    text = text.replace("|", "[pipe]").replace("\\", "[backslash]")
+    low = "".join(ch.lower() if len(ch.lower()) == 1 else ch for ch in text)  # same length as text
+    out, i = [], 0
+    while i < len(text):
+        hit = next((m for m in FR_MARKERS if low.startswith(m, i)), None)
+        if hit:
+            out.append(text[i] + "[x]" + text[i + 1:i + len(hit)])
+            i += len(hit)
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)[:cap].strip() or "-"
+
+
+def _fr_cells(line):
+    line = line.strip()
+    if not (line.startswith("|") and line.endswith("|") and len(line) > 1):
+        return None
+    return [c.strip() for c in line[1:-1].split("|")]
+
+
+def _fr_parse(text, head_sha, workdir):
+    """(verdict, [(group, cells)]) of a reviewer's verdict text, or raise FeatureReviewRefused(why)."""
+    lines = text.split("\n")
+    if len(lines) < 7:
+        raise FeatureReviewRefused("the header is shorter than five lines and a blank line")
+    head = {}
+    for i, key in enumerate(FR_KEYS):
+        k, sep, v = lines[i].partition(":")
+        if not sep or k != key:
+            raise FeatureReviewRefused("header line %d is not `%s:` (keys in order: %s)" % (i + 1, key, ", ".join(FR_KEYS)))
+        head[key] = v.strip()
+    if lines[5].strip():
+        raise FeatureReviewRefused("no blank line after the five header lines")
+    if head["checker-id"] != "feature-reviewer":
+        raise FeatureReviewRefused("checker-id is not feature-reviewer")
+    if not head_sha or head["target-sha"] != head_sha:
+        raise FeatureReviewRefused("target-sha is not the current head")
+    ref = head["capture-evidence-ref"]
+    wd = os.path.realpath(workdir)
+    full = os.path.realpath(os.path.join(wd, ref)) if ref and "\x00" not in ref else ""
+    if not ref or os.path.isabs(ref) or not full.startswith(wd + os.sep) or not os.path.isfile(full):
+        raise FeatureReviewRefused("capture-evidence-ref is not a relative regular file inside the working dir")
+    if head["verdict"] not in ("PASS", "FAIL"):
+        raise FeatureReviewRefused("verdict is neither PASS nor FAIL")
+    rows, group, cols, state, want, got = [], None, (), "", 0, 0
+    for raw in lines[6:]:
+        line = raw.strip()
+        if line.startswith("#"):
+            if state in ("open", "head") or state in ("rows", "closed") and not got:
+                raise FeatureReviewRefused("group %s has no rows and no `none` line" % group)
+            got = 0
+            if want >= len(FR_GROUPS) or line != "## " + FR_GROUPS[want][0]:
+                raise FeatureReviewRefused("heading `%s` is not the next of the six groups" % _fr_clean(line, 40))
+            group, cols = FR_GROUPS[want]
+            state = "open"
+            want += 1
+            continue
+        if not line:
+            if state == "rows":
+                state = "closed"
+            continue
+        if group is None:
+            raise FeatureReviewRefused("text before the first group")
+        if line == "none" and state == "open":
+            state = "none"
+            continue
+        cells = _fr_cells(line)
+        if cells is None or state in ("none", "closed"):
+            raise FeatureReviewRefused("group %s holds text or a second table beyond its one table" % group)
+        if state == "open":
+            if tuple(cells) != cols:
+                raise FeatureReviewRefused("group %s table columns are not: %s" % (group, " | ".join(cols)))
+            state = "head"
+        elif state == "head":
+            if len(cells) != len(cols) or not all(c and set(c) <= set("-: ") for c in cells):
+                raise FeatureReviewRefused("group %s table has no separator row" % group)
+            state = "rows"
+        else:
+            if len(cells) != len(cols):
+                raise FeatureReviewRefused("group %s row has %d cells, not %d" % (group, len(cells), len(cols)))
+            ok = ("PASS", "FAIL", "NOT-READ") + (("N/A",) if group == "Earned rules" else ())
+            if not all(cells):
+                raise FeatureReviewRefused("group %s row has an empty cell" % group)
+            if cells[-1] not in ok:
+                raise FeatureReviewRefused("group %s verdict cell is not one of %s" % (group, ", ".join(ok)))
+            rows.append((group, cells))
+            got += 1
+    if state in ("open", "head") or state in ("rows", "closed") and not got:
+        raise FeatureReviewRefused("group %s has no rows and no `none` line" % group)
+    if want != len(FR_GROUPS):
+        raise FeatureReviewRefused("only %d of the six groups are present" % want)
+    fails = sum(1 for _, c in rows if c[-1] == "FAIL")
+    if head["verdict"] == "PASS" and fails:
+        raise FeatureReviewRefused("verdict PASS with %d FAIL row(s)" % fails)
+    if head["verdict"] == "FAIL" and not fails:
+        raise FeatureReviewRefused("verdict FAIL with no FAIL row")
+    return head["verdict"], rows
+
+
+def run_feature_review(a):
+    """CLI dispatch for --feature-review: validate <workdir>/review-feature-<id>.md; print the verdict line and
+    one row line per row (exit 0), or the FAIL row and `feature review owed: <why>` (exit 1)."""
+    import gate_record
+    if not a.workdir or not a.feature:
+        print("error: --feature-review needs --workdir and a feature id (--feature)")
+        return 2
+    if os.sep in a.feature or a.feature in (".", "..") or "\x00" in a.feature:
+        print("error: --feature is a feature id")
+        return 2
+    path = os.path.join(a.workdir, "review-feature-%s.md" % a.feature)
+    try:
+        ident = gate_record.identity(os.path.realpath(os.path.abspath(a.root)))
+    except gate_record.Error as e:
+        print("error: %s" % e)
+        return 2
+    toks = ident.split()
+    sha = toks[1] if len(toks) > 1 else ""
+    try:
+        try:
+            if not os.path.realpath(path).startswith(os.path.realpath(a.workdir) + os.sep):
+                raise FeatureReviewRefused("the verdict file resolves outside the working dir")
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+        except (OSError, UnicodeError):
+            raise FeatureReviewRefused("no readable review-feature-%s.md in the working dir" % a.feature)
+        verdict, rows = _fr_parse(text, sha, a.workdir)
+    except FeatureReviewRefused as e:
+        print("feature-review: header | FAIL | %s" % e)
+        print("feature review owed: %s" % e)
+        return 1
+    print("feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ")))
+    for group, _cols in FR_GROUPS:
+        if not any(g == group for g, _ in rows):
+            print("feature-review: %s | none" % group)
+            continue
+        for g, cells in rows:
+            if g == group:
+                ev = cells[1] if group == "Earned rules" else cells[-2]
+                print("feature-review: %s | %s | %s | %s" % (group, _fr_clean(cells[0], 40), cells[-1], _fr_clean(ev, 80)))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description="Deterministic SAID feature-state analyzer (read-only).")
     ap.add_argument("feature", nargs="?", help="feature-id for a deep-dive (else: roster)")
@@ -1628,7 +1810,10 @@ def main():
                          "resolved prints one `skipped: ...` line; `count: <N>` counts the resolved rows")
     ap.add_argument("--reviewer-gate", action="store_true",
                     help="L2: validate the declared reviewer set for a working dir (exit-coded gate)")
-    ap.add_argument("--workdir", help="reviewer-gate: feature working dir holding verdict artifacts")
+    ap.add_argument("--feature-review", action="store_true",
+                    help="validate the feature-reviewer's verdict file in --workdir for --feature and print its rows")
+    ap.add_argument("--workdir", help="reviewer-gate / feature-review: feature working dir holding verdict artifacts")
+    ap.add_argument("--feature", dest="feature_opt", help="feature-review: the feature id")
     ap.add_argument("--surface", help="reviewer-gate: the lane's SAID.surface medium")
     ap.add_argument("--reviewers", help="reviewer-gate: comma-sep declared reviewer ids")
     ap.add_argument("--checkers-dir", default=None,  # None -> resolve via lane SAID.checkers-dir -> the plugin's own agents/ (no lane-root/agents fallback)
@@ -1640,6 +1825,9 @@ def main():
         ap.error("--resolve is a form of --registry")
     if a.registry:  # the lane registry's rows, for any caller that needs a lane's root
         sys.exit(run_registry(a))
+    if a.feature_review:
+        a.feature = a.feature_opt or a.feature
+        sys.exit(run_feature_review(a))
     if a.reviewer_gate:  # L2 exit-coded enforcement gate
         sys.exit(run_reviewer_gate(a))
 
