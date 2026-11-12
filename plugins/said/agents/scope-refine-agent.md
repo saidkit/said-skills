@@ -285,13 +285,11 @@ For each Stage 1 decision, locate the matching contract clause:
 
 - Folder layout / feature structure -> `<ADR-ID>`, template.
 - Service shape -> `<ADR-ID>`.
-- Lib triad / file granularity -> `<ADR-ID>`.
 - No mega-engines -> `<ADR-ID>`.
 - Data-layer-only feature shape -> `<ADR-ID>`.
 - List wire format -> `<ADR-ID>` + the routed list-rule spec <RULE-LABEL>.
 - Toolbar / band / pane shape -> the surface's routed frozen-rule specs.
 - Error containment -> `<ADR-ID>` + the routed error-rule spec.
-- RBAC affordance gating -> the routed list/form rule specs <RULE-LABEL>.
 - Naming / prefixes -> `<ADR-ID>`.
 - Workspace scoping -> `<ADR-ID>`.
 
