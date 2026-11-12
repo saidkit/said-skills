@@ -51,7 +51,16 @@ FR_MARKERS = ("reviewer-gate:", "verdict:", "goal:", "feature-review:", "feature
 FR_LINE_CAP = 300  # the validator's longest row is under 200 characters
 
 
-FR_GROUP_NAMES = ("Covers", "Uncovered rulings", "Uncovered requirements", "Earned rules", "Captures", "Other defects")
+FR_DECISIONS = "Uncovered decisions"  # group 2: the decisions no Covers line names
+FR_GROUPS = (  # the six groups of a feature-review verdict and their table columns, in order; read by said_status too
+    ("Covers", ("id", "requirement", "where built", "verdict")),
+    (FR_DECISIONS, ("decision", "requirement", "where built", "verdict")),
+    ("Uncovered requirements", ("requirement", "where built", "verdict")),
+    ("Earned rules", ("rule", "evidence", "differs from Rules applied", "verdict")),
+    ("Captures", ("item", "where built", "verdict")),
+    ("Other defects", ("defect", "path:line", "verdict")),
+)
+FR_GROUP_NAMES = tuple(g for g, _cols in FR_GROUPS)
 
 
 def feature_review_problem(lines):

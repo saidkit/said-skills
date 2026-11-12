@@ -1622,14 +1622,6 @@ def run_reviewer_gate(a):
 
 
 FR_KEYS = ("checker-id", "target-sha", "capture-evidence-ref", "verdict", "timestamp")
-FR_GROUPS = (
-    ("Covers", ("id", "requirement", "where built", "verdict")),
-    ("Uncovered rulings", ("ruling", "requirement", "where built", "verdict")),
-    ("Uncovered requirements", ("requirement", "where built", "verdict")),
-    ("Earned rules", ("rule", "evidence", "differs from Rules applied", "verdict")),
-    ("Captures", ("item", "where built", "verdict")),
-    ("Other defects", ("defect", "path:line", "verdict")),
-)
 FR_FILE_CAP = 1024 * 1024  # a verdict file longer than this is owed, never read whole
 FR_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
@@ -1666,6 +1658,7 @@ def _fr_cells(line):
 
 def _fr_parse(text, head_sha, workdir, verdict_path=""):
     """(verdict, [(group, cells)]) of a reviewer's verdict text, or raise FeatureReviewRefused(why)."""
+    from gate_record import FR_GROUPS  # the verdict's groups and columns, one place; lazy: the analyzer runs without it
     lines = text.split("\n")
     if len(lines) < 7:
         raise FeatureReviewRefused("the header is shorter than five lines and a blank line")
@@ -1772,6 +1765,68 @@ def _fr_rule_ids(root):
     return ids
 
 
+FR_SECTION_D = re.compile("## \u00a7D(?:$|[ :-])")  # the scope's section D heading, not `## \u00a7Draft`
+FR_DEFERRED = "defer to phase 2"  # the scope skills' marker of a deferred section D item (any case)
+
+
+def _fr_decision_ids(paths):
+    """The decision ids of the records the brief named: the live rulings of a `rulings.md`, the `Q-<n>` first words
+    of the `## \u00a7D` section of a `scope.md`, the `DL-`/`CL-` first words of any other file (a ledger); fenced lines are
+    skipped and trailing punctuation is not part of an id. Raises ValueError naming a file that is not there, cannot
+    be read, or is a rulings list with a malformed line."""
+    if not paths:
+        return []
+    import importlib.util
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "said_covers_read", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "review-qa", "covers-read.py"))
+        cr = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cr)  # the review-qa readers of rulings and first words, not a second grammar
+    except Exception as e:  # a missing or broken sibling script is an error line, never a traceback
+        raise ValueError("cannot load the review-qa record readers: %s" % e)
+    ids = []
+    for p in paths:
+        if not os.path.isfile(p):
+            raise ValueError("--decisions names no file: %s" % _fr_clean(p, 120))
+        name = os.path.basename(p)
+        try:
+            if name == "rulings.md":
+                entries, broken = cr.GATE.load_rulings([p])
+                if broken:
+                    raise ValueError("%s has a malformed ruling line (line %s)" % (_fr_clean(p, 120), broken[p][0]))
+                new = [e["id"] for _p, _n, e in entries if e["status"] in cr.LIVE_RULING]
+            else:
+                scope, inside, new, fences = name == "scope.md", name != "scope.md", [], cr.Fences()
+                item = None  # [id, text] of the section D item being read: a deferred one is no decision
+                pat = r"Q-[0-9]+" if scope else r"(DL|CL)-[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*"
+                for ln in cr.read_lines(p) + [None]:  # None ends the last item, even inside an unclosed fence
+                    if ln is None:
+                        if item and FR_DEFERRED not in " ".join(item[1].split()).lower():
+                            new.append(item[0])
+                        break
+                    if fences.skip(ln):
+                        continue
+                    head = scope and ln.startswith("## ")
+                    w = cr.first_word(ln).rstrip(".,;:)") if inside and not head else ""
+                    is_id = bool(w) and re.fullmatch(pat, w) is not None
+                    if item and (head or is_id):
+                        if FR_DEFERRED not in " ".join(item[1].split()).lower():
+                            new.append(item[0])
+                        item = None
+                    if head:
+                        inside = bool(FR_SECTION_D.match(ln))
+                    elif is_id and scope:
+                        item = [w, ln]
+                    elif is_id:
+                        new.append(w)
+                    elif item:
+                        item[1] += " " + ln
+        except (cr.ReadError, cr.GATE.ConfigError, OSError, UnicodeError) as e:
+            raise ValueError("cannot read %s: %s" % (_fr_clean(p, 120), e))
+        ids += [i for i in new if i not in ids]
+    return ids
+
+
 def _fr_workdir_ok(root, workdir, feature):
     """True when workdir is the lane's `SAID.working:` dir of this feature."""
     import gate_record
@@ -1783,7 +1838,44 @@ def _fr_workdir_ok(root, workdir, feature):
     return os.path.realpath(os.path.join(root, value)) == os.path.realpath(workdir)
 
 
-def feature_review_output(root, workdir, feature):
+def _fr_owed(why):
+    return 1, ["feature-review: header | FAIL | %s" % why, "feature review owed: %s" % why]
+
+
+def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decision_ids=(), dirty=lambda: 0):
+    """(rc, lines) of a verdict text with no file or git read of its own: parse it against the head sha, then
+    `dirty()` (the count of uncommitted files outside the working dir), a row per rule id and a Covers or Uncovered
+    decisions row per decision id; rc 0 and the row lines, or rc 1 and the owed lines. feature_review_output reads
+    the file, the store and the records, then calls this."""
+    import gate_record
+    try:
+        verdict, rows = _fr_parse(text, sha, workdir, verdict_path)
+        n = dirty()
+        if n:
+            raise FeatureReviewRefused("%d uncommitted file(s) outside the working dir" % n)
+        have = {m.group(0) for g, c in rows if g == "Earned rules" for m in [FR_RULE_ID.search(c[0])] if m}
+        missing = [r for r in rule_ids if r not in have]
+        if missing:
+            raise FeatureReviewRefused("Earned rules has no row for %s" % ", ".join(missing[:8]))
+        named = {c[0].strip().strip("`*").strip() for g, c in rows if g in ("Covers", gate_record.FR_DECISIONS)}
+        missing = [d for d in decision_ids if d not in named]
+        if missing:
+            raise FeatureReviewRefused("no row in Covers or %s for %s" % (gate_record.FR_DECISIONS, ", ".join(missing[:8])))
+    except FeatureReviewRefused as e:
+        return _fr_owed(e)
+    out = ["feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ"))]
+    for group, _cols in gate_record.FR_GROUPS:
+        if not any(g == group for g, _ in rows):
+            out.append("feature-review: %s | none" % group)
+            continue
+        for g, cells in rows:
+            if g == group:
+                ev = cells[1] if group == "Earned rules" else cells[-2]
+                out.append("feature-review: %s | %s | %s | %s" % (group, _fr_clean(cells[0], 40), cells[-1], _fr_clean(ev, 80)))
+    return 0, out
+
+
+def feature_review_output(root, workdir, feature, decisions=()):
     """(rc, lines) of the feature-review validator: rc 0 and the verdict line then one row line per row; rc 1 and the
     FAIL header row then `feature review owed: <why>`; rc 2 and one `error: <why>` line. The one function behind
     `--feature-review` and `gate_record_row.py --kind feature-review`, so a row is only ever one this produced."""
@@ -1795,6 +1887,10 @@ def feature_review_output(root, workdir, feature):
     root = os.path.realpath(os.path.abspath(root))
     if not _fr_workdir_ok(root, workdir, feature):
         return 2, ["error: --workdir is not the lane's SAID.working: dir of %s" % feature]
+    try:
+        dec = _fr_decision_ids(decisions or ())
+    except ValueError as e:
+        return 2, ["error: %s" % _fr_clean(str(e), 200)]
     path = os.path.join(workdir, "review-feature-%s.md" % feature)
     try:
         ident = gate_record.identity(os.path.realpath(os.path.abspath(root)))
@@ -1803,48 +1899,29 @@ def feature_review_output(root, workdir, feature):
     toks = ident.split()
     sha = toks[1] if len(toks) > 1 else ""
     try:
-        try:
-            real = os.path.realpath(path)
-            if not real.startswith(os.path.realpath(workdir) + os.sep):
-                raise FeatureReviewRefused("the verdict file resolves outside the working dir")
-            if not os.path.isfile(real):
-                raise FeatureReviewRefused("no readable review-feature-%s.md in the working dir" % feature)
-            with open(real, "rb") as fh:
-                raw = fh.read(FR_FILE_CAP + 1)
-            if len(raw) > FR_FILE_CAP:
-                raise FeatureReviewRefused("the verdict file is too large (over %d bytes)" % FR_FILE_CAP)
-            text = raw.decode("utf-8")
-        except (OSError, UnicodeError):
-            raise FeatureReviewRefused("no readable review-feature-%s.md in the working dir" % feature)
-        verdict, rows = _fr_parse(text, sha, workdir, path)
-        if toks and toks[0] == "git":
-            try:
-                dirty = gate_record.git_dirty(root, ["."], os.path.realpath(workdir), set())
-            except gate_record.Error as e:
-                return 2, ["error: %s" % e]
-            if dirty:
-                raise FeatureReviewRefused("%d uncommitted file(s) outside the working dir" % len(dirty))
-        have = {m.group(0) for g, c in rows if g == "Earned rules" for m in [FR_RULE_ID.search(c[0])] if m}
-        missing = [r for r in _fr_rule_ids(root) if r not in have]
-        if missing:
-            raise FeatureReviewRefused("Earned rules has no row for %s" % ", ".join(missing[:8]))
-    except FeatureReviewRefused as e:
-        return 1, ["feature-review: header | FAIL | %s" % e, "feature review owed: %s" % e]
-    out = ["feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ"))]
-    for group, _cols in FR_GROUPS:
-        if not any(g == group for g, _ in rows):
-            out.append("feature-review: %s | none" % group)
-            continue
-        for g, cells in rows:
-            if g == group:
-                ev = cells[1] if group == "Earned rules" else cells[-2]
-                out.append("feature-review: %s | %s | %s | %s" % (group, _fr_clean(cells[0], 40), cells[-1], _fr_clean(ev, 80)))
-    return 0, out
+        real = os.path.realpath(path)
+        if not real.startswith(os.path.realpath(workdir) + os.sep):
+            return _fr_owed("the verdict file resolves outside the working dir")
+        if not os.path.isfile(real):
+            return _fr_owed("no readable review-feature-%s.md in the working dir" % feature)
+        with open(real, "rb") as fh:
+            raw = fh.read(FR_FILE_CAP + 1)
+        if len(raw) > FR_FILE_CAP:
+            return _fr_owed("the verdict file is too large (over %d bytes)" % FR_FILE_CAP)
+        text = raw.decode("utf-8")
+    except (OSError, UnicodeError):
+        return _fr_owed("no readable review-feature-%s.md in the working dir" % feature)
+    wd = os.path.realpath(workdir)
+    dirty = (lambda: len(gate_record.git_dirty(root, ["."], wd, set()))) if toks and toks[0] == "git" else (lambda: 0)
+    try:
+        return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty)
+    except gate_record.Error as e:
+        return 2, ["error: %s" % e]
 
 
 def run_feature_review(a):
     """CLI dispatch for --feature-review: print what feature_review_output returns; exit 0, 1 (owed) or 2 (error)."""
-    rc, lines = feature_review_output(a.root, a.workdir, a.feature)
+    rc, lines = feature_review_output(a.root, a.workdir, a.feature, a.decisions or ())
     for ln in lines:
         print(ln)
     return rc
@@ -1879,6 +1956,7 @@ def main():
                     help="validate the feature-reviewer's verdict file in --workdir for --feature and print its rows")
     ap.add_argument("--workdir", help="reviewer-gate / feature-review: feature working dir holding verdict artifacts")
     ap.add_argument("--feature", dest="feature_opt", help="feature-review: the feature id")
+    ap.add_argument("--decisions", nargs="+", help="feature-review: the decision records the reviewer was briefed with")
     ap.add_argument("--surface", help="reviewer-gate: the lane's SAID.surface medium")
     ap.add_argument("--reviewers", help="reviewer-gate: comma-sep declared reviewer ids")
     ap.add_argument("--checkers-dir", default=None,  # None -> resolve via lane SAID.checkers-dir -> the plugin's own agents/ (no lane-root/agents fallback)

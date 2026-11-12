@@ -3,6 +3,7 @@
 
   gate_record_row.py --root <lane-root> --out <record> --file <path> --open-p1 <n> --reviewer <id>
   gate_record_row.py --kind feature-review --root <lane-root> --out <record> --workdir <dir> --feature <id>
+                     [--decisions <file>...]
 
 The row is `skill-doctor: <file> open-P1=<n> reviewer=<id>`, one per file: a second call for the same file
 replaces it. The record is written through gate_record.py: its first line is the store identity of the physical
@@ -10,7 +11,11 @@ lane root; a record written at another store keeps its round and matrix lines an
 `gate-recompute:` row is ever typed here and a stale one is never carried to a new store. The feature-review form
 runs the validator itself (said_status.feature_review_output, the code behind `said_status.py --feature-review`) on
 <workdir>/review-feature-<id>.md and writes only the `feature-review: ` rows it produced, replacing every earlier
-feature-review row of the record; it takes no rows from a file or stdin, so a row is never typed. It prints the rows
+feature-review row of the record; it takes no rows from a file or stdin, so a row is never typed. With --decisions
+(the decision records the reviewer was briefed with), each decision id of those records needs a row in Covers or
+Uncovered decisions: the live rulings of a `rulings.md`, the `Q-<n>` ids of a `scope.md` section D, the `DL-`/`CL-`
+first words of any other file (a ledger), fenced lines skipped; a missing one is owed, a named file that is not
+there, cannot be read or holds a malformed ruling line an error. It prints the rows
 it wrote. Exit 0 written, 1 refused (the validator's owed lines are printed, nothing written), 2 missing arguments or
 a record, lane or validator error (`error: <why>`, nothing written).
 """
@@ -27,10 +32,13 @@ ap.add_argument("--kind", choices=("skill-doctor", "feature-review"), default="s
 ap.add_argument("--workdir")
 ap.add_argument("--feature")
 ap.add_argument("--rows-from")
+ap.add_argument("--decisions", nargs="+")
 for a in ("root", "out", "file", "open-p1", "reviewer"):
     ap.add_argument("--" + a, required=False)
 a = ap.parse_args()
 fr = a.kind == "feature-review"
+if not fr and a.decisions:
+    ap.error("--decisions is taken by --kind feature-review only")
 if fr and a.rows_from is not None:
     ap.error("--rows-from is not taken by --kind feature-review: the rows come from the validator")
 for name in (("root", "out", "workdir", "feature") if fr else ("root", "out", "file", "open_p1", "reviewer")):
@@ -47,7 +55,7 @@ if fr:
         print("error: %s" % e)
         sys.exit(2)
     import said_status as _ss  # noqa: E402
-    rc, lines = _ss.feature_review_output(a.root, a.workdir, a.feature)
+    rc, lines = _ss.feature_review_output(a.root, a.workdir, a.feature, a.decisions or ())
     if rc == 2:
         print(lines[0])
         sys.exit(2)
