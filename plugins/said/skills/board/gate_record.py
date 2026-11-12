@@ -67,7 +67,7 @@ def feature_review_problem(lines):
         return "an authoritative marker in a row"
     head = lines[0].split(" | ")
     if len(head) != 3 or head[0] != "feature-review: verdict" or head[1] not in ("PASS", "FAIL") \
-            or not head[2].startswith("not-read=") or not head[2][9:].isdigit():
+            or not head[2].startswith("not-read=") or not (head[2][9:].isascii() and head[2][9:].isdigit()):
         return "the first line is not a verdict line"
     fails = nots = 0
     seen = []
