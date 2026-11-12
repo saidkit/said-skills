@@ -1729,6 +1729,8 @@ def _fr_parse(text, head_sha, workdir, verdict_path=""):
             ok = ("PASS", "FAIL", "NOT-READ") + (("N/A",) if group == "Earned rules" else ())
             if not all(cells):
                 raise FeatureReviewRefused("group %s row has an empty cell" % group)
+            if cells[0].strip().lower() == "none":  # a group with no rows is the single line `none`
+                raise FeatureReviewRefused("group %s has a `none` row; write the single line `none` instead" % group)
             if cells[-1] not in ok:
                 raise FeatureReviewRefused("group %s verdict cell is not one of %s" % (group, ", ".join(ok)))
             rows.append((group, cells))

@@ -77,6 +77,8 @@ def feature_review_problem(lines):
         cells = ln[len("feature-review: "):].split(" | ")
         if len(cells) == 2 and cells[1] == "none" and cells[0] in FR_GROUP_NAMES:
             group = cells[0]
+        elif len(cells) == 4 and cells[1].strip().lower() == "none":  # `none` is a line, not a row
+            return "a `none` row in a group"
         elif len(cells) == 4 and cells[0] in FR_GROUP_NAMES and cells[1] and cells[3] and cells[2] in (
                 ("PASS", "FAIL", "NOT-READ", "N/A") if cells[0] == "Earned rules" else ("PASS", "FAIL", "NOT-READ")):
             group = cells[0]
