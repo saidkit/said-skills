@@ -1,8 +1,8 @@
 ---
-name: gate-reviewer
+name: gate-reader
 description: >
-  Read-only reader for a SAID Deliver gate (review-qa, accept, debrief) whose
-  session is above the lane's gate-reviewer threshold. Reads the feature's
+  Read-only reader for a SAID Inspect or Debrief gate (review-qa, accept, debrief) whose
+  session is above the lane's gate-reader threshold. Reads the feature's
   records for the one step the gate hands it and returns proposed rows, each
   with file:line evidence; the calling gate opens the cited lines, decides and
   writes. Not a Checker: never named in SAID.reviewers, never runs a command,
@@ -11,7 +11,7 @@ tools: Read, Grep
 model: inherit
 ---
 
-# gate-reviewer - reads one gate step and proposes rows
+# gate-reader - reads one gate step and proposes rows
 
 **Model:** runs on the session's model (`model: inherit`); a spawning call that passes its own `model` overrides it.
 

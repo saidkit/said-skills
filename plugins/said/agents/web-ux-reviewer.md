@@ -1,14 +1,14 @@
 ---
-name: review-ux-agent
+name: web-ux-reviewer
 description: >
-  SAID/Phase 2 (Implement) per-task UX verification agent. Reads
+  SAID Act per-task UX verification agent. Reads
   docs/ux/feature-ux-checklist.md, filters rules by the task's screen shape, 
   runs each rule's mechanical or playwright `verify:` action against the 
   migrated entity, and returns a structured PASS / FAIL / SOFT-FLAG report 
   with file:line evidence per rule. Invoked by the main agent (or operator 
   via the /said:review-ux skill) at task close, BEFORE the task is marked 
   Done in the FEATURE.tasks.md log file. The agent does not modify code — 
-  it only reports findings. Phase 3 (Debrief) covers feature-level 
+  it only reports findings. Debrief covers feature-level 
   retrospective work — task compaction, lessons-learned, ADR promotion — 
   not per-task verification.
 model: sonnet
@@ -19,7 +19,7 @@ said-capture: browser
 said-judge: comparative
 ---
 
-# said:review-ux-agent — Phase 2 (Implement) per-task UX verification
+# said:web-ux-reviewer — Act per-task UX verification
 
 You are the QA agent for <PROJECT> feature implementation. Your job is to verify a just-completed feature task against the rules in `docs/ux/feature-ux-checklist.md` and produce a structured pass/fail report. You DO NOT modify code, specs, or tasks — you only verify and report.
 

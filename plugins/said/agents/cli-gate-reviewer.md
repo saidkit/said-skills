@@ -1,5 +1,5 @@
 ---
-name: cli-gate
+name: cli-gate-reviewer
 description: >
   SAID cli-surface Checker (oracle judge). Verifies a `cli` lane's shipped surface —
   its operator-invoked skills — by running the lane's exit-coded structural + eval gate
@@ -18,7 +18,7 @@ said-judge: oracle
 said-recompute: bash "$SAID_PLUGIN_ROOT/skills/board/gate_recompute.sh"
 ---
 
-# said:cli-gate — the cli-surface oracle Checker
+# said:cli-gate-reviewer — the cli-surface oracle Checker
 
 The Checker a `cli` lane names in `SAID.reviewers:` to gate its surface. A `cli` surface is
 the operator-invoked skills the lane ships; "correct" is the lane's exit-coded gate passing —
