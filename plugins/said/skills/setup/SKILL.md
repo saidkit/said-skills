@@ -18,11 +18,6 @@ description: >
 
 # said:setup, the SAID lane configuration doctor
 
-Governs the CONFIGURATION of a lane that already exists: its `## Lane` axes, defaults, required
-`CLAUDE.md` sections, reviewer resolvability, and docs skeleton. It reports what is wrong and, on
-`--fix`, repairs what it safely can, composing `said:install` for structural gaps. Installing a
-lane from scratch is `said:install`'s job, not this skill's.
-
 ## Contract, holds every run
 
 - **Read-only by default.** A bare `/said:setup` inspects and reports; it writes nothing. Two
@@ -38,6 +33,11 @@ lane from scratch is `said:install`'s job, not this skill's.
 - **Propose, do not guess.** On any finding whose repair needs a decision the schema cannot settle
   (which surface? which reviewers?), state the proposal and stop; never write a chosen value the
   operator did not confirm.
+
+Governs the CONFIGURATION of a lane that already exists: its `## Lane` axes, defaults, required
+`CLAUDE.md` sections, reviewer resolvability, and docs skeleton. It reports what is wrong and, on
+`--fix`, repairs what it safely can, composing `said:install` for structural gaps. Installing a
+lane from scratch is `said:install`'s job, not this skill's.
 
 ## Invocation
 

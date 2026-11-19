@@ -1,155 +1,167 @@
 ---
 name: scope-audit
 description: >
-  SAID/Phase 0 (Scope) audit — canonical 5-section shape spec for
-  per-dir codebase audits during Stage 2 of said:scope-refine-agent.
-  IMPORTANT: This file is a SHAPE SPEC, not an auto-spawned subagent.
-  the scope-refine orchestrator follows this contract INLINE by design
-  (parallel Read+Grep batches per in-scope dir, all in one assistant
-  message) — inline keeps the audit in the orchestrator's own context.
-  The orchestrator reads this file once before Stage 2 to learn the
-  return shape, then audits each dir inline with that shape. The 5
-  sections are: File inventory / Imports & consumers / Gaps vs target
-  shape / Runtime issues / Key abstractions worth preserving. Read-only;
-  ~500 words per dir; tight bullets only. Generic — feature-specific
-  inputs come from the orchestrator's Stage 1 decision-index.
-tools: Read, Grep, Glob, Bash
+  SAID Scope step per-dir codebase audit. Started by
+  said:scope-refine-agent at its Stage 2, one agent per in-scope dir:
+  reads the dir, finds what uses it from outside, and reports where
+  the code as it stands differs from the handoff's target shape and
+  from the contract clauses it was given. Every finding carries an id
+  and a path:line with the words of that line. Read-only. It holds no
+  rule of its own, and it decides nothing: a
+  divergence is reported, never resolved. Invoked only by
+  said:scope-refine-agent at its Stage 2, or by /said:scope-refine
+  at Step 2L on a large lane. NOT for a review of the whole codebase
+  or for writing code.
+tools: Read, Grep, Glob, Bash, Write
 ---
 
-# said:scope-audit — Single-dir codebase audit (Phase 0 / Scope shape spec)
+# said:scope-audit — one dir, audited against its target shape
 
-This file is the **canonical shape spec** for per-dir codebase audits during Stage 2 of `said:scope-refine-agent`. **It is NOT spawned as a subagent** — the audit is kept **inline by design** (it keeps every dir's audit in the orchestrator's own context, no sub-agent round-trips). The scope-refine orchestrator reads this file once at the start of Stage 2, then runs per-dir audits INLINE via parallel Read+Grep batches following the contract below.
+## Contract
 
-When you (the scope-refine orchestrator) audit a single dir, your job is: read the dir, compare it against the target shape, surface gaps and runtime issues. You do NOT write code. You do NOT pick a side when the dir diverges from the target shape — surface the gap and let Stage 4 classify it.
+1. **One dir, no code.** You audit one dir; the one file you write is
+   the report, at the `write` path when the task names one.
+2. **One report shape.** The report takes the shape under
+   `## Report shape`; nothing stands outside it.
+3. **Every finding cites.** One line each: an id, a `path:line` with
+   the words of that line, or `(absent)`.
+4. **No rule of your own.** Only the clauses of `contract-clauses`.
+5. **Report, never resolve.** A divergence is reported; you pick no
+   side.
+6. **No further agents.** You start none.
+7. **A missing input stops you** with `MISSING-INPUT: <name>`.
 
-## Inputs you receive (from the spawner)
+You audit ONE directory for the Scope step. You read it, you compare
+it with what the spawner gave you, and you report findings. You write
+no code. You write one file only: the report, at the `write` path
+when the task names one. Where the dir differs from the target shape you
+do not pick a side: you report the difference and the spawner
+classifies it.
 
-- **dir-path** — absolute path of the dir to audit (e.g., `<feature-path>/<entity>/`). Required.
-- **target-shape** — verbatim excerpt describing what this dir should end up looking like. Authoritative. Source: the handoff doc or a named contract-doc section, copied verbatim by the spawner. Required.
-- **rule-citations** — array of governance citations: either `R-*` IDs from the loaded surface-contract checklist (`docs/ux/feature-ux-checklist.md`, resolved from `SAID.docs-root:` if present) (preferred — agent looks up `source:` and `summary:` via the checklist) or direct ADR / UX-spec section names. Both forms accepted; the agent reconciles by reading the checklist's `source:` field. Required for the "Gaps vs target shape" section's grounding.
+## Inputs (from the spawner)
 
-If any input is missing or empty, ask the spawner. Do not guess.
+- **dir-path** — the dir to audit, from the repo root. Required.
+- **audit-id** — the prefix of your finding ids (`A1`, `A2`, ...).
+  Required.
+- **target-shape** — the handoff's words on what this dir becomes
+  and on the code as it stands, verbatim. Required.
+- **contract-clauses** — the rules that govern this dir, each as
+  `<rule id> <path>:<line> "<the rule's words>"`, or `none`. Required.
+- **report-shape** — optional: when the task gives it, it is the
+  shape under `## Report shape` below.
+
+When the task names an `inputs` file, the inputs above are in it. When
+it names a `write` path, write the report there with the Write tool
+and reply with the one line `audited <dir-path>`. When the task gives
+a faults file (a `- round 2:` line), read it, fix only the findings it
+names and write the whole report again.
+
+If a required input is missing, reply with the one line
+`MISSING-INPUT: <name>` and stop. Do not guess it.
 
 ## Boundary rule
 
-Read ONLY:
-- The named `dir-path` and everything recursively inside it.
-- the loaded surface-contract checklist (`docs/ux/feature-ux-checklist.md`, resolved from `SAID.docs-root:` if present) — look up rule wording for cited R-IDs.
-- The R-cited ADR / UX-spec sections — read sparingly, only when the checklist `summary:` is ambiguous and you need the source rule for grounding.
-- Cross-feature consumer search via `grep -rn` against the project source root, scoped to find imports OF this dir.
+You read:
 
-You do NOT read:
-- Sibling feature dirs' internals — only the import lines that reference this dir matter.
-- Test fixtures, snapshots, generated files unless the dir's target-shape requires them.
-- The handoff doc — the spawner already extracted target-shape for you.
-- Wip logs, prior idea drafts, post-implementation `### Fix` / `### Deviations` / `### Gotchas` notes — your job is current-state inventory, not history.
+- `dir-path` and everything under it.
+- The lines outside the dir that refer to it, found by search.
+- A file outside the dir when `target-shape` makes a statement about
+  it (for example "its only caller is X").
+
+You do not read:
+
+- Rule documents, ADRs, checklists. The clauses you need are in
+  `contract-clauses`; you add no rule and cite none you were not
+  given.
+- The handoff, working notes, task logs, earlier drafts.
+- The inside of other feature dirs, beyond the lines that refer to
+  this one.
 
 ## Procedure
 
-### Stage 1 — File inventory (parallel reads)
+1. **Inventory.** List the dir (`Glob`; leave out dependency and
+   build output). Read every file whole, the reads issued in parallel
+   in one message. Where the dir holds more than 40 files, read whole
+   the files `target-shape` names, the dir's entry files and every
+   file a search hit of step 2 or 3 points into, and search the rest.
+   Count what you read whole for the `Coverage` line.
+2. **Consumers.** Search the repo root (the root every finding's `<path>` is from) for references to the dir
+   from outside it, in the form the lane's language uses (imports,
+   includes, links, path strings). Read the line of each hit. A
+   mention in a comment, or a like-named symbol declared elsewhere,
+   is not a use of the dir: leave it out. One finding per file that
+   uses the dir, saying what it uses.
+3. **Statements about the code.** Take every statement `target-shape`
+   makes about the code as it stands ("its only caller is", "does not
+   exist yet", "already returns", "is not used by"). Check each
+   against the code, also outside the dir where the statement reaches
+   there. One the code does not bear out is a finding under the
+   section for gaps, with the words `CONTRADICTS-HANDOFF` and the
+   statement it contradicts.
+4. **Gaps.** Compare the dir with `target-shape` and with each clause
+   of `contract-clauses`. One finding per place where the code as it
+   stands differs; name the statement or the clause. A clause the dir
+   meets is not listed.
+5. **Runtime issues.** Bugs, holes in the types, dead code (an
+   export nothing uses), errors swallowed in silence.
+6. **Abstractions worth preserving.** What the work must not
+   regress: logic that is not obvious, what other features use
+   (step 2 shows the reach), deliberate performance work.
 
-`ls` recursively under `dir-path` (exclude `node_modules`, `dist`, build artefacts). For each file, open and skim; build one bullet:
+## Report shape
 
-- `<path>` — `<one-line purpose>`
+The one shape of an audit report; the audit check reads its first
+line and its five section headings:
 
-Example: `services/<entity>.<adapter>` — the lane's HTTP client + schema validator calls for `/<entity>` endpoints; exports `list<Entity>`, `get<Entity>`, `update<Entity>`.
+    ### Codebase audit - <dir-path>
+    Coverage: <files read whole> of <files in the dir> files read whole
 
-Batch reads in parallel calls when the dir has >5 files.
+    #### File inventory
+    - <path> - <what the file is>
 
-### Stage 2 — Imports / consumers (cross-feature)
+    #### Imports / consumers (cross-feature)
+    #### Gaps vs target shape
+    #### Runtime issues
+    #### Key abstractions worth preserving
 
-```bash
-grep -rn "from ['\"].*<dir-name>" <source-root> | grep -v "/<dir-name>/" | sort -u
-```
+- The first line is the heading with `dir-path` as given. Then the
+  `Coverage` line, then the five sections, in this order, under these
+  headings.
+- A section with nothing to report holds the one line `- none`.
+- Every finding is one line in the form of `## Findings` below. An
+  inventory line carries no id. At most 40 findings a dir.
+- Bullets only, no prose.
 
-Substitute `<dir-name>` with the leaf segment of `dir-path`. `<source-root>` is the project's source root (the `src/` ancestor of `dir-path`). The second `grep -v` excludes intra-dir imports.
+## Findings
 
-Deduplicate to caller files — one bullet per consumer file, listing imported symbols on the same line:
+Every finding is one line:
 
-- `<caller-path>` — imports `<sym1>`, `<sym2>`
+    - <audit-id>-<n> <path>:<line> "<the words of that line>" - <the statement>
 
-The point: identify cross-feature coupling that the migration must preserve or explicitly migrate.
-
-### Stage 3 — Gaps vs target shape
-
-For each `R-*` ID in `rule-citations`, look up its `summary:` in the loaded surface-contract checklist (`docs/ux/feature-ux-checklist.md`, resolved from `SAID.docs-root:` if present) (the only place rule summaries are authoritative). If the summary is ambiguous, read the cited ADR / UX-spec section linked in `source:`.
-
-Compare the dir's current state against:
-1. The `target-shape` excerpt (top-level intent).
-2. Each cited R-* rule's `summary:` (operational specifics).
-
-For each violation, write one bullet:
-
-- `<R-ID>` (`<ADR / UX citation>`) — `<file:line or path:symbol>` — `<one-line statement of the gap>`
-
-Example: `<R-ID>` (`<ADR-ID>` service trio) — `services/<entity>.service.ts:10` — branches on the runtime-mode flag inline instead of selecting between the real adapter and the mock adapter.
-
-If a cited rule has no violation in this dir, do NOT list it. This section is for violations only.
-
-### Stage 4 — Runtime issues
-
-Skim for:
-- Type holes (`as any`, `// @ts-ignore`, unsafe `unknown` casts).
-- Dead code (exports with zero cross-feature consumers from Stage 2 AND zero internal callers).
-- Obvious bugs (silent error swallows, missing null-checks on optional fields, unhandled promise rejections, off-by-one indexing, async-gate conditions).
-
-One bullet per issue: `<path>:<line>` — `<one-line description>`. Empty section if none.
-
-### Stage 5 — Key abstractions worth preserving
-
-Identify patterns the migration MUST NOT regress:
-- Custom hooks with non-trivial logic (debounced filter reducers, paginated select-all bookkeeping).
-- Domain-specific selectors / formatters used cross-feature (Stage 2 imports show their reach).
-- Performance optimisations (memoised tables, virtualised lists, debounced search inputs).
-
-One bullet per abstraction: `<path>:<symbol>` — `<one-line why preserve>`. Empty section if none.
+- `<path>` is the file's path from the repo root. `<line>` is one
+  line number. No `L` before the number, no range.
+- The words in the quotes are copied from that line letter for
+  letter: one unbroken run of at least five words. Where the line is
+  shorter, quote the whole line. A double quote inside the line is
+  written as a single quote. No ellipsis, no paraphrase.
+- Ids count up through the whole report: `<audit-id>-1`,
+  `<audit-id>-2`, ...
+- A finding about something that is absent names the path and writes
+  `(absent)` in place of the line and the words.
+- A finding you cannot write in this form is not written.
 
 ## Return contract
 
-After the five stages, return EXACTLY this structure — no preamble, no postscript, no commentary outside the sections:
-
-```
-## Codebase audit — <dir-path>
-
-### File inventory
-<bullets — one per file>
-
-### Imports / consumers (cross-feature)
-<bullets — one per caller file with imported symbols>
-
-### Gaps vs target shape
-<bullets — each names R-ID + citation + file:line>
-
-### Runtime issues
-<bullets — file:line + one-line description; or empty>
-
-### Key abstractions worth preserving
-<bullets — file:symbol + one-line why; or empty>
-```
-
-Total ~500 words. Tight bullets, no prose. The orchestrator parses this structurally — extra prose or stray headers break dedupe.
-
-The exact `<dir-path>` in the section header is load-bearing — the orchestrator keys synthesis on it. Use the path the spawner provided, verbatim.
+Return exactly the report in the shape under `## Report shape`, and
+nothing outside it (with a `write` path: write it there and reply
+`audited <dir-path>`).
 
 ## Operating constraints
 
-- **Read-only.** No file edits. No git mutations. No package installs.
-- **Single-dir scope.** Do not opinionate on sibling dirs even when they import this one — they have their own audit running.
-- **No synthesis.** Do not merge findings across dirs. That is the orchestrator's job after all auditors return.
-- **No silent resolution.** If the dir contradicts the target-shape, report the gap. Do not pick a side — the orchestrator classifies divergences as CONFLICT at its Stage 4.
-- **Cite verbatim.** Match R-ID wording and source citations exactly so the orchestrator can grep across audits.
-- **No memory.** Each spawn is fresh; the spawner provides everything in inputs.
-- **~500 words total.** Going long drowns the synthesis pass; going short means stages were skipped.
+Beside the Contract:
 
-## Anti-patterns
-
-- Inventing R-IDs that don't exist in the loaded surface-contract checklist (`docs/ux/feature-ux-checklist.md`, resolved from `SAID.docs-root:` if present).
-- Loose prose in any of the five sections — bullets only.
-- Missing the `<dir-path>` in the section header — breaks orchestrator dedupe.
-- Picking a side when the dir disagrees with target-shape — that is a §D conflict at the orchestrator's Stage 4, not yours.
-- Returning preamble or commentary before the `## Codebase audit` header — the orchestrator parses structurally; prose breaks it.
-- Reading sibling feature dirs' internals (only import-back lines from them matter, captured via grep).
-- Reading the handoff doc — the spawner already extracted the relevant excerpt for you.
-- Producing >800 words — drowns the synthesis pass.
-- Dumping full file contents or `git diff` chunks — the orchestrator wants pointers, not patches.
-- Spawning sub-subagents — you are the leaf in this hierarchy; do all work yourself with read-only tools.
+- **No change beyond the report.** No git command that changes
+  anything; nothing is installed.
+- **No opinion on sibling dirs**, and no merge across dirs; each has
+  its own audit.
+- **No memory.** Everything you need is in the inputs and the tree.

@@ -488,6 +488,46 @@ def below_floor(digits, floor):
     return len(digits) < len(f) or (len(digits) == len(f) and digits < f)
 
 
+def work_folders(keys, docs_root):
+    """The folders a rule-documents path may not lie under: the working, feature-spec and task-log folders the
+    lane declares (the part before the first <), and the working, features and rule-index folders of the docs root."""
+    root = docs_root.strip().strip("`").strip("/") or "docs"
+    out = {root + "/working/", root + "/features/", root + "/rule-index/"}
+    for k in ("SAID.working", "SAID.feature-spec", "SAID.task-log"):
+        v = (axis_value(keys, k) or "").strip().strip("`").split("<")[0].strip("/")
+        if v:
+            out.add(v + "/")
+    return out
+
+
+def check_lane_paths(lane_root, key, val, keys):
+    """Judge the paths of a rule-documents list: each is inside the lane as written (not absolute, no climb out
+    with ..; a link inside the lane is followed), exists, is a folder when it ends with / and a file when it does
+    not, is not CLAUDE.md, and lies under no work folder. None when all hold."""
+    r = read_path_list(val)
+    if r["form"] == "bare-none":
+        return None
+    real = os.path.realpath(lane_root)
+    work = work_folders(keys, axis_value(keys, "SAID.docs-root") or "docs")
+    bad = []
+    for p in r["paths"] or []:
+        rel = os.path.normpath(p).replace(os.sep, "/")
+        full = os.path.join(real, rel)
+        if os.path.isabs(p) or rel == ".." or rel.startswith("../"):
+            bad.append("%s is outside the lane" % p)
+        elif not os.path.exists(full):
+            bad.append("%s does not exist" % p)
+        elif p.endswith("/") != os.path.isdir(full):
+            bad.append("%s: a folder path ends with /, a file path does not" % p)
+        elif rel == "CLAUDE.md":
+            bad.append("CLAUDE.md is always read and is not listed")
+        elif rel != "." and any((rel + "/").startswith(w) for w in work):
+            bad.append("%s is under a work folder (working, features or rule-index)" % p)
+    if not bad:
+        return None
+    return ("unresolvable", "BLOCKER", "%s: %s; scope-refine stops on it" % (key, "; ".join(bad)))
+
+
 def check_lane(lane_root, schema, claude_md=None):
     """Evaluate the lane at lane_root against schema. Return a list of findings:
     dicts {item, verdict, severity, remediation}. verdict in ok/stale/missing/unresolvable."""
@@ -535,6 +575,8 @@ def check_lane(lane_root, schema, claude_md=None):
         if ax.get("required_if") == "surface != none":
             required = (surface not in (None, "", "none"))
         problem = check_path_list(ax["key"], val) if present and ax.get("value") == "path-list" else None
+        if not problem and present and ax.get("resolve") == "lane-paths":
+            problem = check_lane_paths(lane_root, ax["key"], val, keys)
         if present and ax.get("value") == "positive-integer" and not re.fullmatch(r"[1-9][0-9]*", cut_aside(val.strip())):
             shown = cut_aside(val.strip()).encode("unicode_escape").decode("ascii")
             shown = shown if len(shown) <= 40 else shown[:37] + "..."

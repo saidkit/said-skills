@@ -21,10 +21,15 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 
 ### Subagents (spawned by the skills)
 
-- `said:scope-refine-agent` — Phase-1 parallel codebase audit + wire/visual probes.
-- `said:scope-audit` — the 5-section per-directory audit shape the refine agent follows inline.
+- `said:scope-refine-agent` — Phase-1 scope agent on a small lane: reads the lane's rules against the handoff, audits the code in scope, runs the lane's probe procedure when one is passed, writes the scope draft.
+- `said:scope-audit` — the per-directory code audit the scope agent runs inline or starts as agents.
+- `said:scope-decision-lister`, `said:scope-card-writer`, `said:scope-first-pass`, `said:scope-zone-reader`, `said:scope-exception-check`, `said:scope-chain-drafter` — the rule chain `said:scope-refine` runs on a lane whose rule documents are too large for one agent to read whole: the lister places every handoff line in a decision, card writers say what each rule section applies to (two independent builds), two heading passes and a silence pass (`said:scope-first-pass`) sort the sections the cards keep into the zone that bears on the handoff and the band, readers (`said:scope-zone-reader`) give a verdict on every rule unit, the zone read twice and the band once, no reader seeing another reading, two looks check every conflict, the drafter writes the draft. A script bundled with `said:scope-refine` fixes what is read and checks every step.
+- `said:scope-question-kind` — the question look of the rule chain: sorts each question row into choice, rule-settles, answered or no-bear with the line it rests on; started twice, the second time in the opposite row order.
+- `said:scope-confirm-look` — the confirm look of the rule chain: answers each kept conflict's question in one line, holds, does not hold or cannot tell.
 - `said:web-ux-reviewer` — Act per-task UX verification against your UX checklist.
 - `said:gate-reader` - reads one step of `review-qa`, `accept` or `debrief` above `SAID.gate-reader-threshold` and proposes rows with file:line evidence; the gate decides and writes.
+- `said:cli-gate-reviewer` — the `cli` surface Checker: runs the lane's exit-coded structural and eval gate and writes its verdict; a lane names it as `cli-gate` in `SAID.reviewers:`.
+- `said:feature-reviewer` — reads a feature's sources (decision records, spec, each task's `Covers` ids, the lane's Earned rules) against its diff once per round, before `review-qa`, and reports one row per source item with file:line evidence.
 
 ### Session roles (main sessions, launched with --agent)
 
@@ -36,6 +41,14 @@ Two definitions you launch as top-level sessions, not subagents the skills spawn
 "The records" are the project's specs, decisions and task logs: what both roles read and cite instead of restating. A worker's transcript, where the supervisor looks for a skill invocation, is that session's log, a `.jsonl` file under `~/.claude/projects/`. The brief's macros are the operator's, not the plugin's: `said!!` and `flow!!` invoke `said:said` and `said:flow`, and `drive!!` runs the operator's quality loop around them; each is defined in the operator's own `CLAUDE.md`.
 
 Each definition pins a model (the supervisor `opus`, the worker `sonnet`); `--model` on the launch line overrides the pinned model. `--name` sets the session's name, the one you give the supervisor when you name its workers.
+
+### The rule chain on a large lane
+
+A scope reads as rules `CLAUDE.md` and the paths the lane declares in its `## Lane` block, for example `SAID.scope-mounts: [docs/adr/, docs/ux/, docs/qa/, docs/conventions.md]` (a path ending `/` is a folder, read for its `.md` files; `none` reads `CLAUDE.md` alone); a document the handoff names outside them is added for that refine. Without the key it reads the default folders `<docs-root>/adr/`, `<docs-root>/ux/` and `<docs-root>/qa/` that exist, and stops only when none exists. On a large lane the draft ends with the list of documents read and the top-level docs folders no path reaches; on a small lane the draft cites each rule it uses as `path:line`.
+
+`/said:scope-refine` sizes the lane's rule documents first. Up to 170000 bytes one agent reads them whole. Above it the skill runs the rule chain: the first refine writes the cards of every rule section under `<docs-root>/rule-index/` (two builds; a one-time cost). Commit those files: a later refine cards again only the sections whose text changed. Two heading passes and a silence pass sort the sections the cards keep into the zone (the sections that bear on the handoff's decisions) and the band (the sections only the silence pass names; the others are left out, each with its reason line); the zone is read whole twice, in document order and in reverse, and the band once, each reading by readers who see no other reading. The number of readings is fixed; there is no switch.
+
+A refine on a large lane can take longer than ten minutes. In a non-interactive run (`claude -p`) set `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` above the expected run time, in milliseconds.
 
 ## Quick start
 
