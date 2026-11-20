@@ -162,7 +162,8 @@ trace        writes the trace of every row other than none, with its look, at th
              audited, each report whole
 carried      the check of the draft: every row the looks do not drop is in the trace; every audit finding id is
              named in the draft (where it shapes the work, or under `Findings not carried`); every cite of
-             cites.tsv not in state match is asked in section D by its id; with --d-items every
+             cites.tsv not in state match is asked in section D by its id, and each cite item there (`- **C<k>**`)
+             has a `Hint` line with a rule `path:line` or `no single item`; with --d-items every
              conflict and question has its d-items.tsv line and is named in the draft
 pass-check   the subjects check of one pass, and one line a rule section (kinds.tsv not no-rule) is mandatory: a
              `touched` row or an `out` row (on the section or its document); a rule section with neither is one
@@ -1070,6 +1071,34 @@ def trace(folder):
         fh.write(body.rstrip('\n') + '\n\n' + tr)
     return tr.count('\n- ')
 
+CITE_ITEM = re.compile('^- \\*\\*(C\\d+)\\*\\*')
+HINT_LINE = re.compile("^\\s*Hint \\(the drafter's reading\\):")
+
+
+def rule_docs_read(folder):
+    """the rule documents the manifest of the folder names under `Files read:`; none without a manifest"""
+    p = os.path.join(folder, MANIFEST_FILE)
+    m = re.search('(?m)^Files read: (.*)$', read(p)) if os.path.isfile(p) else None
+    return set(re.findall('`([^`]+)`', m.group(1))) if m else set()
+
+
+def cite_items_unhinted(dpart, docs):
+    """the ids of the cite items of section D (a line that begins `- **C<k>**`, up to the next such line or a blank
+    line) with no `Hint` line naming `no single item` or a `path:line` of a rule document"""
+    out, cur, ok = [], None, False
+    for l in dpart.split('\n') + ['']:
+        m = CITE_ITEM.match(l)
+        if m or not l.strip():
+            if cur and not ok:
+                out.append(cur)
+            cur, ok = (m.group(1), False) if m else (None, False)
+            continue
+        if cur and HINT_LINE.match(l) and ('no single item' in l or any(
+                p in docs or any(d.endswith('/' + p) for d in docs) for p in re.findall('([\\w./-]+\\.md):\\d+', l))):
+            ok = True
+    return out
+
+
 def carried(folder, d_items=False):
     dp = os.path.join(folder, 'scope.md')
     if not os.path.isfile(dp):
@@ -1173,10 +1202,12 @@ def carried(folder, d_items=False):
     bl = body.split('\n')
     da = [i for i, l in enumerate(bl) if D_HEAD.match(l)]
     dpart = '\n'.join(bl[da[0]:]) if da else ''  # section D: from its heading to the trace
-    for c in (tsv(cp, 8) if os.path.isfile(cp) else []):
+    crows = tsv(cp, 8) if os.path.isfile(cp) else []
+    for c in crows:
         cid = '(?<![\\w-])%s(?!\\d)' % c[0]
         if c[7] in CITE_CARRY and not re.search(cid, dpart):
             lost.append(('cite not asked: %s' if re.search(cid, body) else 'cite not carried: %s') % c[0])
+    lost += ['cite without hint: %s' % k for k in cite_items_unhinted(dpart, rule_docs_read(folder) | {c[2] for c in crows if c[2] != '-'})]
     dp2 = os.path.join(folder, 'decision-pairs.tsv')
     if os.path.isfile(dp2):
         for c in tsv(dp2, 3):

@@ -26,7 +26,8 @@ frames to copy; the `asks` rows then get their items as said under `d-items.tsv`
 `cites.tsv` holds every numbered item the handoff cites in a rule document (`rules.md #3`), written by script:
 the handoff's words for it beside the item's first line and its `path:line`, and a state; `match` says every word of
 the handoff's is on that line. A cite the script does not mark `match` is a question for the owner, whatever the
-drafter reads on the item's line: the drafter never settles it.
+drafter reads on the item's line: the drafter never settles it. The hint is the drafter's reading, never a default
+applied: the question stays open until the owner answers it.
 
 The rows that bear are the rows of `table.tsv` other than `none` that `look.tsv` does not `drop`. A row that
 `look.tsv` marks `ask` bears as a question, not as a conflict. An `asks` row bears as a question row of its
@@ -55,9 +56,12 @@ Write `scope.md` into the run folder with these sections:
   - every `against` row the check marks `ask`: the question whether the exception applies to this decision, who
     or what decides it, citing the rule `path:line` and the first rule `path:line` its `look.tsv` reason names;
   - every pair of `pairs-look.tsv` marked `disagree`, and every pair of `decision-pairs.tsv`, both decision ids on one line;
-  - every cite of `cites.tsv` not in state `match`: its id (`C3`), the handoff line, what the handoff cites
-    the item for, what the item says (its `path:line`, or that no single item has that number), and the question
-    which rule the handoff means.
+  - every cite of `cites.tsv` not in state `match`: a line that begins `- **C3**` (its id), with the handoff line,
+    what the handoff cites the item for, and what the item says (its `path:line`, or that no single item has that
+    number); on the next line `Hint (the drafter's reading):` and which rule you think the handoff means, with its
+    `path:line` in a rule document and the item's first words (for a number that matches more than one item, each
+    of those items with its `path:line` and first words; where no rule fits, the words `no single item`); then a
+    line `Question:` with the question which rule the handoff means. No blank line inside the item.
 
 Write also `d-items.tsv` into the run folder: one line for every `against` row the check keeps, three fields
 joined by one TAB, no header: `D<n>` TAB the rule `path:line` of the row TAB `against`.
