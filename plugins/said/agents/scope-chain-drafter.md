@@ -23,7 +23,7 @@ frames to copy; the `asks` rows then get their items as said under `d-items.tsv`
 `look.tsv`, no look ran: every row of `table.tsv` other than `none` bears as the reader wrote it. When it names no
 `pairs-look.tsv`, there is no pair to write.
 
-`cites.tsv` holds every numbered item the handoff cites in a rule document (`lists.md #21`), written by script:
+`cites.tsv` holds every numbered item the handoff cites in a rule document (`rules.md #3`), written by script:
 the handoff's words for it beside the item's first line and its `path:line`, and a state; `match` says every word of
 the handoff's is on that line.
 

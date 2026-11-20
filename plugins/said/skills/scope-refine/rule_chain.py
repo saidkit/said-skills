@@ -162,8 +162,7 @@ trace        writes the trace of every row other than none, with its look, at th
              audited, each report whole
 carried      the check of the draft: every row the looks do not drop is in the trace; every audit finding id is
              named in the draft (where it shapes the work, or under `Findings not carried`); every cite of
-             cites.tsv in state mismatch, ambiguous, no-item or no-file is named in the draft by its id; with
-             --d-items every
+             cites.tsv not in state match is named in the draft by its id; with --d-items every
              conflict and question has its d-items.tsv line and is named in the draft
 pass-check   the subjects check of one pass, and one line a rule section (kinds.tsv not no-rule) is mandatory: a
              `touched` row or an `out` row (on the section or its document); a rule section with neither is one
@@ -2110,7 +2109,7 @@ CITE_NUM = re.compile('#(\\d+)(?![\\w])')
 ITEM_LINE = re.compile('^(\\d+)\\.\\s+(.*)')
 HEAD_ITEM = re.compile('^#?(\\d+)(?:[.:)]|\\s)\\s*(?:(?:-|:|\\u2014)\\s*)?(.*)')
 CITE_STOP = ('also', 'each', 'every', 'from', 'into', 'must', 'only', 'than', 'that', 'then', 'this', 'when', 'with')
-CITE_CARRY = ('mismatch', 'ambiguous', 'no-item', 'no-file')
+CITE_CARRY = ('mismatch', 'ambiguous', 'no-item', 'no-file', 'no-words')
 
 def cite_words(s):
     ws = []
