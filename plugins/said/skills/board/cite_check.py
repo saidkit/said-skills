@@ -62,8 +62,8 @@ def text_faults(lane, text):
     for m in IN_TEXT.finditer(text):
         path, a, b, words = m.group(1), int(m.group(2)), m.group(3), m.group(4)
         cite = '%s:%s%s' % (path, m.group(2), '-' + b if b else '')
-        if not re.search(r'[A-Za-z]', path) or ('/' not in path and len(m.group(2)) >= 4):
-            continue  # a number such as 1.5:2, or a host and port such as example.com:8080, not a path
+        if not re.search(r'[A-Za-z]', path) or ('/' not in path and (len(m.group(2)) >= 4 or not re.search(r'\.[A-Za-z]\w*$', path))):
+            continue  # a number (1.5:2), a version (v1.2:3) or a host and port (example.com:8080), not a path
         if not inside(path):
             out.append((cite, 'outside the lane'))
             continue
