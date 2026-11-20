@@ -163,7 +163,8 @@ trace        writes the trace of every row other than none, with its look, at th
 carried      the check of the draft: every row the looks do not drop is in the trace; every audit finding id is
              named in the draft (where it shapes the work, or under `Findings not carried`); every cite of
              cites.tsv not in state match is asked in section D as its item, a line that begins `- **C<k>**`, and
-             each such item has a `Hint` line with a rule `path:line` or `no single item`; with --d-items every
+             each such item has a `Hint` line with a rule `path:line` (two or more for an ambiguous cite) or
+             `no single item`; with --d-items every
              conflict and question has its d-items.tsv line and is named in the draft
 pass-check   the subjects check of one pass, and one line a rule section (kinds.tsv not no-rule) is mandatory: a
              `touched` row or an `out` row (on the section or its document); a rule section with neither is one
@@ -1082,20 +1083,24 @@ def rule_docs_read(folder):
     return set(re.findall('`([^`]+)`', m.group(1))) if m else set()
 
 
-def cite_items_unhinted(dpart, docs):
-    """the ids of the cite items of section D (a line that begins `- **C<k>**`, up to the next such line or a blank
-    line) with no `Hint` line naming `no single item` or a `path:line` of a rule document"""
-    out, cur, ok = [], None, False
+def cite_hint_faults(dpart, docs, amb):
+    """the faults of the cite items of section D (a line that begins `- **C<k>**`, up to the next such line or a
+    blank line): an item with no `Hint` line naming `no single item` or a `path:line` of a rule document; an item of
+    a cite in `amb` (state ambiguous) whose `Hint` line names fewer than two such `path:line`, without `no single item`"""
+    out, cur, best = [], None, -1
     for l in dpart.split('\n') + ['']:
         m = CITE_ITEM.match(l)
         if m or not l.strip():
-            if cur and not ok:
-                out.append(cur)
-            cur, ok = (m.group(1), False) if m else (None, False)
+            if cur and best < 1:
+                out.append('cite without hint: %s' % cur)
+            elif cur and cur in amb and best < 2:
+                out.append('cite hint names one item: %s' % cur)
+            cur, best = (m.group(1), -1) if m else (None, -1)
             continue
-        if cur and HINT_LINE.match(l) and ('no single item' in l or any(
-                p in docs or any(d.endswith('/' + p) for d in docs) for p in re.findall('([\\w./-]+\\.md):\\d+', l))):
-            ok = True
+        if cur and HINT_LINE.match(l):
+            n = len({p for p in re.findall('([\\w./-]+\\.md:\\d+)', l)
+                     if p.rsplit(':', 1)[0] in docs or any(d.endswith('/' + p.rsplit(':', 1)[0]) for d in docs)})
+            best = max(best, 2 if 'no single item' in l else n)
     return out
 
 
@@ -1209,7 +1214,7 @@ def carried(folder, d_items=False):
             lost.append(('cite not asked: %s' if re.search(cid, body) else 'cite not carried: %s') % c[0])
         elif c[7] in CITE_CARRY and not re.search('(?m)^- \\*\\*%s\\*\\*' % c[0], dpart):
             lost.append('cite not in item form: %s' % c[0])
-    lost += ['cite without hint: %s' % k for k in cite_items_unhinted(dpart, rule_docs_read(folder) | {c[2] for c in crows if c[2] != '-'})]
+    lost += cite_hint_faults(dpart, rule_docs_read(folder) | {c[2] for c in crows if c[2] != '-'}, {c[0] for c in crows if c[7] == 'ambiguous'})
     dp2 = os.path.join(folder, 'decision-pairs.tsv')
     if os.path.isfile(dp2):
         for c in tsv(dp2, 3):
