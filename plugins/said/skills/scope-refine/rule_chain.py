@@ -164,7 +164,7 @@ carried      the check of the draft: every row the looks do not drop is in the t
              named in the draft (where it shapes the work, or under `Findings not carried`); every cite of
              cites.tsv not in state match is asked in section D as its item, a line that begins `- **C<k>**`, and
              each such item has a `Hint` line with a rule `path:line` (two or more for an ambiguous cite) or
-             `no single item`; with --d-items every
+             `no single item`, and a `Question:` line; with --d-items every
              conflict and question has its d-items.tsv line and is named in the draft
 pass-check   the subjects check of one pass, and one line a rule section (kinds.tsv not no-rule) is mandatory: a
              `touched` row or an `out` row (on the section or its document); a rule section with neither is one
@@ -1086,8 +1086,9 @@ def rule_docs_read(folder):
 def cite_hint_faults(dpart, docs, amb):
     """the faults of the cite items of section D (a line that begins `- **C<k>**`, up to the next such line or a
     blank line): an item with no `Hint` line naming `no single item` or a `path:line` of a rule document; an item of
-    a cite in `amb` (state ambiguous) whose `Hint` line names fewer than two such `path:line`, without `no single item`"""
-    out, cur, best = [], None, -1
+    a cite in `amb` (state ambiguous) whose `Hint` line names fewer than two such `path:line`, without `no single item`;
+    an item with no `Question:` line"""
+    out, cur, best, ask = [], None, -1, False
     for l in dpart.split('\n') + ['']:
         m = CITE_ITEM.match(l)
         if m or not l.strip():
@@ -1095,8 +1096,12 @@ def cite_hint_faults(dpart, docs, amb):
                 out.append('cite without hint: %s' % cur)
             elif cur and cur in amb and best < 2:
                 out.append('cite hint names one item: %s' % cur)
-            cur, best = (m.group(1), -1) if m else (None, -1)
+            if cur and not ask:
+                out.append('cite without question: %s' % cur)
+            cur, best, ask = (m.group(1), -1, False) if m else (None, -1, False)
             continue
+        if cur and l.lstrip().startswith('Question:'):
+            ask = True
         if cur and HINT_LINE.match(l):
             n = len({p for p in re.findall('([\\w./-]+\\.md:\\d+)', l)
                      if p.rsplit(':', 1)[0] in docs or any(d.endswith('/' + p.rsplit(':', 1)[0]) for d in docs)})
