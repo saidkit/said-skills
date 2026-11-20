@@ -236,7 +236,7 @@ Agent prompts name every path from the lane root. Every command that reads the l
    - Run `$CHAIN question-check <q> --look A --lane . --handoff $H` yourself on every part of `qlook-a` (`--look B` on every part of `qlook-b`); the looks never run a script. Exit 1 -> run it again with `> <q>/qlook-faults.txt` and start that look on that part once more with the same prompt and the line `- round 2: the check exited 1; its faults: <q>/qlook-faults.txt. Fix qlook.tsv.` Exit 1 again -> BLOCK with the faults.
    - `$CHAIN questions-merge $RUN/qlook-a $RUN/qlook-a/parts` and `$CHAIN questions-merge $RUN/qlook-b $RUN/qlook-b/parts`, then `$CHAIN question-join $RUN/qlook-a $RUN/qlook-b $RUN/questions-join.tsv --lane . --handoff $H` (a row stays a question when both looks say `choice`; a row only one look says `choice` on is not asked: it is named in its decision's question frame when the decision has one, otherwise listed as one look of two; any other row becomes a rule to follow or a rule the handoff follows when a look says `rule-settles` or `answered` (look A's kind when the two differ), and a rule read and judged not to bear when both say `no-bear`; the script writes the four lists with both grounds directly before section D).
 
-10. **Code audit.** First, if `$RUN/audit/dirs.tsv` is there (made in step 5), run only the audit-check line below. Otherwise `$CHAIN audit-dirs . $RUN --handoff $H` (with the operator's scope-hint: add `--hint <scope-hint>`). It prints one line a directory the handoff names: `A<n>` with the directory to audit, or `-` with `absent` or `ambiguous` (no audit; the draft says so), or `audit: no directory named` -> go to 11. Start one `said:scope-audit` agent for every `A<n>`, all in one assistant message, each with exactly this prompt:
+10. **Code audit.** First, if `$RUN/audit/dirs.tsv` is there (made in step 5), run only the audit-check line below. Otherwise `$CHAIN audit-dirs . $RUN --handoff $H` (with the operator's scope-hint: add `--hint <scope-hint>`). It prints one line a directory the handoff names: `A<n>` with the directory to audit (a named directory that is gone: its feature dir, the ancestor two names deep, else the nearest existing one, `parent`), or `-` with `absent` or `ambiguous` (no audit; the draft says so), or `audit: no directory named` -> go to 11. Start one `said:scope-audit` agent for every `A<n>`, all in one assistant message, each with exactly this prompt:
 
     ```
     Task: audit one directory.
@@ -246,7 +246,7 @@ Agent prompts name every path from the lane root. Every command that reads the l
 
     Run `$CHAIN audit-check $RUN/audit A<n> --lane .` yourself on every report. Exit 1 -> save its output as `$RUN/audit/A<n>-faults.txt` and start that audit once more with the same prompt and the line `- round 2: the check exited 1; its faults: $RUN/audit/A<n>-faults.txt. Fix the report.` Exit 1 again -> BLOCK with the faults.
 
-11. **Draft.** `$CHAIN draft-in $RUN $RUN/draft --lane .` (the drafter's folder: the table without the split rows and the rows that are no longer questions, the looks, the split rows, the question looks' join, the audits, the list of rule documents read and the question frames `frames.md`, one a decision the owner must answer). Start one `said:scope-chain-drafter` agent with exactly this prompt (`<d>` = `$RUN/draft`):
+11. **Draft.** `$CHAIN draft-in $RUN $RUN/draft --lane . --handoff $H` (the drafter's folder: the table without the split rows and the rows that are no longer questions, the looks, the split rows, the question looks' join, the audits, the list of rule documents read, the question frames `frames.md`, one a decision the owner must answer, and `cites.tsv`, every numbered item the handoff cites in a rule document beside that item's first line). Start one `said:scope-chain-drafter` agent with exactly this prompt (`<d>` = `$RUN/draft`):
 
    ```
    Task: the scope draft.
@@ -258,6 +258,7 @@ Agent prompts name every path from the lane root. Every command that reads the l
    - pairs look: <d>/pairs-look.tsv
    - audits: <d>/audit/
    - frames: <d>/frames.md
+   - cites: <d>/cites.tsv
    - write: <d>/scope.md, <d>/d-items.tsv
    - check command: python3 -I -B <script> trace <d> && python3 -I -B <script> carried <d> --d-items
    ```

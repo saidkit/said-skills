@@ -8,9 +8,9 @@ model: sonnet
 
 ## Contract
 
-- Input: the handoff, the code it names, decisions.tsv, decision-pairs.tsv, table.tsv, audit/, and look.tsv, pairs-look.tsv and frames.md when the task names them.
+- Input: the handoff, the code it names, decisions.tsv, decision-pairs.tsv, table.tsv, audit/, cites.tsv, and look.tsv, pairs-look.tsv and frames.md when the task names them.
 - Returns: scope.md (sections A to D) and d-items.tsv in the run folder; last message `draft written`.
-- Rule: open no rule document and cite no rule that has no row of table.tsv.
+- Rule: open no rule document and cite no rule that has no row of table.tsv or cites.tsv.
 
 # Drafter
 
@@ -22,6 +22,10 @@ frames, one a decision the owner must answer, written by script. When the task n
 frames to copy; the `asks` rows then get their items as said under `d-items.tsv` below. When the task names no
 `look.tsv`, no look ran: every row of `table.tsv` other than `none` bears as the reader wrote it. When it names no
 `pairs-look.tsv`, there is no pair to write.
+
+`cites.tsv` holds every numbered item the handoff cites in a rule document (`lists.md #21`), written by script:
+the handoff's words for it beside the item's first line and its `path:line`, and a state; `match` says every word of
+the handoff's is on that line.
 
 The rows that bear are the rows of `table.tsv` other than `none` that `look.tsv` does not `drop`. A row that
 `look.tsv` marks `ask` bears as a question, not as a conflict. An `asks` row bears as a question row of its
@@ -36,6 +40,8 @@ Write `scope.md` into the run folder with these sections:
   audit found: name each finding id of the audit reports (`A1-3`) where it shapes the work, and list every other
   finding id under a line `Findings not carried:` with one short reason. A finding that contradicts a decision of
   the handoff is also an item of section D, naming its id. Do not copy the reports: a script appends them whole.
+  List under a line `Cites that hold:` every cite of `cites.tsv` not in state `match` whose item says what the
+  handoff cites it for, by its id (`C3`) with one short reason.
 - **D. Conflicts and open questions** - headed by one line that begins `## D.` (no other line of the draft
   begins so); one item each:
   - every `against` row kept by the check: the decision, the rule `path:line`, what it forbids or requires,
@@ -49,7 +55,10 @@ Write `scope.md` into the run folder with these sections:
     `Question:`. Write no other item for an `asks` row;
   - every `against` row the check marks `ask`: the question whether the exception applies to this decision, who
     or what decides it, citing the rule `path:line` and the first rule `path:line` its `look.tsv` reason names;
-  - every pair of `pairs-look.tsv` marked `disagree`, and every pair of `decision-pairs.tsv`, both decision ids on one line.
+  - every pair of `pairs-look.tsv` marked `disagree`, and every pair of `decision-pairs.tsv`, both decision ids on one line;
+  - every other cite of `cites.tsv` not in state `match`: its id (`C3`), the handoff line, what the handoff cites
+    the item for, what the item says (its `path:line`, or that no single item has that number), and the question
+    which rule the handoff means.
 
 Write also `d-items.tsv` into the run folder: one line for every `against` row the check keeps, three fields
 joined by one TAB, no header: `D<n>` TAB the rule `path:line` of the row TAB `against`.

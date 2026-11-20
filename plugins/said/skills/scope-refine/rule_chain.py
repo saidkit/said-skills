@@ -48,7 +48,8 @@ usage: rule_chain.py size --lane <lane> [--handoff <handoff>] [--manifest <out m
        rule_chain.py question-join <look folder A> <look folder B> <out questions-join.tsv> --lane <lane> --handoff <handoff>
        rule_chain.py audit-dirs <lane> <run folder> --handoff <handoff> [--hint <dir>,<dir> | --hint -]
        rule_chain.py audit-check <audit folder> <audit id> --lane <lane>
-       rule_chain.py draft-in <run folder> <out folder> [--lane <lane>]
+       rule_chain.py cites <lane> <out cites.tsv> --handoff <handoff>
+       rule_chain.py draft-in <run folder> <out folder> --lane <lane> --handoff <handoff>
        rule_chain.py trace <run folder>
        rule_chain.py carried <run folder> [--d-items]
        rule_chain.py pass-check <pass folder> --mandatory --kinds <kinds.tsv> [--net]
@@ -133,8 +134,16 @@ questions-merge  the parts' qlook.tsv joined into the look folder's; refused whi
 question-join  a question becomes a rule to follow only when both looks say rule-settles, and a rule the handoff
              follows only when both say answered; every other row stays a question; both looks must pass their check
 audit-dirs   the directories the handoff names in backquotes (a path ending /), or the --hint list: found from the
-             lane root or as the end of exactly one lane directory path; writes audit/dirs.tsv and a task file for
-             each one found; an absent or ambiguous one gets a line in the draft and no audit
+             lane root or as the end of exactly one lane directory path; one that is gone takes its feature directory
+             found so, the ancestor two names deep, else its nearest existing ancestor (state parent); writes
+             audit/dirs.tsv and a task file for each one found; an absent or ambiguous one gets a line in the
+             draft and no audit
+cites        cites.tsv: every `#<n>` item the handoff cites in a rule document (`<name>.md`, at most three words,
+             then `#<n>`, more `#<n>` after it): the handoff's words for it beside the item's first line (a line
+             `<n>. ` under a heading holding the word before the first `#`, else the one such line), one row a
+             cite: id, handoff line, document, n, item line, handoff words, item first line, state; the state is
+             match (every word of four letters or more of the handoff's is on the item's first line), mismatch,
+             ambiguous (more than one such item), no-item, no-file or no-words; an item is also a heading `#<n>`
 audit-check  the check of one audit report: its heading, Coverage line, five sections in order, finding ids of its
              audit, each finding citing a lane line with words on it, or (absent)
 draft-in     the drafter's folder: the run folder's decisions, looks, split rows and manifest, table-all.tsv,
@@ -145,13 +154,16 @@ draft-in     the drafter's folder: the run folder's decisions, looks, split rows
              look.tsv keeps an against row, refused unless confirm/confirm.tsv passes confirm-check: a kept row
              the confirm says does not hold becomes a drop in the drafter's look.tsv, its sentence the why-not;
              cannot tell becomes an ask with the sentence and its table row a question row (class asks) in
-             the drafter's table, named in its decision's question frame with the sentence
+             the drafter's table, named in its decision's question frame with the sentence; writes the drafter's
+             cites.tsv (as cites)
 trace        writes the trace of every row other than none, with its look, at the end of scope.md; the rows of
              split.tsv go in their own block, both looks' verdicts and grounds verbatim; the rules to follow and the rules the handoff
              follows each in their own block with both grounds; then the codebase audits section: the path line, a line for each directory not
              audited, each report whole
 carried      the check of the draft: every row the looks do not drop is in the trace; every audit finding id is
-             named in the draft (where it shapes the work, or under `Findings not carried`); with --d-items every
+             named in the draft (where it shapes the work, or under `Findings not carried`); every cite of
+             cites.tsv in state mismatch, ambiguous, no-item or no-file is named in the draft by its id; with
+             --d-items every
              conflict and question has its d-items.tsv line and is named in the draft
 pass-check   the subjects check of one pass, and one line a rule section (kinds.tsv not no-rule) is mandatory: a
              `touched` row or an `out` row (on the section or its document); a rule section with neither is one
@@ -1158,6 +1170,10 @@ def carried(folder, d_items=False):
     for fid in audit_ids(folder):
         if not re.search('(?<![\\w-])%s(?!\\d)' % re.escape(fid), body):
             lost.append('audit finding not named in the draft: %s' % fid)
+    cp = os.path.join(folder, CITES_FILE)
+    for c in (tsv(cp, 8) if os.path.isfile(cp) else []):
+        if c[7] in CITE_CARRY and not re.search('(?<![\\w-])%s(?!\\d)' % c[0], body):
+            lost.append('cite not carried: %s' % c[0])
     dp2 = os.path.join(folder, 'decision-pairs.tsv')
     if os.path.isfile(dp2):
         for c in tsv(dp2, 3):
@@ -1926,8 +1942,26 @@ def named_dirs(lane, handoff_text, hint=None):
         if every is None:
             every = lane_dirs(lane)
         m = [d for d in every if d.endswith('/' + t)]
+        up = None if m else parent_dir(lane, t, every)
+        if up:
+            out.append((t, up, 'parent', [up]))
+            continue
         out.append((t, m[0], 'audit', m) if len(m) == 1 else (t, '-', 'ambiguous' if m else 'absent', m))
     return out
+
+def parent_dir(lane, t, every):
+    """the ancestor audited for a named directory that is gone: its feature directory, the ancestor two names deep,
+    else the nearest existing ancestor of three names or more; each from the lane root or the end of exactly one lane
+    directory path (an ambiguous one is passed over); none when no ancestor is found"""
+    parts = t.strip('/').split('/')
+    for n in [2] * (len(parts) > 2) + list(range(len(parts) - 1, 2, -1)):
+        p = '/'.join(parts[:n]) + '/'
+        if os.path.isdir(os.path.join(lane, p)):
+            return p
+        m = [d for d in every if d.endswith('/' + p)]
+        if len(m) == 1:
+            return m[0]
+    return None
 
 def dir_files(lane, d):
     fs = []
@@ -1958,7 +1992,7 @@ def audit_dirs(lane, run, hint=None):
     os.makedirs(out)
     rows, k = ([], 0)
     for named, path, state, matches in found:
-        if state != 'audit':
+        if state not in ('audit', 'parent'):
             rows.append(['-', named, '-', state, '0', '0'])
             continue
         k += 1
@@ -1978,6 +2012,8 @@ def audit_dirs(lane, run, hint=None):
                 cl.append('  - %s "%s"' % (r, ' '.join(lines_of(lane, p)[int(n) - 1].split())))
         task = ['# Audit task %s' % aid, '', '- dir-path: %s' % path, '- audit-id: %s' % aid, "- target-shape: the handoff's lines that name this directory (%s), verbatim:" % HANDOFF]
         task += ['  %d: %s' % (i, hl[i - 1]) for i in at]
+        if state == 'parent':
+            task.append('- named: %s, no such directory in the lane; this ancestor is audited in its place' % named)
         task += ['- contract-clauses: %s' % ('the rule lines the checked table holds for the decisions on those lines:' if cl else 'none')] + cl
         task += ['- report-shape:', ''] + ['    ' + l if l else '' for l in AUDIT_SHAPE.split('\n')]
         with open(os.path.join(out, aid + '.task.md'), 'w', encoding='utf-8', newline='\n') as fh:
@@ -2062,9 +2098,95 @@ def audit_text(folder):
             lines_.append('- `%s`: named in the handoff, no such directory in the lane; not audited.' % c[1])
         elif c[3] == 'ambiguous':
             lines_.append('- `%s`: named in the handoff, more than one lane directory ends so; not audited.' % c[1])
+        elif c[3] == 'parent':
+            lines_.append('- `%s`: named in the handoff, no such directory in the lane; its ancestor `%s` is audited (%s).' % (c[1], c[2], c[0]))
     for c in au:
         lines_ += ['', read(os.path.join(folder, AUDIT_DIR, c[0] + '.md')).strip()]
     return '\n'.join(lines_) + '\n'
+
+CITES_FILE = 'cites.tsv'
+CITE_DOC = re.compile('`?([\\w./-]+\\.md)`?')
+CITE_NUM = re.compile('#(\\d+)(?![\\w])')
+ITEM_LINE = re.compile('^(\\d+)\\.\\s+(.*)')
+HEAD_ITEM = re.compile('^#?(\\d+)(?:[.:)]|\\s)\\s*(?:(?:-|:|\\u2014)\\s*)?(.*)')
+CITE_STOP = ('also', 'each', 'every', 'from', 'into', 'must', 'only', 'than', 'that', 'then', 'this', 'when', 'with')
+CITE_CARRY = ('mismatch', 'ambiguous', 'no-item', 'no-file')
+
+def cite_words(s):
+    ws = []
+    for w in re.findall('[a-z0-9]+', s.lower()):
+        w = w[:-1] if len(w) > 4 and w.endswith('s') else w
+        if len(w) >= 4 and w not in CITE_STOP and w not in ws:
+            ws.append(w)
+    return ws
+
+def cite_label(r):
+    """(the handoff's words for one cite, whether more cites follow): a parenthesis right after `#<n>`, else the
+    text up to the end of the clause"""
+    s = r.strip()
+    if s.startswith('('):
+        d = 0
+        for i, ch in enumerate(s):
+            d += {'(': 1, ')': -1}.get(ch, 0)
+            if d == 0:
+                return s[1:i].strip(), s[i + 1:].strip(' ,;') in ('', 'and', 'or')
+        return s[1:].strip(), False
+    head = re.split('[.;](?:\\s|$)', s, maxsplit=1)
+    return head[0].strip(' ,'), len(head) == 1
+
+def cite_item(lane, doc, word, n):
+    """(line, text) of item <n> of a rule document, a line `<n>. ` or a heading `#<n>` or `<n>.`: under a heading
+    that holds the word, else the one such item; `ambiguous` when more than one"""
+    hits, stack, fence = ([], []), [], False
+    for i, l in enumerate(lines_of(lane, doc), 1):
+        if FENCE.match(l):
+            fence = not fence
+            continue
+        if fence:
+            continue
+        h = HEAD.match(l)
+        if h:
+            stack = [x for x in stack if x[0] < len(h.group(1))]
+        m = HEAD_ITEM.match(h.group(2)) if h else ITEM_LINE.match(l)
+        if m and int(m.group(1)) == n:
+            hits[1].append((i, m.group(2)))
+            if word and any(word.lower() in x[1] for x in stack):
+                hits[0].append((i, m.group(2)))
+        if h:
+            stack.append((len(h.group(1)), h.group(2).lower()))
+    for x in hits:
+        if x:
+            return x[0] if len(x) == 1 else 'ambiguous'
+    return None
+
+def cites(lane):
+    hl = lines_of(lane, HANDOFF)
+    docs = rule_files(lane)
+    rows = []
+    for ln, l in enumerate(hl, 1):
+        ds = list(CITE_DOC.finditer(l))
+        for j, d in enumerate(ds):
+            seg = l[d.end():ds[j + 1].start() if j + 1 < len(ds) else len(l)]
+            ns = list(CITE_NUM.finditer(seg))
+            if not ns or len(seg[:ns[0].start()].split()) > 3:
+                continue
+            lead = seg[:ns[0].start()].split()
+            word = lead[-1] if lead and re.match('^[A-Za-z][\\w-]*$', lead[-1]) else ''
+            name = d.group(1)
+            hit = [f for f in docs if f == name or f.endswith('/' + name)]
+            doc = hit[0] if len(hit) == 1 else None
+            for k, nm in enumerate(ns):
+                words, more = cite_label(seg[nm.end():ns[k + 1].start() if k + 1 < len(ns) else len(seg)])
+                it = cite_item(lane, doc, word, int(nm.group(1))) if doc else None
+                state = 'no-file' if not doc else 'no-item' if not it else it if it == 'ambiguous' else 'no-words' if \
+                    not cite_words(words) else 'match' if all(w in cite_words(it[1]) for w in cite_words(words)) else 'mismatch'
+                it = it if isinstance(it, tuple) else None
+                rows.append(['C%d' % (len(rows) + 1), '%s:%d' % (HANDOFF, ln), doc or '-', nm.group(1),
+                             '%s:%d' % (doc, it[0]) if it else '-', fold(words.replace('\t', ' ')) or '-',
+                             fold(it[1].replace('\t', ' ')) if it else '-', state])
+                if not more:
+                    break
+    return rows
 
 LARGE_BYTES = 170000  # the largest size measured good for one agent
 PORTION_BYTES = 150000
@@ -2443,6 +2565,8 @@ def confirmed_look(run):
 def draft_in(run, out, lane=None):
     if os.path.exists(out):
         raise Refused('refused: %s exists; name a fresh folder' % out)
+    if lane is None or not HANDOFF:
+        raise Refused('refused: draft-in needs --lane and --handoff (it writes the cites)')
     for f in ('decisions.tsv', 'table.tsv'):
         if not os.path.isfile(os.path.join(run, f)):
             raise Refused('refused: the run folder has no %s' % f)
@@ -2500,6 +2624,7 @@ def draft_in(run, out, lane=None):
     ft = frames_text(out)
     if ft:
         put(os.path.join(out, FRAMES_FILE), ft + '\n')
+    write(os.path.join(out, CITES_FILE), cites(lane))
     return len(t), len(t) - len(keep), len(sp)
 
 
@@ -3850,7 +3975,7 @@ def main(argv):
     ab = lambda k: os.path.realpath(os.path.abspath(opt[k]))
     if '--handoff' in opt:
         HANDOFF = os.path.relpath(ab('--handoff'), ab('--lane')).replace(os.sep, '/') if '--lane' in opt else \
-            os.path.relpath(ab('--handoff'), a[0]).replace(os.sep, '/') if cmd == 'audit-dirs' and a else opt['--handoff']
+            os.path.relpath(ab('--handoff'), a[0]).replace(os.sep, '/') if cmd in ('audit-dirs', 'cites') and a else opt['--handoff']
     try:
         if cmd == 'size' and not a and '--lane' in opt:
             npaths, _, loose, extra, text = manifest(ab('--lane'))
@@ -3921,6 +4046,18 @@ def main(argv):
             for m in faults:
                 print('fault: ' + m)
             return 1 if faults else 0
+        if cmd == 'cites' and len(a) == 2:
+            if '--handoff' not in opt:
+                raise Refused('refused: cites needs --handoff')
+            rows = cites(a[0])
+            write(a[1], rows)
+            n = lambda s: sum(1 for c in rows if c[7] == s)
+            print('cites %d: match %d, mismatch %d, ambiguous %d, no-item %d, no-file %d, no-words %d' % (
+                len(rows), n('match'), n('mismatch'), n('ambiguous'), n('no-item'), n('no-file'), n('no-words')))
+            for c in rows:
+                if c[7] in CITE_CARRY:
+                    print('%s\t%s\t%s #%s\t%s' % (c[0], c[1], c[2], c[3], c[7]))
+            return 0
         if cmd == 'draft-in' and len(a) == 2:
             (n, out, sp), same = again([a[1]], draft_in, a[0], a[1], ab('--lane') if '--lane' in opt else None)
             print('draft-in: table rows %d, split rows out %d (split.tsv rows %d)%s' % (n, out, sp, '; unchanged' if same else ''))
