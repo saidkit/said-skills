@@ -162,7 +162,7 @@ trace        writes the trace of every row other than none, with its look, at th
              audited, each report whole
 carried      the check of the draft: every row the looks do not drop is in the trace; every audit finding id is
              named in the draft (where it shapes the work, or under `Findings not carried`); every cite of
-             cites.tsv not in state match is named in the draft by its id; with --d-items every
+             cites.tsv not in state match is asked in section D by its id; with --d-items every
              conflict and question has its d-items.tsv line and is named in the draft
 pass-check   the subjects check of one pass, and one line a rule section (kinds.tsv not no-rule) is mandatory: a
              `touched` row or an `out` row (on the section or its document); a rule section with neither is one
@@ -1170,9 +1170,13 @@ def carried(folder, d_items=False):
         if not re.search('(?<![\\w-])%s(?!\\d)' % re.escape(fid), body):
             lost.append('audit finding not named in the draft: %s' % fid)
     cp = os.path.join(folder, CITES_FILE)
+    bl = body.split('\n')
+    da = [i for i, l in enumerate(bl) if D_HEAD.match(l)]
+    dpart = '\n'.join(bl[da[0]:]) if da else ''  # section D: from its heading to the trace
     for c in (tsv(cp, 8) if os.path.isfile(cp) else []):
-        if c[7] in CITE_CARRY and not re.search('(?<![\\w-])%s(?!\\d)' % c[0], body):
-            lost.append('cite not carried: %s' % c[0])
+        cid = '(?<![\\w-])%s(?!\\d)' % c[0]
+        if c[7] in CITE_CARRY and not re.search(cid, dpart):
+            lost.append(('cite not asked: %s' if re.search(cid, body) else 'cite not carried: %s') % c[0])
     dp2 = os.path.join(folder, 'decision-pairs.tsv')
     if os.path.isfile(dp2):
         for c in tsv(dp2, 3):
