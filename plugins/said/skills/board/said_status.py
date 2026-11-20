@@ -1860,11 +1860,14 @@ def _fr_owed(why):
     return 1, ["feature-review: header | FAIL | %s" % why, "feature review owed: %s" % why]
 
 
-def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decision_ids=(), dirty=lambda: 0, doc=False):
+def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decision_ids=(), dirty=lambda: 0, doc=False,
+                         cites=None):
     """(rc, lines) of a verdict text with no file or git read of its own: parse it against the head sha, then
     `dirty()` (the count of uncommitted files outside the working dir), a row per rule id and a Covers or Uncovered
-    decisions row per decision id; rc 0 and the row lines, or rc 1 and the owed lines. feature_review_output reads
-    the file, the store and the records, then calls this."""
+    decisions row per decision id; rc 0 and the row lines, or rc 1 and the owed lines. cites(cell text) gives the
+    failing cites of a row as [(cite, why)]: such a row is written FAIL with its cites in the evidence cell, never
+    dropped, and the verdict follows the rows. feature_review_output reads the file, the store and the records, then
+    calls this."""
     import gate_record
     try:
         verdict, rows = _fr_parse(text, sha, workdir, verdict_path, doc)
@@ -1881,6 +1884,9 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
             raise FeatureReviewRefused("no row in Covers or %s for %s" % (gate_record.FR_DECISIONS, ", ".join(missing[:8])))
     except FeatureReviewRefused as e:
         return _fr_owed(e)
+    if cites:
+        rows = [(g, _fr_cite_row(g, c, cites(" | ".join(c[:-1])))) for g, c in rows]
+        verdict = "FAIL" if any(c[-1] == "FAIL" for _, c in rows) else verdict
     out = ["feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ"))]
     for group, _cols in gate_record.fr_groups(doc):
         if not any(g == group for g, _ in rows):
@@ -1888,9 +1894,25 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
             continue
         for g, cells in rows:
             if g == group:
-                ev = cells[1] if group in ("Earned rules", gate_record.FR_EDITORIAL[0]) else cells[-2]
+                ev = cells[_fr_evidence_at(group, cells)]
                 out.append("feature-review: %s | %s | %s | %s" % (group, _fr_clean(cells[0], 40), cells[-1], _fr_clean(ev, 80)))
     return 0, out
+
+
+def _fr_evidence_at(group, cells):
+    import gate_record
+    return 1 if group in ("Earned rules", gate_record.FR_EDITORIAL[0]) else len(cells) - 2
+
+
+def _fr_cite_row(group, cells, faults):
+    """The row as it is when every cite holds; else a FAIL row whose evidence cell names each failing cite."""
+    if not faults:
+        return cells
+    out = list(cells)
+    tail = lambda c: c if len(c) <= 40 else "..." + c[-37:]  # the row cell is cut at 80: keep the cite's end
+    out[_fr_evidence_at(group, cells)] = "cite " + "; ".join("%s %s" % (tail(c), why) for c, why in faults)
+    out[-1] = "FAIL"
+    return out
 
 
 def feature_review_output(root, workdir, feature, decisions=()):
@@ -1934,7 +1956,9 @@ def feature_review_output(root, workdir, feature, decisions=()):
     wd = os.path.realpath(workdir)
     dirty = (lambda: len(gate_record.git_dirty(root, ["."], wd, set()))) if toks and toks[0] == "git" else (lambda: 0)
     try:
-        return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc)
+        import cite_check  # the one cite check, shared with the scope chain
+        return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc,
+                                    lambda cell: cite_check.text_faults(root, cell))
     except gate_record.Error as e:
         return 2, ["error: %s" % e]
 

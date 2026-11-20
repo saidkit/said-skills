@@ -198,9 +198,13 @@ tiers        join/zone.tsv: the rule sections touched by pass-1 or pass-2, with 
 tier-join    table-0.tsv: zone-1's table, a unit it found nothing in taking zone-2's rows (as table-join), then
              band-1's rows as they are; refused when a band unit is a unit of the zone. The hole round reads it
 """
-import hashlib, math, os, re, sys
+import hashlib, importlib.util, math, os, re, sys
 
 sys.dont_write_bytecode = True
+
+_CC = importlib.util.spec_from_file_location('said_cite_check', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'board', 'cite_check.py'))
+CITES = importlib.util.module_from_spec(_CC)  # the one cite check, shared with the feature-review step
+_CC.loader.exec_module(CITES)
 
 INDEX_DIR = 'rule-index'
 
@@ -1857,13 +1861,7 @@ def deal_questions(folder, out, cap=QUESTION_PART, reverse=False):
     return res
 
 def cite_line(lane, cite):
-    m = re.match('^([\\w./-]+):(\\d+)$', cite)
-    if not m or '..' in m.group(1).split('/') or m.group(1).startswith('/'):
-        return None
-    p = os.path.join(lane, m.group(1))
-    if not os.path.isfile(p) or not 1 <= int(m.group(2)) <= len(lines_of(lane, m.group(1))):
-        return None
-    return (m.group(1), int(m.group(2)))
+    return CITES.cite_line(lane, cite, lambda p: os.path.isfile(p), lambda p: lines_of(lane, p))
 
 def is_handoff(path):
     return bool(HANDOFF) and (path == HANDOFF or (os.path.basename(path) == os.path.basename(HANDOFF) and HANDOFF.endswith(path)))
@@ -2113,7 +2111,7 @@ def audit_report_check(audit, aid, lane):
             at_ = cite_line(lane, '%s:%s' % (c.group(1), c.group(2)))
             if at_ is None:
                 faults.append('%s.md: %s cites %s:%s, no such line' % (aid, fid, c.group(1), c.group(2)))
-            elif fold(c.group(3).replace("'", '"')) not in fold(lines_of(lane, at_[0])[at_[1] - 1]) and fold(c.group(3)) not in fold(lines_of(lane, at_[0])[at_[1] - 1]):
+            elif not CITES.quote_at(lines_of(lane, at_[0])[at_[1] - 1], c.group(3)):
                 faults.append('%s.md: %s quotes words not on %s:%s' % (aid, fid, c.group(1), c.group(2)))
     return faults
 
