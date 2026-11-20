@@ -162,8 +162,8 @@ trace        writes the trace of every row other than none, with its look, at th
              audited, each report whole
 carried      the check of the draft: every row the looks do not drop is in the trace; every audit finding id is
              named in the draft (where it shapes the work, or under `Findings not carried`); every cite of
-             cites.tsv not in state match is asked in section D by its id, and each cite item there (`- **C<k>**`)
-             has a `Hint` line with a rule `path:line` or `no single item`; with --d-items every
+             cites.tsv not in state match is asked in section D as its item, a line that begins `- **C<k>**`, and
+             each such item has a `Hint` line with a rule `path:line` or `no single item`; with --d-items every
              conflict and question has its d-items.tsv line and is named in the draft
 pass-check   the subjects check of one pass, and one line a rule section (kinds.tsv not no-rule) is mandatory: a
              `touched` row or an `out` row (on the section or its document); a rule section with neither is one
@@ -1207,6 +1207,8 @@ def carried(folder, d_items=False):
         cid = '(?<![\\w-])%s(?!\\d)' % c[0]
         if c[7] in CITE_CARRY and not re.search(cid, dpart):
             lost.append(('cite not asked: %s' if re.search(cid, body) else 'cite not carried: %s') % c[0])
+        elif c[7] in CITE_CARRY and not re.search('(?m)^- \\*\\*%s\\*\\*' % c[0], dpart):
+            lost.append('cite not in item form: %s' % c[0])
     lost += ['cite without hint: %s' % k for k in cite_items_unhinted(dpart, rule_docs_read(folder) | {c[2] for c in crows if c[2] != '-'})]
     dp2 = os.path.join(folder, 'decision-pairs.tsv')
     if os.path.isfile(dp2):
