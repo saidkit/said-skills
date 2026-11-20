@@ -7,7 +7,7 @@
 - after: said-0.26.0
 
 One ordered pass that brings a project from `said` 0.27.1 onto 0.28.0. A lane stamped `said@0.26.0` takes it too:
-0.27.0 and 0.27.1 ask nothing of a lane. 0.28.0 renames the phases, three agents and one lane key.
+0.27.0 and 0.27.1 ask nothing of a lane. 0.28.0 renames the phases, five agents and one lane key.
 **Config only: no engine edit, no new skill, no commit unless the project's owner asks.**
 
 ## Preconditions
@@ -45,7 +45,8 @@ The phases are Scope, Act, Inspect, Debrief, Closed. In the project's instructio
 - the phase Implement -> Act;
 - the phase Deliver -> Inspect for the gates (`review-qa`, `review-ux`, `accept`) and Debrief for `/said:debrief`;
 - `said:review-ux-agent` -> `said:web-ux-reviewer`, `said:gate-reviewer` -> `said:gate-reader`, the agent
-  `said:cli-gate` -> `said:cli-gate-reviewer`. The Checker id `cli-gate` in `SAID.reviewers:` keeps its name:
+  `said:cli-gate` -> `said:cli-gate-reviewer`, `said:scope-refine-agent` -> `said:scope-refiner`,
+  `said:scope-audit` -> `said:scope-auditor`. The Checker id `cli-gate` in `SAID.reviewers:` keeps its name:
   Checkers resolve by their `said-checker:` key, not by file name.
 
 A reader of `/said:board --json` sees the new phase values; a script that matched the old ones is updated the same
@@ -62,10 +63,12 @@ The shipped plugin names Architect only as Act's first step, "the Architect step
 lines with it; any other use is a leftover.
 
 - `README.md`: 2
+- `agents/scope-refiner.md`: 5
 - `skills/add-task/SKILL.md`: 2
 - `skills/architect/SKILL.md`: 4
 - `skills/flow/SKILL.md`: 9
 - `skills/said/SKILL.md`: 7
+- `skills/setup/references/lane-schema.json`: 1
 - `skills/scope-grill/SKILL.md`: 8
 - `skills/scope-refine/SKILL.md`: 3
 - `skills/uxtoc/SKILL.md`: 1
@@ -96,7 +99,7 @@ echo "old key lines: ${N:-0}"
 ```bash
 T="${T:-.}"
 FILES="$(ls "$T"/CLAUDE.md "$T"/Makefile "$T"/package.json 2>/dev/null; find "$T/.claude" "$T/scripts" -type f 2>/dev/null)"
-P='\b(Implement|Deliver)\b|said:(review-ux-agent|gate-reviewer|cli-gate)([^a-z-]|$)'
+P='\b(Implement|Deliver)\b|said:(review-ux-agent|gate-reviewer|cli-gate|scope-refine-agent|scope-audit)([^a-z-]|$)'
 N=0
 if [ -n "$FILES" ]; then
   printf '%s\n' "$FILES" | xargs grep -nE "$P" 2>/dev/null

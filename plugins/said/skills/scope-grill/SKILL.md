@@ -14,7 +14,7 @@ description: >
 
 # Feature Scope Grill — Phase 1 (Scope) Case 2: Interactive Ideation
 
-This skill drives the Phase 1 Case 2 path — turning a thin user prompt into a complete `scope.md`. Case 1 (handoff exists) uses the `said:scope-refine-agent` agent instead; THIS skill is for when the operator has only a thin idea ("notification preferences UI", "CSV import for projects") and needs to think through scope via focused Q&A before the Architect step starts. Your goal is to grill user idea from different angles to build a comprehensive scope - literally extract implicit knowledge from user's head and match it with harsh reality
+This skill drives the Phase 1 Case 2 path — turning a thin user prompt into a complete `scope.md`. Case 1 (handoff exists) uses the `said:scope-refiner` agent instead; THIS skill is for when the operator has only a thin idea ("notification preferences UI", "CSV import for projects") and needs to think through scope via focused Q&A before the Architect step starts. Your goal is to grill user idea from different angles to build a comprehensive scope - literally extract implicit knowledge from user's head and match it with harsh reality
 
 There is NO separate agent. You — the main agent — drive the Q&A loop interactively. Read this file, enter the loop, and stay until §D is empty.
 
@@ -59,7 +59,7 @@ Operator questions: unresolved items the operator answers. EVERY question carrie
 §D MUST be empty when scope.md is final. Non-empty §D = Phase 1 incomplete; the Architect step cannot start.
 ```
 
-The §A/§B/§C/§D slot positions match the slots in `said:scope-refine-agent`'s output. The CONTENT differs — the refine agent populates §A with verbatim wire captures, §B with visual contract screenshots, §C with cross-cutting decisions, §D with handoff-vs-contract conflicts. This skill populates them with purpose / target shape / constraints / open questions extracted from Q&A. Either way, Phase 2 reads four §-sections and uses them to build the spec.
+The §A/§B/§C/§D slot positions match the slots in `said:scope-refiner`'s output. The CONTENT differs — the refine agent populates §A with verbatim wire captures, §B with visual contract screenshots, §C with cross-cutting decisions, §D with handoff-vs-contract conflicts. This skill populates them with purpose / target shape / constraints / open questions extracted from Q&A. Either way, Phase 2 reads four §-sections and uses them to build the spec.
 
 ## Q&A loop
 

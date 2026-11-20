@@ -609,6 +609,23 @@ def check_lane(lane_root, schema, claude_md=None):
             findings.append({"item": w["key"], "verdict": "stale", "severity": w["severity"],
                              "remediation": remediation})
 
+    # Withdrawn phase words: the old phase names, looked for in the lane block outside fences
+    if span:
+        open_lines = {n for n, _ in unfenced(lines)}
+        for n in range(span[0], span[1]):
+            if n not in open_lines:
+                continue
+            for w in schema.get("withdrawn_words", []):
+                name = w["word"][:1].upper() + w["word"][1:]  # held in lower case, matched as a phase name is written
+                for m in re.finditer(r"(?<![\w-])%s(?!\w)" % re.escape(name), lines[n]):
+                    if w.get("except") and lines[n].startswith(w["except"], m.start()):
+                        continue
+                    findings.append({"item": "phase-word:%s" % name, "verdict": "stale", "severity": w["severity"],
+                                     "remediation": "CLAUDE.md line %d, in the ## Lane block, names the old phase %s; the "
+                                                    "phases are Scope, Act, Inspect, Debrief, Closed: write %s (the word "
+                                                    "in another sense is not an error)" % (n + 1, name, w["replacement"])})
+                    break
+
     # Block-shape invariants
     skip, registry_key = set(), next((a["key"] for a in schema["axes"] if a.get("value") == "registry"), None)
     loc = said_status.locate_lane_registry(text) if said_status is not None and hasattr(said_status, "locate_lane_registry") else None

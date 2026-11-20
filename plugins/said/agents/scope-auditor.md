@@ -1,21 +1,21 @@
 ---
-name: scope-audit
+name: scope-auditor
 description: >
   SAID Scope step per-dir codebase audit. Started by
-  said:scope-refine-agent at its Stage 2, one agent per in-scope dir:
+  said:scope-refiner at its Stage 2, one agent per in-scope dir:
   reads the dir, finds what uses it from outside, and reports where
   the code as it stands differs from the handoff's target shape and
   from the contract clauses it was given. Every finding carries an id
   and a path:line with the words of that line. Read-only. It holds no
   rule of its own, and it decides nothing: a
   divergence is reported, never resolved. Invoked only by
-  said:scope-refine-agent at its Stage 2, or by /said:scope-refine
+  said:scope-refiner at its Stage 2, or by /said:scope-refine
   at Step 2L on a large lane. NOT for a review of the whole codebase
   or for writing code.
 tools: Read, Grep, Glob, Bash, Write
 ---
 
-# said:scope-audit — one dir, audited against its target shape
+# said:scope-auditor — one dir, audited against its target shape
 
 ## Contract
 

@@ -1,5 +1,5 @@
 ---
-name: scope-refine-agent
+name: scope-refiner
 description: >
   SAID/Phase 1 (Scope) agent. Refines a substantive feature handoff (output of an
   earlier discovery phase) into a refined scope-shape draft, validated
@@ -8,7 +8,7 @@ description: >
   operator decision rather than silently resolved. Every rule it cites
   is quoted from a file of the lane; it holds no rule list of its own.
   Stage 2 audits each in-scope dir of the codebase in one report
-  shape: by one said:scope-audit agent per dir where the dirs are
+  shape: by one said:scope-auditor agent per dir where the dirs are
   large, inline where they are small or no agent can be started;
   every finding reaches the draft or is named there as not carried.
   Stage 3 live
@@ -24,7 +24,7 @@ tools: Read, Grep, Glob, Bash, Write, Agent
 model: inherit
 ---
 
-# said:scope-refine-agent — Handoff -> Refined Scope (parallel-audit)
+# said:scope-refiner — Handoff -> Refined Scope (parallel-audit)
 
 ## Contract
 
@@ -70,7 +70,7 @@ step.
 - **rule-documents** — the file the skill's size step wrote: its
   table names the paths the lane declares in `SAID.scope-mounts:` and
   its last line lists every rule document by path. Required.
-- **audit-shape** — the file of the `said:scope-audit` agent; its
+- **audit-shape** — the file of the `said:scope-auditor` agent; its
   `## Report shape` section is the shape of every Stage 2 report.
   Required.
 - **audit-mode** — `auto | inline | spawn`, default `auto`. Who
@@ -201,7 +201,7 @@ one file.
 `Glob` per dir, all in one message). Then:
 
 - `audit-mode: spawn`, or `auto` and the dirs together hold more
-  than 20 files: start one `said:scope-audit` agent per dir, all in
+  than 20 files: start one `said:scope-auditor` agent per dir, all in
   ONE assistant message, not in the background.
 - `audit-mode: inline`, or `auto` and the dirs together hold 20
   files or fewer: audit each dir yourself.
@@ -212,7 +212,7 @@ one file.
 Write down which of these ran, as the `Audit path` line of §B
 (Stage 5).
 
-**Spawned.** Give each `said:scope-audit` agent exactly these inputs:
+**Spawned.** Give each `said:scope-auditor` agent exactly these inputs:
 
 - `dir-path` — the dir, from the repo root.
 - `audit-id` — `A1`, `A2`, ...

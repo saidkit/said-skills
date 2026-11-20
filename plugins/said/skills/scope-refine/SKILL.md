@@ -4,7 +4,7 @@ description: >
   SAID/Phase 1 (Scope) Case 1 — refines a substantive technical handoff
   (handoff doc OR current branch state) into a `scope.md` for Act's
   Architect step. Resolves input from operator argument, spawns the
-  `said:scope-refine-agent` agent (codebase audit, and the lane's probe
+  `said:scope-refiner` agent (codebase audit, and the lane's probe
   procedure when one is passed) on a small lane, or runs the bundled rule chain on a
   lane whose rule documents are large, and relays the draft and its §D to
   the operator.
@@ -19,14 +19,14 @@ description: >
 
 1. **Scope only.** This skill writes the scope draft and nothing else: no spec, task list or code (Step 4).
 2. **The script sizes the lane and lists its rule documents.** `size` decides small or large and names the documents; never decide or pick either yourself. A lane with no `SAID.scope-mounts` reads the default folders and stops only when none of them exists (Step 1c).
-3. **Small lane: one agent.** `said:scope-refine-agent` does the work (Step 2).
+3. **Small lane: one agent.** `said:scope-refiner` does the work (Step 2).
 4. **Large lane: the chain as written.** Every step of Step 2L runs as written; never write, edit or repair a file a script or an agent writes. A failed check goes back to its agent once, then BLOCK; the silence pass of step 5 goes back for up to three rounds, then STOP.
 5. **Wait for every agent.** No agent runs in the background; its reply or its file comes before the next command.
 6. **Section D reaches the operator unchanged.** Print it verbatim; never resolve, default or empty an item (Step 3).
 
 This skill drives the Phase 1 Case 1 path — turning a substantive handoff into a refined `scope.md`. Case 2 (thin idea, no handoff) uses `/said:scope-grill` instead; THIS skill is for branch continuation, refactoring, or any work where a real handoff doc OR current git state already carries the substance.
 
-The skill itself is a thin wrapper. The `said:scope-refine-agent` agent does the substantive work — Stage 0 contract reads, Stage 1 handoff index, Stage 2 codebase audit (one report per in-scope dir, by `said:scope-audit` agents or inline, as the agent's text says), Stage 3 the lane's probe procedure when one is passed, Stage 4 contract classification, Stage 5 scope.md write, Stage 6 self-check. Your job here is to resolve inputs, size the lane's rule documents (Step 1c), spawn the agent on a small lane or run the rule chain on a large one (Step 2L), and carry §D items visibly back to the operator.
+The skill itself is a thin wrapper. The `said:scope-refiner` agent does the substantive work — Stage 0 contract reads, Stage 1 handoff index, Stage 2 codebase audit (one report per in-scope dir, by `said:scope-auditor` agents or inline, as the agent's text says), Stage 3 the lane's probe procedure when one is passed, Stage 4 contract classification, Stage 5 scope.md write, Stage 6 self-check. Your job here is to resolve inputs, size the lane's rule documents (Step 1c), spawn the agent on a small lane or run the rule chain on a large one (Step 2L), and carry §D items visibly back to the operator.
 
 **Surface note.** Works for every `SAID.surface:` medium. Stage 0 reads whichever contract docs the project's `CLAUDE.md` names; a live probe runs only from the probe procedure the lane passes for its surface (`probe-procedure=<path>`). The skill itself is surface-agnostic — it just resolves inputs and spawns.
 
@@ -236,7 +236,7 @@ Agent prompts name every path from the lane root. Every command that reads the l
    - Run `$CHAIN question-check <q> --look A --lane . --handoff $H` yourself on every part of `qlook-a` (`--look B` on every part of `qlook-b`); the looks never run a script. Exit 1 -> run it again with `> <q>/qlook-faults.txt` and start that look on that part once more with the same prompt and the line `- round 2: the check exited 1; its faults: <q>/qlook-faults.txt. Fix qlook.tsv.` Exit 1 again -> BLOCK with the faults.
    - `$CHAIN questions-merge $RUN/qlook-a $RUN/qlook-a/parts` and `$CHAIN questions-merge $RUN/qlook-b $RUN/qlook-b/parts`, then `$CHAIN question-join $RUN/qlook-a $RUN/qlook-b $RUN/questions-join.tsv --lane . --handoff $H` (a row stays a question when both looks say `choice`; a row only one look says `choice` on is not asked: it is named in its decision's question frame when the decision has one, otherwise listed as one look of two; any other row becomes a rule to follow or a rule the handoff follows when a look says `rule-settles` or `answered` (look A's kind when the two differ), and a rule read and judged not to bear when both say `no-bear`; the script writes the four lists with both grounds directly before section D).
 
-10. **Code audit.** First, if `$RUN/audit/dirs.tsv` is there (made in step 5), run only the audit-check line below. Otherwise `$CHAIN audit-dirs . $RUN --handoff $H` (with the operator's scope-hint: add `--hint <scope-hint>`). It prints one line a directory the handoff names: `A<n>` with the directory to audit (a named directory that is gone: its feature dir, the ancestor two names deep, else the nearest existing one, `parent`), or `-` with `absent` or `ambiguous` (no audit; the draft says so), or `audit: no directory named` -> go to 11. Start one `said:scope-audit` agent for every `A<n>`, all in one assistant message, each with exactly this prompt:
+10. **Code audit.** First, if `$RUN/audit/dirs.tsv` is there (made in step 5), run only the audit-check line below. Otherwise `$CHAIN audit-dirs . $RUN --handoff $H` (with the operator's scope-hint: add `--hint <scope-hint>`). It prints one line a directory the handoff names: `A<n>` with the directory to audit (a named directory that is gone: its feature dir, the ancestor two names deep, else the nearest existing one, `parent`), or `-` with `absent` or `ambiguous` (no audit; the draft says so), or `audit: no directory named` -> go to 11. Start one `said:scope-auditor` agent for every `A<n>`, all in one assistant message, each with exactly this prompt:
 
     ```
     Task: audit one directory.
@@ -269,7 +269,7 @@ Agent prompts name every path from the lane root. Every command that reads the l
 
 ## Step 2: Spawn the agent (small lane)
 
-Spawn `said:scope-refine-agent` via the Agent tool with the resolved inputs. The agent is generic — pass everything in the prompt; it has no memory of this conversation.
+Spawn `said:scope-refiner` via the Agent tool with the resolved inputs. The agent is generic — pass everything in the prompt; it has no memory of this conversation.
 
 Example spawn prompt:
 
@@ -280,7 +280,7 @@ Run Phase 1 (Scope) refinement.
 - output-path: docs/working/scope-refine/scope.md
 - scope-hint: (none)
 - rule-documents: docs/working/scope-refine/mounts.md
-- audit-shape: ${CLAUDE_SKILL_DIR}/../../agents/scope-audit.md
+- audit-shape: ${CLAUDE_SKILL_DIR}/../../agents/scope-auditor.md
 - Precedent (said:retrieval): <the findings of Step 1b, or: no precedent found>
 
 Read the handoff in full and run every stage of your procedure. Write the refined draft to output-path.
@@ -288,7 +288,7 @@ Read the handoff in full and run every stage of your procedure. Write the refine
 Reply with the section of conflicts and open questions of the draft, verbatim, so the operator can resolve.
 ```
 
-`rule-documents` is the file `size` wrote in Step 1c (`<folder of output-path>/mounts.md`). With a probe procedure add the line `- probe-procedure: <path>` after `scope-hint`. `audit-shape` is the file of the `said:scope-audit` agent of this plugin: its `## Report shape` is the shape of every audit report. The agent runs its own Stage 2 audits, by `said:scope-audit` agents or inline, as its text says; you do not manage them.
+`rule-documents` is the file `size` wrote in Step 1c (`<folder of output-path>/mounts.md`). With a probe procedure add the line `- probe-procedure: <path>` after `scope-hint`. `audit-shape` is the file of the `said:scope-auditor` agent of this plugin: its `## Report shape` is the shape of every audit report. The agent runs its own Stage 2 audits, by `said:scope-auditor` agents or inline, as its text says; you do not manage them.
 
 Run the agent and wait for its reply before you answer: do not start it in the background, and do not end your turn or report that it is still running.
 

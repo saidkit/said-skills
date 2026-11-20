@@ -21,8 +21,8 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 
 ### Subagents (spawned by the skills)
 
-- `said:scope-refine-agent` — Phase-1 scope agent on a small lane: reads the lane's rules against the handoff, audits the code in scope, runs the lane's probe procedure when one is passed, writes the scope draft.
-- `said:scope-audit` — the per-directory code audit the scope agent runs inline or starts as agents.
+- `said:scope-refiner` — Phase-1 scope agent on a small lane: reads the lane's rules against the handoff, audits the code in scope, runs the lane's probe procedure when one is passed, writes the scope draft.
+- `said:scope-auditor` — the per-directory code audit the scope agent runs inline or starts as agents.
 - `said:scope-decision-lister`, `said:scope-card-writer`, `said:scope-first-pass`, `said:scope-zone-reader`, `said:scope-exception-check`, `said:scope-chain-drafter` — the rule chain `said:scope-refine` runs on a lane whose rule documents are too large for one agent to read whole: the lister places every handoff line in a decision, card writers say what each rule section applies to (two independent builds), two heading passes and a silence pass (`said:scope-first-pass`) sort the sections the cards keep into the zone that bears on the handoff and the band, readers (`said:scope-zone-reader`) give a verdict on every rule unit, the zone read twice and the band once, no reader seeing another reading, two looks check every conflict, the drafter writes the draft. A script bundled with `said:scope-refine` fixes what is read and checks every step.
 - `said:scope-question-kind` — the question look of the rule chain: sorts each question row into choice, rule-settles, answered or no-bear with the line it rests on; started twice, the second time in the opposite row order.
 - `said:scope-confirm-look` — the confirm look of the rule chain: answers each kept conflict's question in one line, holds, does not hold or cannot tell.

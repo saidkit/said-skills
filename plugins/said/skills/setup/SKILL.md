@@ -75,8 +75,9 @@ python3 <skill-dir>/setup_check.py --root <lane-root> [--json]
 - **Show the ledger verbatim.** The columns are the script's; re-typing them reintroduces the
   drift the script exists to remove.
 - **No `python3`?** Read `references/lane-schema.json` and evaluate each item against the lane
-  block by hand (key-grep each `SAID.<axis>:`; check the required section headings; resolve each
-  declared reviewer against the plugin's Checker set), and say you did so.
+  block by hand (key-grep each `SAID.<axis>:`; check the required section headings; look for the
+  schema's withdrawn phase words in the block; resolve each declared reviewer against the plugin's
+  Checker set), and say you did so.
 
 ## Step 2, read the ledger
 
@@ -87,7 +88,7 @@ The script gives the facts; add the reading a script cannot:
   no Checker (or an empty `reviewers: []` on a surface-bearing lane) is a gate that reports PASS
   while running nothing. Name what each BLOCKER breaks.
 - **STALE** , a withdrawn or drifted declaration a current lane should not carry (a retired axis, a
-  duplicated key, prose between keys). Name the current form (a `write:` line gives it:
+  duplicated key, prose between keys, an old phase word in the block). Name the current form (a `write:` line gives it:
   `SAID.mounts: [a/]`).
 - **ADVISORY** , a recommended-but-not-fatal gap (a missing skeleton dir, an absent optional axis,
   lanes beneath a root with no registry).

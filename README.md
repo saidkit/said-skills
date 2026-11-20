@@ -4,7 +4,7 @@
 
 SAID organize the context in scalable way for the application to grow. It manages knowledge and specifications (ADRs, features, tasks etc) and provides a robust workflow to deliver features with quality and knowledge management discipline.
 
-SAID workflow drives a feature through four phases — **Scope → Architect → Implement → Debrief** — as a set of Claude Code skills, with quality and UX gates along the way. It ships in two parts.
+SAID workflow drives a feature through its phases — **Scope → Act → Inspect → Debrief** — as a set of Claude Code skills, with quality and UX gates along the way. It ships in two parts.
 
 ## 1. The engine — the `said` plugin
 
