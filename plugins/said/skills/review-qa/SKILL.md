@@ -60,6 +60,8 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 /said:debrief <feature-id>           # Phase 4 entry allowed (preflight reads review-qa report)
 ```
 
+The feature-mode gate recompute, Covers read and round also run as one command outside the session: `python3 <skill-dir>/../board/inspect_run.py <feature-id> --root <lane-root>`. It writes the same record through the same scripts and refuses (exit 3) while another run holds the lane; the verdict stays this skill's.
+
 ## Step 0 — Preflight
 
 1. **Resolve mode + inputs:**

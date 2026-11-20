@@ -219,11 +219,28 @@ def render_feature(data, fid, lane=None):
     comp = ('<div class="d-complete"><span class="lbl">Complete</span> %s</div>'
             % esc(f["completeness_note"])) if f.get("completeness_note") else ""
     tasks = render_tasks(said_status.feature_tasks([f["paths"]["tasks"]] if f["paths"]["tasks"] else []), f["id"])
+    insp = render_inspect(f)
     return (
         '<div class="d-head"><span class="rid big">%s</span>%s%s%s%s</div>%s'
         '<ul class="steps steps-horizontal d-steps">%s</ul>'
         '<div class="d-gates">%s</div>%s%s'
         '<div class="d-dates">%s</div>%s%s%s'
-        '<div class="d-files">%s</div>'
+        '<div class="d-files">%s</div>%s'
     ) % (esc(f["id"]), _pill(f["phase"]), _pbox(f), lane_tag, chip(f["id"]), d_name, steps, esc(gate_line), comp, prog, dates,
-         tasks, mount("thread", scope="feature", feature=f["id"]), nxt, files)
+         tasks, mount("thread", scope="feature", feature=f["id"]), nxt, files, insp)
+
+
+def render_inspect(f):
+    """The feature's Inspect report, derived from its gate record on every render (said_status.inspect_report); empty
+    with no record. Every value is escaped: the rows carry builder-written text."""
+    rep = said_status.inspect_report(f)
+    if rep is None:
+        return ""
+    if "error" in rep:
+        return '<div class="d-inspect"><span class="lbl">Inspect</span> error: %s</div>' % esc(rep["error"])
+    owed = "".join('<div class="d-owed">%s</div>' % esc(o) for o in rep["owed"])
+    reads = "".join('<div class="d-read"><b>%s</b> %s%s</div>' % (
+        esc(name), esc(status), '<pre>%s</pre>' % esc("\n".join(rows)) if rows else "") for name, status, rows in rep["sections"])
+    return ('<details class="d-inspect"%s><summary><span class="lbl">Inspect</span> %s</summary>'
+            '<div class="d-store">store %s, lane %s</div>%s%s</details>') % (
+        " open" if rep["owed"] else "", esc(rep["state"]), esc(rep["store"] or "none"), esc(rep["lane"]), owed, reads)

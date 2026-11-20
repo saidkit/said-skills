@@ -181,6 +181,7 @@ Markdown (keep `file:line` paths clickable) — the "position in the SAID cycle"
 - **Dates** — started, last activity, age, idle (with the threshold applied).
 - **Blockers** — each open crossing and the task it holds, or `none`.
 - **Next** — the exact command(s) to advance, and the key artifacts (`scope.md`, spec, tasks log) as clickable paths.
+- **Inspect record** — when the feature's gate record exists, its report (`gate_record.py report`), rebuilt from the record on every render: the store, the check line, each owed line, then each read and the skill-doctor rows. A missing read, a run that left a unit out, a FAIL row, an open P1 or a moved store reads owed, never current. The web deep-dive shows the same report.
 
 ### Cross-lane — `/said:board --cli --lanes`
 

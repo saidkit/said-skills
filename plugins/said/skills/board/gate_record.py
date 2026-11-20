@@ -4,6 +4,7 @@
   gate_record.py identity --root <lane-root> [--record <record>]
   gate_record.py check    --root <lane-root> --record <record> --reads <read>[,<read>...]
   gate_record.py round    --root <lane-root> --record <record> --matrix-from <file> [--set <key>=<value>]...
+  gate_record.py report   --root <lane-root> --record <record>
 
 Line grammar, one kind per line, read by a line parser:
   store: git <sha> [dirty <sha256>] | store: content <sha256>   first line; the store identity
@@ -29,11 +30,16 @@ round: writes this store's round row and the snapshot from the `matrix: ` lines 
   output; `-` reads stdin). The same store replaces its own round; a moved store appends round n+1. Keys:
   decisions, leaks, look, operator-min, rework-min, elapsed-min, tokens; a value is one token of printable ASCII
   without a comma or a space; a key not given is `-`.
+report: the Inspect report, derived from the record and the lane's store, never written: the store, the check line
+  over every read, each owed line, then each read and the skill-doctor rows with a status and their rows. A read the
+  check names, a run that left a unit out, a FAIL row, an open P1 or a moved store reads owed, never current. Exit 0
+  nothing owed, 1 something owed.
 A refused round value prints `refused: <why>` and writes nothing (exit 1); exit 2 = a usage, read or lane error
 (`error: <why>`).
 """
 import hashlib
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -351,12 +357,12 @@ def gate_row_ok(line):
     return False
 
 
-def check(root, path, reads):
+def check(root, path, reads, ident=None):
     for r in reads:
         if r not in READS:
             raise Error("unknown read %s" % r)
     rec = load(path)
-    if rec is None or rec[0] is None or rec[0] != identity(root, path):
+    if rec is None or rec[0] is None or rec[0] != (ident or identity(root, path)):
         return 1, "gate owed"
     store, rows, history = rec
     owed = []
@@ -380,6 +386,95 @@ def check(root, path, reads):
     if owed:
         return 1, "Inspect owed: " + ", ".join(owed)
     return 0, "current"
+
+
+def report(root, path):
+    """The Inspect report of the record at path, derived from the record and the lane's store on every call and never
+    written: {record, store, lane, state, owed, sections}. state is the check line over every read; each section (the
+    three reads, then the skill-doctor rows) carries a status and its rows. A read the check line names, a run that
+    left a unit out, a FAIL row, an open P1 or a moved store reads owed; no section reads current that the check line
+    does not."""
+    rec = load(path)
+    lane = identity(root, path)
+    rep = {"record": path, "store": None, "lane": lane, "state": "gate owed", "owed": [], "sections": []}
+    if rec is None:
+        rep["owed"].append("gate owed: no record")
+        return rep
+    store, rows, history = rec
+    rep["store"] = store
+    moved = store != lane
+    if moved:
+        rep["owed"].append("gate owed: the record is at %s, the lane at %s" % (store or "no store", lane))
+        named = set(READS)
+    else:
+        rep["state"] = check(root, path, READS, ident=lane)[1]
+        named = set(rep["state"][len("Inspect owed: "):].split(", ")) if rep["state"].startswith("Inspect owed: ") else set()
+        if named:
+            rep["owed"].append(rep["state"])
+    stale = "not current (store %s)" % (store or "none")
+
+    def mine(prefix):
+        return [ln[len(prefix):] for ln in rows if ln.startswith(prefix)]
+
+    gr = mine("gate-recompute: ")
+    left = [r for r in gr if r.endswith(" skipped (not selected)")]
+    failed = [r.split(" exit=")[0] for r in gr if " exit=" in r and r.split(" exit=")[1].split()[1:2] == ["FAIL"]]
+    if moved:
+        st = stale
+    elif "gate-recompute" in named:
+        st = "owed"
+    elif left:
+        st = "owed: %d unit(s) not selected, a full run owed" % len(left)
+        rep["owed"].append("gate-recompute owed: a full run (%d unit(s) not selected)" % len(left))
+    elif failed:
+        st = "FAIL: %d unit(s)" % len(failed)
+        rep["owed"].append("gate-recompute FAIL: " + ", ".join(failed))
+    else:
+        st = "current, %d row(s)" % len(gr)
+    rep["sections"].append(("gate-recompute", st, gr))
+
+    rounds = [ln for ln in history if ln.startswith("round: ")]
+    last = round_fields(rounds[-1]) if rounds else {}
+    snap = [ln for ln in history if ln.startswith("matrix@%s: " % last.get("n", "?"))]
+    st = stale if moved else ("owed" if "matrix" in named else "current, round %s" % last.get("n"))
+    rep["sections"].append(("matrix", st, rounds[-1:] + snap))
+
+    fr = mine("feature-review: ")
+    if moved:
+        st = stale
+    elif "feature-review FAIL" in named:
+        st = "owed: verdict FAIL, each FAIL row goes to a new task"
+    elif "feature-review" in named:
+        st = "owed"
+    else:
+        st = "current, verdict PASS"
+    rep["sections"].append(("feature-review", st, fr))
+
+    sd = mine("skill-doctor: ")
+    open_p1 = [r.split(" ")[0] for r in sd if not re.search(r" open-P1=0( |$)", r)]  # no count reads open
+    if moved:
+        st = stale
+    elif open_p1:
+        st = "owed: open P1 in %d file(s)" % len(open_p1)
+        rep["owed"].append("skill-doctor owed: open P1 in " + ", ".join(open_p1))
+    else:
+        st = "%d row(s), open-P1=0" % len(sd)
+    rep["sections"].append(("skill-doctor", st, sd))
+    return rep
+
+
+def report_text(rep, root=None):
+    """The report as lines, the record path shown relative to root when given."""
+    rel = os.path.relpath(rep["record"], root) if root else rep["record"]
+    out = ["Inspect record  %s" % rel,
+           "  store   %s" % ("%s (current)" % rep["store"] if rep["store"] and rep["store"] == rep["lane"]
+                             else "%s, the lane is at %s" % (rep["store"] or "none", rep["lane"])),
+           "  state   %s" % rep["state"]]
+    out += ["  owed    %s" % o for o in rep["owed"]]
+    for name, status, rows in rep["sections"]:
+        out.append("  %s  %s" % (name, status))
+        out += ["    %s" % r for r in rows]
+    return out
 
 
 def read_matrix(src):
@@ -426,7 +521,7 @@ def do_round(root, path, src, sets):
 
 
 def parse(argv):
-    if not argv or argv[0] not in ("identity", "check", "round"):
+    if not argv or argv[0] not in ("identity", "check", "round", "report"):
         raise Error("usage: " + __doc__.strip().splitlines()[2].strip() + " | check ... | round ...")
     cmd, opts, sets, i = argv[0], {}, [], 1
     while i < len(argv):
@@ -438,7 +533,8 @@ def parse(argv):
         else:
             opts[k[2:]] = argv[i + 1]
         i += 2
-    need = {"identity": ("root",), "check": ("root", "record", "reads"), "round": ("root", "record", "matrix-from")}[cmd]
+    need = {"identity": ("root",), "check": ("root", "record", "reads"), "round": ("root", "record", "matrix-from"),
+            "report": ("root", "record")}[cmd]
     for k in need:
         if k not in opts:
             raise Error("usage: %s needs --%s" % (cmd, k))
@@ -460,6 +556,10 @@ def main(argv):
             code, text = check(o["root"], o["record"], [r for r in o["reads"].split(",") if r])
             print(text)
             return code
+        if cmd == "report":
+            rep = report(o["root"], o["record"])
+            print("\n".join(report_text(rep, o["root"])))
+            return 1 if rep["owed"] else 0
         do_round(o["root"], o["record"], o["matrix-from"], sets)
         return 0
     except Refused as e:

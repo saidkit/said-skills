@@ -60,6 +60,8 @@ After Phase 3 closes (all targeted tasks `Status: Done`):
 /said:debrief <feature-id>          # Phase 4 entry allowed (preflight reads accept report)
 ```
 
+The record this skill reads may come from the one-command Inspect run outside the session, `python3 ${CLAUDE_SKILL_DIR}/../board/inspect_run.py <feature-id> --root <lane-root>`; it is read as the record `review-qa` writes is read.
+
 ## Step 0 — Preflight
 
 1. **Resolve mode + inputs:**

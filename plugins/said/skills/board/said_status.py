@@ -702,6 +702,9 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
                           "tasks": relpath(tasks[0], root) if tasks else None,
                           "scope": relpath(os.path.join(work_root, fid, "scope.md"), root) if scope else None},
         })
+        record = os.path.join(workdir, "gate-%s.md" % fid)
+        if os.path.isfile(record):  # the record the deep-dive reports from; the report is derived at render time
+            out[-1].update(inspect_record=os.path.normpath(record), lane_root=os.path.normpath(root))
 
     out.sort(key=_sortkey)
     return {
@@ -940,7 +943,30 @@ def _feature_block(f, lane_label=None):
         out.append("Next    %s" % f["next"])
     p = f.get("paths_rel") or f["paths"]
     out.append("Files   " + ", ".join([x for x in (p["spec"], p["tasks"], p["scope"]) if x]))
-    return "\n".join(out)
+    out += [""] + inspect_lines(f)
+    return "\n".join(out).rstrip("\n")
+
+
+def inspect_report(f):
+    """The Inspect report of the feature's gate record (gate_record.report), or None with no record; derived on every
+    call. A record or identity error is returned as {"error": <why>}."""
+    if not f.get("inspect_record"):
+        return None
+    try:
+        import gate_record
+        return gate_record.report(os.path.realpath(os.path.abspath(f["lane_root"])), os.path.abspath(f["inspect_record"]))
+    except Exception as e:  # an unreadable record is shown, never a crash of the board
+        return {"error": str(e)[:200]}
+
+
+def inspect_lines(f):
+    rep = inspect_report(f)
+    if rep is None:
+        return []
+    if "error" in rep:
+        return ["Inspect record  error: " + rep["error"]]
+    import gate_record
+    return gate_record.report_text(rep, os.path.realpath(os.path.abspath(f["lane_root"])))
 
 
 def render_feature(data, fid):

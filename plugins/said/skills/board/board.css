@@ -142,6 +142,7 @@ body.drawer-open #backdrop{opacity:1;visibility:visible}
 .d-next .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
 .d-next code{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px}
 .d-files{font-size:11.5px;color:var(--muted);word-break:break-all;line-height:1.8}
+.d-inspect{margin-top:10px;font-size:12px}.d-inspect pre{font-family:var(--font-mono);font-size:11.5px;white-space:pre-wrap;word-break:break-all;margin:2px 0 6px 12px}.d-owed{color:var(--warn,#b45309)}.d-store{color:var(--muted);font-size:11.5px}
 footer{padding:10px 20px;border-top:1px solid var(--border);color:var(--muted);font-size:11.5px;
   display:flex;justify-content:space-between;gap:10px;background:var(--surface)}
 #cdnwarn{display:none;background:#7c2d12;color:#fff;font-size:12px;padding:6px 20px;text-align:center}

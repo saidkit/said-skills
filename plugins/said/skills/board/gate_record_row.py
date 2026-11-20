@@ -6,7 +6,8 @@
                      [--decisions <file>...]
 
 The row is `skill-doctor: <file> open-P1=<n> reviewer=<id>`, one per file: a second call for the same file
-replaces it. The record is written through gate_record.py: its first line is the store identity of the physical
+replaces it. <file> is written relative to the lane root, an absolute spelling inside it included; a path outside the
+lane is an error. The record is written through gate_record.py: its first line is the store identity of the physical
 lane root; a record written at another store keeps its round and matrix lines and drops its rows, so no
 `gate-recompute:` row is ever typed here and a stale one is never carried to a new store. The feature-review form
 runs the validator itself (said_status.feature_review_output, the code behind `said_status.py --feature-review`) on
@@ -74,6 +75,16 @@ for name, val in (() if fr else (("file", a.file), ("reviewer", a.reviewer))):
     if not val or not val.isascii() or re.search(r"\s", val) or any(ord(c) < 32 or ord(c) == 127 for c in val):
         print("refused: --%s is one ASCII token without whitespace" % name)
         sys.exit(1)
+if not fr:  # the row names the file lane-relative, whatever spelling was given; a path outside the lane is refused
+    f = os.path.normpath(a.file)
+    if os.path.isabs(f):
+        tops = (os.path.realpath(os.path.abspath(a.root)), os.path.normpath(os.path.abspath(a.root)))
+        top = next((t for t in tops if f.startswith(t.rstrip(os.sep) + os.sep)), None)
+        f = os.path.relpath(f, top) if top else ".."
+    if f in (".", "..") or f.startswith(".." + os.sep):
+        print("error: --file %s is outside the lane root" % a.file)
+        sys.exit(2)
+    a.file = f
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.dont_write_bytecode = True
 import gate_record  # noqa: E402  the one reader and writer of the record
