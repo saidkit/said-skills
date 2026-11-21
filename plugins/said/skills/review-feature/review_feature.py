@@ -25,6 +25,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -152,22 +153,54 @@ def prepare(fid, root, base, ref, spec_ledgers):
 
 
 def file_reply(fid, root, reply, spec_ledgers):
-    """(code, lines): file the reply when it carries a verdict line, then write its rows through gate_record_row.py.
-    Code 0 written, 1 owed (nothing filed, or the writer refused), 2 a writer error."""
+    """(code, lines): file the reply when it carries a verdict line and the row writer accepts it, then its rows are
+    written through gate_record_row.py. Code 0 written, 1 owed (nothing filed, or the writer refused), 2 a writer
+    error. The writer reads the reply at the verdict path, so it is put there for the writer's run only: on a refusal
+    or an error it is taken away and an earlier file at that path is put back."""
     working = lane_path(root, "working", fid)
     if not VERDICT.search(reply or ""):
         return 1, ["owed (the read returned no verdict line; nothing filed)"]
     out, _ = out_path(root, working, fid)
     os.makedirs(working, exist_ok=True)
-    with open(out, "w", encoding="utf-8") as fh:
-        fh.write(reply)
-    records = decisions(working, spec_ledgers)
-    row = subprocess.run([sys.executable, os.path.join(BOARD, "gate_record_row.py"), "--kind", "feature-review",
-                          "--root", root, "--out", os.path.join(working, "gate-%s.md" % fid), "--workdir", working,
-                          "--feature", fid] + (["--decisions"] + records if records else []),
-                         capture_output=True, text=True)
+    prev = None
+    if os.path.lexists(out):
+        prev = "%s.%d.prev" % (out, os.getpid())  # beside it: one rename back, the working dir is not dirt to the writer
+        os.replace(out, prev)
+    rc = 2
+    try:
+        with open(out, "w", encoding="utf-8") as fh:
+            fh.write(reply)
+        records = decisions(working, spec_ledgers)
+        row = subprocess.run([sys.executable, os.path.join(BOARD, "gate_record_row.py"), "--kind", "feature-review",
+                              "--root", root, "--out", os.path.join(working, "gate-%s.md" % fid), "--workdir", working,
+                              "--feature", fid] + (["--decisions"] + records if records else []),
+                             capture_output=True, text=True)
+        rc = row.returncode
+    finally:
+        if rc != 0 and prev:
+            os.replace(prev, out)  # the earlier file back over the refused reply, in one step
+        elif rc != 0:
+            try:
+                os.remove(out)
+            except FileNotFoundError:
+                pass
+        elif prev:
+            os.remove(prev)
+    rc = 0 if rc == 0 else 1 if rc == 1 else 2
+    err = [ln for ln in row.stderr.strip().split("\n") if ln][-1:] if rc else []
     lines = [ln for ln in row.stdout.strip().split("\n") if ln] or ["exit %d" % row.returncode]
-    return min(row.returncode, 2), ["filed %s" % os.path.relpath(out, root)] + lines
+    lines += ["writer stderr: %s" % e[:200] for e in err]
+    head = ("filed %s" % os.path.relpath(out, root) if rc == 0 else
+            "not filed (the writer refused the reply)" if rc == 1 else "not filed (the writer failed)")
+    return rc, [head] + lines
+
+
+def keep_refused(fid, reply):
+    """The path of a new temp file outside the lane holding a refused reply (the headless read has no scratchpad)."""
+    fd, kept = tempfile.mkstemp(prefix="review-feature-refused-%s-" % fid, suffix=".md")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(reply)
+    return kept
 
 
 def parse(argv):

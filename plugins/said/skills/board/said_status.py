@@ -1779,7 +1779,8 @@ def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False):
             state = "rows"
         else:
             if len(cells) != len(cols):
-                raise FeatureReviewRefused("group %s row has %d cells, not %d" % (group, len(cells), len(cols)))
+                more = ": a cell holds a pipe: write [pipe]" if len(cells) > len(cols) else ""  # a quoted pipe splits the cell
+                raise FeatureReviewRefused("group %s row has %d cells, not %d%s" % (group, len(cells), len(cols), more))
             ok = ("PASS", "FAIL", "NOT-READ") + (("N/A",) if group == "Earned rules" else ())
             if not all(cells):
                 raise FeatureReviewRefused("group %s row has an empty cell" % group)

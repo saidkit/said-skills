@@ -14,7 +14,8 @@ task log is an error before any estimate:
      and runs gate_record_row.py --kind feature-review, which validates it and writes its rows. A read spends model
      tokens: without --yes the runner prints the estimate and its yes token and runs no read; --yes runs it only when
      the token is the one the current estimate prints (it covers HEAD, the base and the uncommitted changes). --base (the feature's base commit) and --capture-ref (a
-     non-empty capture file in the working dir) are needed for the read. A reply with no verdict line is not filed.
+     non-empty capture file in the working dir) are needed for the read. A reply with no verdict line is not filed;
+     a reply the writer refuses is not filed either, and is kept in a temp file outside the lane whose path is printed.
   2. gate_recompute.sh over every unit (SAID_GATE_UNITS is never passed), writing the record.
   3. covers-read.py over the task log, its output in <working>/covers-<id>.txt (--ledger names the decision ledgers).
   4. gate_record.py round from that output, then check over every read; the report of the record is printed.
@@ -104,6 +105,8 @@ def feature_review(fid, opts, root):
         print("feature-review: the read did not run (%s)" % e.__class__.__name__)
     code, lines = review_feature.file_reply(fid, root, reply, opts["ledgers"])
     print("feature-review: %s" % (lines[1] if len(lines) > 1 else lines[0]))  # the writer's first line, else why not filed
+    if code and lines[0].startswith("not filed"):  # a refused reply is kept outside the lane, never at the verdict path
+        print("feature-review: the refused reply is kept at %s" % review_feature.keep_refused(fid, reply))
 
 
 def main(argv):
