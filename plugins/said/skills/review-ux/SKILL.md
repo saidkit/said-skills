@@ -30,7 +30,6 @@ The editorial read happens once per round: `/said:review-feature`, which `said` 
 
 1. **Per task.** `/said:review-ux <task-id>` on a doc lane runs nothing: print `review-ux: doc-editorial is read once per round, by /said:review-feature; nothing to run per task` and stop. The task close does not wait on it.
 2. **Feature scope.** Confirm that the round's verdict `<SAID.working:>/review-doc-editorial-<feature-id>.md` exists, then report its path and its `verdict:` line at the shared Step 3 (Present the report). A missing file is a FAIL of this gate (the round's `/said:review-feature` has not run), never a silent pass.
-3. **Writes no Eval artifact.** The Inspect-time Eval belongs to the orchestrator (`said:said`).
 
 ## Run scope (fast-track)
 

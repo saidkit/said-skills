@@ -50,6 +50,9 @@ The phases are Scope, Act, Inspect, Debrief, Closed. In the project's instructio
   Checkers resolve by their `said-checker:` key, not by file name;
 - the skill `said:retrieval` -> `said:precedent`, one name with the operator macro `precedent!!`: point the macro
   and every instruction that names the skill at `/said:precedent`. The old name is not accepted beside the new one.
+- the Eval step is retired: `said`'s Inspect ends `/said:accept` -> `/said:debrief`. An instruction that runs or
+  waits on an Eval after `accept`, or on a `QA-eval-<id>.md` file, drops that step; existing `QA-eval-*` files stay
+  as history. A multi-lane feature's e2e/UAT close in `/said:flow` is not the Eval and stays.
 
 A reader of `/said:board --json` sees the new phase values; a script that matched the old ones is updated the same
 way. Check with V3.
