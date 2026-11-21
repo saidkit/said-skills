@@ -9,7 +9,7 @@
 Line grammar, one kind per line, read by a line parser:
   store: git <sha> [dirty <sha256>] | store: content <sha256>   first line; the store identity
   gate-recompute: <unit> exit=<n> <PASS|EXPECTED|FAIL> [ids]   rows of the current store (gate_recompute.sh)
-  skill-doctor: <file> open-P1=<n> reviewer=<id>               rows of the current store (gate_record_row.py)
+  skill-doctor: <file> open-P1=<n> reviewer=<id> [base=<sha>]  rows of the current store (gate_record_row.py)
   feature-review: <row>                                         rows of the current store
   round: n=<k>, store=<identity>, <key>=<value>, ...            one per round, kept across stores
   matrix@<k>: <task> | covers: <c> | rules-applied: <r> | reviewer: <v>   round k's snapshot, kept across stores
