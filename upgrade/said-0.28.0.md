@@ -32,9 +32,9 @@ old plugin does not read; a stamp set before the other steps claims a walk that 
 
 ## Step 2 -- Rename the gate-reader key
 
-`SAID.gate-reviewer-threshold` is now `SAID.gate-reader-threshold`, same value. The old spelling is not read: the
-gates use the default 150000 until it is renamed, and `/said:setup` flags it STALE with the line to write. A lane
-that never declared the key does nothing. Check with V2.
+`SAID.gate-reviewer-threshold` is now `SAID.gate-reader-threshold`, same value. Rename the key in the lane block.
+The old spelling is ignored: the gates use the default 150000 until it is renamed, and `/said:setup` reports
+nothing for it, so V2 is where a lane finds it. A lane that never declared the key does nothing.
 
 ## Step 3 -- Rename the phases and the agents in the project's own files
 
