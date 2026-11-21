@@ -18,8 +18,8 @@ then each --ledger (a file inside the lane root).
 file runs gate_record_row.py --kind feature-review with the same decision records over a reply that carries a
 `verdict: PASS` or `verdict: FAIL` line, and files it only when the writer accepts it, as
 <working>/review-feature-<id>.md (review-doc-editorial-<id>.md on a lane whose SAID.surface: is doc, never both); it
-prints the writer's lines. A reply with no verdict line is not filed. Exit 0 the rows are written, 1 owed (no verdict line, or the writer refused
-and wrote nothing), 2 an error. Pass file the --ledger files prepare was given.
+prints the writer's lines. A reply with no verdict line is not filed. Exit 0 the rows are written, 1 owed (no
+verdict line, or the writer refused and wrote nothing), 2 an error. Pass file the --ledger files prepare was given.
 """
 import os
 import re
