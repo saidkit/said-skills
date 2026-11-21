@@ -1,10 +1,10 @@
 ---
-name: retrieval
+name: precedent
 description: |
-  Precedent/decision-record search. When to use: At the start of any `§D` walk, multi-question decision pass, or `scope.md` review; Before walking an agent-produced scope / decision-map / framing with the operator; When the operator asks "is this consistent with prior decisions?" or "did we decide this before?"; When you notice yourself about to propose a default without consulting precedent — STOP, run it, then propose; When the same type of question recurs across sessions (the meta-failure signal — precedent exists but isn't reachable from your usual research path). Also invocable directly via `/said:retrieval` or `precedent!!`. Read-only; each run ends with a retrieval-status stop signal (coverage + goal), so it is loop-ready.
+  Precedent/decision-record search. When to use: At the start of any `§D` walk, multi-question decision pass, or `scope.md` review; Before walking an agent-produced scope / decision-map / framing with the operator; When the operator asks "is this consistent with prior decisions?" or "did we decide this before?"; When you notice yourself about to propose a default without consulting precedent — STOP, run it, then propose; When the same type of question recurs across sessions (the meta-failure signal — precedent exists but isn't reachable from your usual research path). Also invocable directly via `/said:precedent` or `precedent!!`. Read-only; each run ends with a retrieval-status stop signal (coverage + goal), so it is loop-ready.
 ---
 
-# said:retrieval — precedent/decision-record search
+# said:precedent — precedent/decision-record search
 
 Before proposing a default, accepting a spawned-agent's framing, or answering "what's the default for X" — STOP and exhaust the project's decision record first.
 
@@ -18,7 +18,7 @@ Before proposing a default, accepting a spawned-agent's framing, or answering "w
 
 ## Invocation
 
-- `/said:retrieval` or `precedent!!` (the operator macro). The proactive triggers live in the frontmatter `description` — direct invocation is one route in, not the only trigger.
+- `/said:precedent` or `precedent!!` (the operator macro). The proactive triggers live in the frontmatter `description` — direct invocation is one route in, not the only trigger.
 
 ## Procedure — exhaust five sources, in order
 

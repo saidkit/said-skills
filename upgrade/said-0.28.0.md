@@ -7,7 +7,7 @@
 - after: said-0.26.0
 
 One ordered pass that brings a project from `said` 0.27.1 onto 0.28.0. A lane stamped `said@0.26.0` takes it too:
-0.27.0 and 0.27.1 ask nothing of a lane. 0.28.0 renames the phases, five agents and one lane key.
+0.27.0 and 0.27.1 ask nothing of a lane. 0.28.0 renames the phases, five agents, one skill and one lane key.
 **Config only: no engine edit, no new skill, no commit unless the project's owner asks.**
 
 ## Preconditions
@@ -47,7 +47,9 @@ The phases are Scope, Act, Inspect, Debrief, Closed. In the project's instructio
 - `said:review-ux-agent` -> `said:web-ux-reviewer`, `said:gate-reviewer` -> `said:gate-reader`, the agent
   `said:cli-gate` -> `said:cli-gate-reviewer`, `said:scope-refine-agent` -> `said:scope-refiner`,
   `said:scope-audit` -> `said:scope-auditor`. The Checker id `cli-gate` in `SAID.reviewers:` keeps its name:
-  Checkers resolve by their `said-checker:` key, not by file name.
+  Checkers resolve by their `said-checker:` key, not by file name;
+- the skill `said:retrieval` -> `said:precedent`, one name with the operator macro `precedent!!`: point the macro
+  and every instruction that names the skill at `/said:precedent`. The old name is not accepted beside the new one.
 
 A reader of `/said:board --json` sees the new phase values; a script that matched the old ones is updated the same
 way. Check with V3.
@@ -93,13 +95,13 @@ N=$(grep -cE '^- SAID\.gate-reviewer-threshold:' "$T/CLAUDE.md" 2>/dev/null || t
 echo "old key lines: ${N:-0}"
 ```
 
-**V3 -- the old phase and agent names.** Scans the project's instruction, build and script files. Expect
+**V3 -- the old phase, agent and skill names.** Scans the project's instruction, build and script files. Expect
 `old names: 0` after Step 3; a line it lists that is not a phase name (a word in another sense) is not an error.
 
 ```bash
 T="${T:-.}"
 FILES="$(ls "$T"/CLAUDE.md "$T"/Makefile "$T"/package.json 2>/dev/null; find "$T/.claude" "$T/scripts" -type f 2>/dev/null)"
-P='\b(Implement|Deliver)\b|said:(review-ux-agent|gate-reviewer|cli-gate|scope-refine-agent|scope-audit)([^a-z-]|$)'
+P='\b(Implement|Deliver)\b|said:(review-ux-agent|gate-reviewer|cli-gate|scope-refine-agent|scope-audit|retrieval)([^a-z-]|$)'
 N=0
 if [ -n "$FILES" ]; then
   printf '%s\n' "$FILES" | xargs grep -nE "$P" 2>/dev/null
