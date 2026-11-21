@@ -334,12 +334,23 @@ def feature_review_failed(root, workdir, fid):
         return False
 
 
+def feature_review_owed(root, workdir, fid):
+    """True when the gate record does not hold the feature-reviewer's PASS rows at the lane's store: the read comes
+    before review-qa. An unreadable record or an identity error is not owed here; the gates report it."""
+    try:
+        import gate_record
+        code, line = gate_record.check(root, os.path.join(workdir, "gate-%s.md" % fid), ["feature-review"])
+        return line != "current"
+    except Exception:
+        return False
+
+
 def _fr_doc_lane(root):
     import gate_record
     return gate_record.fr_doc_lane(root)
 
 
-def next_action(fid, phase, workdir, gates, sub, doc=False):
+def next_action(fid, phase, workdir, gates, sub, doc=False, fr_owed=False):
     workdir = os.path.normpath(workdir)
     if sub == "feature review FAIL":  # doc: the lane kind, so the action names the verdict that lane writes
         return "/said:add-task %s (one task per FAIL row of %s-%s.md)" % (fid, "review-doc-editorial" if doc else "review-feature", fid)
@@ -350,6 +361,8 @@ def next_action(fid, phase, workdir, gates, sub, doc=False):
             return "/said:architect %s" % os.path.join(workdir, "scope.md")
         return "/said:impl %s" % fid
     if phase in ("Inspect", "Debrief"):  # a gate still unrecorded comes before the debrief
+        if fr_owed and not gates.get("qa"):  # the read's place in a round: before review-qa
+            return "/said:review-feature %s --base <rev> --capture-ref <file>" % fid
         if not gates["qa"]:
             return "/said:review-qa %s" % fid
         if not gates["accept"]:
@@ -689,7 +702,9 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
             "started": started, "last_activity": last_activity,
             "age_days": age, "idle_days": idle, "stale": stale, "threshold": threshold,
             "next": next_action(fid, phase, relpath(workdir, root), gates, sub,
-                                doc=sub == "feature review FAIL" and _fr_doc_lane(root)),
+                                doc=sub == "feature review FAIL" and _fr_doc_lane(root),
+                                fr_owed=phase in ("Inspect", "Debrief") and not gates["qa"]
+                                and feature_review_owed(root, workdir, fid)),
             "integrity": t["integrity"],
             "fast_track_open": [r for r in parse_runs(tasks) if r["open"]],
             "waiting": (waiting_reason(workdir) if os.path.isdir(workdir) else None) or waiting_on_question(tasks, os.path.join(workdir, "rulings.md"), root),

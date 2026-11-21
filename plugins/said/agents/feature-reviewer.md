@@ -9,7 +9,7 @@ description: >
   on every lane; its own name is never listed in SAID.reviewers. On a doc lane it also answers for the `doc-editorial` id
   that lane lists, and adds the editorial rows to the same one verdict.
   Returns one verdict; never edits, never files anything. Use when a round's
-  last task is Done or held, spawned by the said or flow round step before
+  last task is Done or held, spawned by /said:review-feature before
   review-qa. NOT for a task close (review-qa), a surface Checker's verdict
   (cli-gate, web-ux) or a read of a gate record.
 tools: Read, Grep, Glob, Bash
@@ -74,7 +74,7 @@ line `none` under its heading, never as a table row. A row is a
 verdict on evidence you opened, never a guess: a PASS row cites the line that
 carries the item, a FAIL row cites the line that contradicts it or says what is
 missing.
-Write each cite as `path:line`, the path relative to the lane root; the line's words may follow in double quotes. Name a source outside the lane root by its file name alone, with no line. The feature-review step checks every cite: a path outside the lane, a line that is not there or quoted words not on that line turn the row FAIL.
+Write each cite as `path:line`, the path relative to the lane root; the line's words may follow in double quotes. Name a source outside the lane root by its file name alone, with no line. `/said:review-feature` checks every cite: a path outside the lane, a line that is not there or quoted words not on that line turn the row FAIL.
 
 1. **Covers.** One row per id named in any task's `**Covers:**` line (a ruling
    id, a todo or backlog id, a ledger id, a rule anchor, or a source anchor).

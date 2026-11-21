@@ -9,9 +9,8 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 | Phase | Skills | Produces |
 |---|---|---|
 | **1 — Scope** | `said:scope-grill` (thin idea), `said:scope-refine` (handoff / branch / external product specs) | `scope.md` (purpose / target shape / constraints / open questions) |
-| **2 — Act, the Architect step** | `said:uxtoc` (optional aid — outline early, re-read late), `said:architect`, `said:add-task` | feature spec (recreation contract) + append-only `*.tasks.md` |
-| **2 — Act** | `said:impl`, `said:review-ux` | tasks driven Todo -> Done test-first, per-task UX gate |
-| **3 — Inspect** | `said:review-qa` (hygiene), `said:accept` (acceptance contract) | pass/fail reports |
+| **2 — Act** | the Architect step: `said:uxtoc` (optional), `said:architect`, `said:add-task`; then `said:impl`, `said:review-ux` | feature spec (recreation contract) + append-only `*.tasks.md`; tasks driven Todo -> Done test-first, per-task UX gate |
+| **3 — Inspect** | `said:review-feature` (the sources read against the build, once per round), `said:review-qa`, `said:accept` (acceptance contract) | the feature-reviewer's verdict and its rows in the gate record; pass/fail reports |
 | **4 — Debrief** | `said:debrief` | retrospective + backports + shipping reports |
 | **Helper** | `said:triage` | read-only root-cause investigation |
 | **Observe** | `said:board` (web page by default, `--cli` terminal, `--json` data) | read-only board — where every feature sits in the phase chain, what's stalled or waiting, and the exact command that advances it |
@@ -29,7 +28,7 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 - `said:web-ux-reviewer` — Act per-task UX verification against your UX checklist.
 - `said:gate-reader` - reads one step of `review-qa`, `accept` or `debrief` above `SAID.gate-reader-threshold` and proposes rows with file:line evidence; the gate decides and writes.
 - `said:cli-gate-reviewer` — the `cli` surface Checker: runs the lane's exit-coded structural and eval gate and writes its verdict; a lane names it as `cli-gate` in `SAID.reviewers:`.
-- `said:feature-reviewer` — reads a feature's sources (decision records, spec, each task's `Covers` ids, the lane's Earned rules) against its diff once per round, before `review-qa`, and reports one row per source item with file:line evidence.
+- `said:feature-reviewer` — reads a feature's sources (decision records, spec, each task's `Covers` ids, the lane's Earned rules) against its diff once per round, spawned by `said:review-feature` before `review-qa`, and reports one row per source item with file:line evidence.
 
 ### Session roles (main sessions, launched with --agent)
 
@@ -66,7 +65,7 @@ Under that spine sits one **surface-agnostic model**. Naming it is what lets a r
 
 1. **Intent contract** — *what to build + its shape*: `scope.md` + the design contract (`docs/ux`) + the feature spec's Acceptance Criteria.
 2. **Production** — *build it*: `said:impl`.
-3. **Evaluation contract + independent gate** — *prove it meets intent*: `docs/qa` (the checkable criteria) + `said:review-qa` / `said:review-ux` / `said:accept` (the judges).
+3. **Evaluation contract** — *prove it meets intent*: `docs/qa` (the checkable criteria) + `said:review-feature` / `said:review-qa` / `said:review-ux` / `said:accept` (the judges).
 
 Bound by one **meta-invariant**: *leg 3 is derived from leg 1, pre-committed, artifact-external, and judged by someone other than leg 2.* The producer neither writes nor grades their own acceptance. Collapse evaluation into production and you get a wall of green gates that never checked the built thing against a complete contract.
 
@@ -82,8 +81,6 @@ Bound by one **meta-invariant**: *leg 3 is derived from leg 1, pre-committed, ar
 **The load-bearing guard:** a lane declares `SAID.surface:` (the medium) and `SAID.reviewers:` (the Checkers). The gate (`said:review-ux`) **resolves the declared reviewers and runs each** — it does **not** branch on the medium; each Checker owns its own capture + judge (browser / http-call / process-spawn ...), so an API lane is gated by its schema Checker, never Playwright-walked, reported "env-blocked", and shipped unverified. The design step (`said:architect`) reads `SAID.surface:` to author requirements against the medium — **config in the per-project binding; adding a reviewer / medium is a dropped Checker file, not a new skill per surface**.
 
 **The QA contract (`docs/qa`) — the evaluation harness.** `docs/qa` is the evaluation *contract*, not the gate: the frozen, per-project, *checkable* definition of what must be verifiably true to accept the work (`feature-qa-checklist.md`; the UX contract's operationalized checklist lives UX-side at `docs/ux/feature-ux-checklist.md`), run by the gates in Inspect, before Debrief. It is `docs/ux` (+ structural ADR rules + spec Acceptance Criteria) **operationalized into `verify:` predicates** — same intent, two faces: `docs/ux` is the **generative** face (*what it should be*, used to design), `docs/qa` the **evaluative** face (*how we prove it is that*, used to accept). This is the error-correction channel — correctness defined and judged *apart from* the act of producing it. Software has a partial ground-truth backstop (the compiler, the tests); a research- or knowledge-shaped lane has none, so there the pre-committed contract + an independent judge is not merely good practice — it is the *only* backstop there is.
-
-**A `doc` lane — the same two contracts, an engine for the umbrella.** A lane that ships prose (copy, docs, research) declares `SAID.surface: doc`, `SAID.reviewers: [doc-editorial]` and `SAID.commands: doc-gate`, and carries the two contracts every lane carries. `docs/ux/feature-ux-rules.md` holds the shape of its artifacts (`R-DOC-*`: a page's section order, front-matter, headings, citation form). `docs/qa/feature-qa-checklist.md` holds its quality bar in the same five-field shape as any lane: `R-QA-01..05`, **one row per engine rule** (closure <=> acceptance, no void source, no exclamation, no banned term, no dangling reference), each `verify:` a grep over the umbrella's log; `R-QA-06`, the round has an editorial verdict (`review-doc-editorial-<feature-id>.md`); `R-QA-07..`, the editorial rules themselves — openable sources, no invented people or figures, what is off-limits — as semantic rows **discharged by the editorial verdict**, never by the operator. The umbrella is the plugin's own engine: `doc-gate` is a **plugin-provided verb**, not a shell command — the skills' command resolution expands it to the shipped `doc-gate.py` with the lane's task log, shippable root and `docs/qa/banned-lexicon.txt`, logged per invocation; the arguments after the verb (`--soft <rule>`, `--off <rule>`) are the lane's whole relaxation, printed on every run, and **every rule off is refused** (exit 2, a config error, never a verdict — the same class as a root that matched nothing). The semantic half is the `doc-editorial` Checker, the plugin's feature-reviewer on a doc lane: the feature-review step runs it once per round, before `review-qa`, against the checklist's editorial rows, and `/said:review-ux` confirms its verdict at feature scope; `/said:accept` reads its verdict as recorded evidence; the orchestrator's Eval re-runs the umbrella at HEAD and records both. Nothing is vendored into the project; `claude plugin update` ships every engine fix.
 
 ## Hooks
 

@@ -203,7 +203,7 @@ import hashlib, importlib.util, math, os, re, sys
 sys.dont_write_bytecode = True
 
 _CC = importlib.util.spec_from_file_location('said_cite_check', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'board', 'cite_check.py'))
-CITES = importlib.util.module_from_spec(_CC)  # the one cite check, shared with the feature-review step
+CITES = importlib.util.module_from_spec(_CC)  # the one cite check, shared with the feature-reviewer's read
 _CC.loader.exec_module(CITES)
 
 INDEX_DIR = 'rule-index'

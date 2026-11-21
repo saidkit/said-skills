@@ -8,7 +8,7 @@ SAID workflow drives a feature through its phases — **Scope → Act → Inspec
 
 ## 1. The engine — the `said` plugin
 
-Stack-agnostic. **17 skills + 16 agents** that run the phase chain (`said:scope-refine` → `said:architect` → `said:impl` → `said:debrief`, plus the inter-phases gates and helpers). The engine carries the *method* — it hardcodes nothing about your stack. Commands, ADRs, and rule labels all resolve from your repo at runtime. Full skill catalogue: [`plugins/said/README.md`](plugins/said/README.md).
+Stack-agnostic. **18 skills + 16 agents** that run the phase chain (`said:scope-refine` → `said:architect` → `said:impl` → `said:debrief`, plus the inter-phases gates and helpers). The engine carries the *method* — it hardcodes nothing about your stack. Commands, ADRs, and rule labels all resolve from your repo at runtime. Full skill catalogue: [`plugins/said/README.md`](plugins/said/README.md).
 
 ## 2. The starters — batteries for your stack
 
@@ -62,7 +62,7 @@ said/                                 (engine repo + marketplace-of-one)
 ├── .claude-plugin/marketplace.json
 ├── plugins/said/                     the engine
 │   ├── .claude-plugin/plugin.json
-│   ├── skills/                       17 skills (bare verbs under said:)
+│   ├── skills/                       18 skills (bare verbs under said:)
 │   ├── agents/                       16 agent files
 │   └── README.md
 ├── starters/                         per-stack kits (contract + roadmap)
