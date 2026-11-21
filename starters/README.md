@@ -27,7 +27,7 @@ Every surface additionally ships its representation contract — content per `su
   - Engine consumer: `said:uxtoc`, the `completeness` Checker
   - Purpose: the per-surface unit grammar (`unit`, `containers`, attribute set) — one `SC-HEADER` section per surface
 - `docs/ux/feature-ux-checklist.md`
-  - Engine consumer: `said:review-ux`, `said:review-ux-agent`
+  - Engine consumer: `said:review-ux`, `said:web-ux-reviewer`
   - Purpose: UX-gate checklist (the surface's design rules operationalized into `verify:` predicates) + the gate/wire label convention
 
 Non-`web` starters (server / CLI / library / MCP) still ship a `docs/ux` — its *content* is their surface's contract (endpoint / error-envelope rules for `api`, tool-schemas for `mcp`, flags / exit-codes for `cli`), not screen rules — and declare their lane's `surface` + `reviewers` accordingly. The lane's declared reviewers gate that surface's contract (schema / handshake / invocation) instead of a browser walk. A surface that lacks a `docs/ux` is a project deficiency the framework surfaces, not a supported mode.
@@ -41,6 +41,7 @@ A `work` lane (knowledge work, no code: `said-work`) declares `SAID.surface: non
 | `said-next`    | Next.js + TS monorepo       | reference | TBD  |
 | `said-work`    | Knowledge work (no code)    | reference | -    |
 | `said-lane-doc`| Document lane (doc surface) | reference | -    |
+| `said-claude`  | Claude Code skills and plugins | reference | -    |
 | `said-saas`    | Next.js + Supabase for SaaS | roadmap   | -    |
 | `said-ts`      | TS services / Bun / MCP     | reference | TBD  |
 | `said-py`      | Python (FastAPI) / MCP      | reference | TBD  |
