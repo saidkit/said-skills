@@ -1,7 +1,7 @@
 ---
 name: precedent
 description: |
-  Precedent/decision-record search. When to use: At the start of any `§D` walk, multi-question decision pass, or `scope.md` review; Before walking an agent-produced scope / decision-map / framing with the operator; When the operator asks "is this consistent with prior decisions?" or "did we decide this before?"; When you notice yourself about to propose a default without consulting precedent — STOP, run it, then propose; When the same type of question recurs across sessions (the meta-failure signal — precedent exists but isn't reachable from your usual research path). Also invocable directly via `/said:precedent` or `precedent!!`. Read-only; each run ends with a retrieval-status stop signal (coverage + goal), so it is loop-ready.
+  Precedent/decision-record search. When to use: At the start of any `§D` walk, multi-question decision pass, or `scope.md` review; Before walking an agent-produced scope / decision-map / framing with the operator; When the operator asks "is this consistent with prior decisions?" or "did we decide this before?"; When you notice yourself about to propose a default without consulting precedent — STOP, run it, then propose; When the same type of question recurs across sessions (the meta-failure signal — precedent exists but isn't reachable from your usual research path). Also invocable directly via `/said:precedent` or `precedent!!`. Read-only; each run ends with a retrieval-status stop signal (coverage + goal), so it is loop-ready. NOT for writing or changing a decision record (it never edits); NOT for finding where code lives (`/said:triage`); NOT for spec authoring (`/said:architect`).
 ---
 
 # said:precedent — precedent/decision-record search
