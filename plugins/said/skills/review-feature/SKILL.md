@@ -16,8 +16,8 @@ description: >
 ## Contract
 
 1. **One read per round, only when owed.** Spawn the reader only after `review_feature.py prepare` prints `review-feature: ready`. A `current` record is never read again, and a recorded FAIL is not read again: its FAIL rows go to `/said:add-task`.
-2. **The scripts write; this skill never does.** The brief is the one `prepare` printed, passed verbatim. `review_feature.py file` files the verdict and runs the row writer: rows are never typed, and the verdict file and the gate record are never edited by hand.
-3. **The reader is cold and the only judge.** Spawn `said:feature-reviewer` cold with the printed brief alone; this skill judges nothing about the build.
+2. **The scripts write; this skill never does.** The brief is the one `prepare` printed, passed verbatim, and on the one re-spawn passed verbatim plus the refusal line (Step 3). `review_feature.py file` files the verdict and runs the row writer: rows are never typed, and the verdict file and the gate record are never edited by hand.
+3. **The reader is cold and the only judge.** Spawn `said:feature-reviewer` cold with the printed brief alone, and on the one re-spawn its refusal line (Step 3); this skill judges nothing about the build.
 4. **One outcome line ends every run** (**Outcome**); the caller routes it.
 
 ## When this fires
@@ -46,7 +46,7 @@ With the brief in hand, spawn `said:feature-reviewer` cold (the Agent tool, suba
 Run `python3 ${CLAUDE_SKILL_DIR}/review_feature.py file <feature-id> --root <lane-root> --reply <that file> [--ledger <file>]...` with the `--ledger` files of Step 1. It files the reply at the `out:` path `prepare` printed, `<SAID.working:>/review-feature-<id>.md`, on a `doc` lane `<SAID.working:>/review-doc-editorial-<id>.md` (the name the reviewer gate reads), never both. It then runs `gate_record_row.py --kind feature-review`, which validates the verdict and writes only the rows it produced.
 
 - **Exit 0:** the rows are written; its verdict line reads `feature-review: verdict | <PASS or FAIL> | not-read=<N>`. End with `review-feature: PASS, not-read=<N>` or `review-feature: FAIL, not-read=<N>`.
-- **Exit 1:** nothing written; the writer printed its `feature review owed: <why>` line, or the reply had no verdict line; re-spawn the reviewer once with the same brief, then this step; a second exit 1 ends with `review-feature: owed: <that line>`.
+- **Exit 1:** nothing written; the writer printed its `feature review owed: <why>` line, or the reply had no verdict line; re-spawn the reviewer once with the same brief plus one last line, `Your last reply was refused by the row writer: <that line>. Keep the Output rules exactly.`, then this step; a second exit 1 ends with `review-feature: owed: <that line>`.
 - **Exit 2:** an `error:` line; end with `review-feature: error: <that line>`.
 
 A lane outside git has no HEAD to brief, so the read reads owed there (a known limit).
@@ -66,6 +66,6 @@ The last line of every run is one of:
 ## Anti-patterns
 
 - Typing a row, or editing the verdict file or the gate record.
-- Briefing the reader with anything beyond the printed brief, or forking it with this session's context.
+- Briefing the reader with anything beyond the printed brief and its refusal line, or forking it with this session's context.
 - Reading again over a `current` record or a recorded FAIL.
 - Spawning from `said` or `flow` directly: they invoke this skill.

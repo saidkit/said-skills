@@ -175,6 +175,14 @@ On a doc lane the header differs in one value and the filing in one name:
 any other lane the header is as above and the file is
 `review-feature-<feature-id>.md`. Never write a second copy.
 
+The spawning step refuses the whole reply, and records nothing, unless it keeps these rules exactly:
+
+- After the header's blank line, the first line is `## Covers`. Nothing comes before it: no note, no summary. A remark on how you read (a sample, a grep) is one row of Other defects.
+- The group headings come in the order above, each once: six, and seven on a doc lane. Under each heading is either the single line `none` or one table: the column line exactly as shown, its separator row, then the rows. Nothing else follows inside the group; a blank line ends the table.
+- Every row has exactly its group's number of cells, none empty, and no cell holds a `|`. Write a quoted pipe as `[pipe]`.
+- The last cell of a row is the bare word `PASS`, `FAIL` or `NOT-READ`, nothing after it. `N/A` is allowed in Earned rules only. What a NOT-READ row needed goes in an earlier cell of the same row.
+- A row never starts with `none`; a group with nothing to report is the single line `none`.
+
 `verdict: FAIL` when any row is FAIL, else PASS. A NOT-READ row never makes a
 FAIL and is never counted as a PASS. The spawning step files your text under
 the name above in the feature working dir, validates the
