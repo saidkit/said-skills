@@ -6,7 +6,9 @@ A cite is `<path>:<line>` or `<path>:<line>-<line>`, the path relative to the la
 has a `..` part is outside the lane; the test is on the text of the path, so a link inside the lane is followed.
 The cite holds when the file is there and every line it names exists. A quote is the words in double quotes
 directly after the cite; it holds when, whitespace folded, the words stand on the cited line (on one of the lines of
-a range), read as written or with each ' read as ".
+a range), read as written or with each ' read as ", and also when they stand there with the markdown emphasis
+markers dropped from both the line and the words: a pair of ** or * around text, or of backticks, is unwrapped
+to the text inside it. A lone * or backtick is text and stays; nothing else is dropped.
 
   cite_check.py --lane <lane> <file>    check every cite in the text of <file>
 
@@ -24,6 +26,17 @@ IN_TEXT = re.compile(r'(?<![\w./:@-])([\w./-]*[/.][\w./-]*):(\d+)(?:-(\d+))?(?!\
 
 def fold(s):
     return re.sub(r'\s+', ' ', s).strip()
+
+
+# a marker pair around text: bold, italic, a code span; a lone * or ` (a glob, a product) is text and stays
+EMPHASIS = (re.compile(r'\*\*(?=\S)(.+?)(?<=\S)\*\*'), re.compile(r'\*(?=\S)(.+?)(?<=\S)\*'), re.compile(r'`([^`]+)`'))
+
+
+def plain(s):
+    """The text folded with each markdown emphasis pair unwrapped to the text inside it."""
+    for pair in EMPHASIS:
+        s = pair.sub(r'\1', s)
+    return fold(s)
 
 
 def read_lines(lane, path):
@@ -52,8 +65,12 @@ def cite_line(lane, cite, isfile=None, lines=None):
 
 
 def quote_at(line, words):
-    """True when the quoted words stand on the line, whitespace folded, as written or with ' read as "."""
-    return fold(words.replace("'", '"')) in fold(line) or fold(words) in fold(line)
+    """True when the quoted words stand on the line, whitespace folded, as written or with ' read as ", or so with the
+    emphasis markers dropped from both."""
+    for w in (words, words.replace("'", '"')):
+        if fold(w) in fold(line) or (plain(w) and plain(w) in plain(line)):
+            return True
+    return False
 
 
 def text_faults(lane, text):
