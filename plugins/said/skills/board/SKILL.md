@@ -127,7 +127,7 @@ Per registry feature-id, glob `<id>*` so sub-phased specs (`<id>-<slug>.md`) and
 Denominator = `Done + Todo` (Canceled + Backlog shown but excluded from the bar). If a `## Summary
 Table` exists, cross-check its rows vs the parsed counts; on mismatch emit a one-line **data-integrity** note — parsed `Status:` lines win, the table is a convenience index that can go stale.
 
-**Gate sub-ticks** (meaningful at Inspect, Debrief and Closed), from working-dir artifacts, a run's `-F<NN>.md` report excluded: `review-qa*.md`->qa; ->ux: `review-ux*.md`, or, when the lane's `## Lane` block declares Checkers in `SAID.reviewers:`, a `review-<checker-id>-<feature-id>*.md` for every one (the feature id right after the exact Checker id, so `cli` never ticks from a `cli-gate` file; one declared Checker's file alone does not tick; any verdict, PASS or FAIL: presence only; validation is the reviewer gate's), `accept*.md`->accept, `debrief.md`->debrief-started, `## Debrief close` footer->debrief-done. Render `✓` present, `○` pending, `-` n/a (`ux -` for a no-UI feature — absence of a UX gate is not a failure).
+**Gate sub-ticks** (meaningful at Inspect, Debrief and Closed), from working-dir artifacts, a run's `-F<NN>.md` report excluded: `review-qa*.md`->qa; ->ux: `review-ux*.md`, or, when the lane's `## Lane` block declares Checkers in `SAID.reviewers:`, a `review-<checker-id>-<feature-id>*.md` for every one (the feature id right after the exact Checker id, so `cli` never ticks from a `cli-gate` file; one declared Checker's file alone does not tick; any verdict, PASS or FAIL: presence only; validation is the reviewer gate's), `accept*.md`->accept, `debrief.md`->debrief-started, `## Debrief close` footer->debrief-done; review-feature from the gate record's feature-review rows: `✓` pass at the lane's store, `FAIL`, `owed` (a filed read not current there), `○` none filed. Render `✓` present, `○` pending, `-` n/a (`ux -` for a no-UI feature — absence of a UX gate is not a failure).
 
 **Waiting on an operator question.** A separate axis from the gate ticks: a tick shows only that a file is present, never that it passed. A feature waits on one of two derived sources, the first that applies:
 1. The accept file: the newest `accept-*.md` in `<working>/<id>/` by modification time (a run's `-F<NN>` report excluded) whose last `Verdict:` line, bulleted (`- Verdict: ...`) or not, outside a code fence, reads exactly `MANUAL-PENDING` -> reason `accept MANUAL-PENDING`. The `accept` tick stays present; the wait says it has not passed.
@@ -175,7 +175,7 @@ Markdown (keep `file:line` paths clickable) — the "position in the SAID cycle"
 - **Pipeline** — an arrow sequence with the current stop marked:
   `Scope ✓ -> Act ✓ -> Inspect ● -> Debrief ○ -> Closed ○` (`✓` done, `●` current, `○` ahead).
   Never a box-drawn diagram.
-- **Gates** line (at Inspect and after): `review-qa ✓, review-ux -, accept ○, debrief ○`.
+- **Gates** line (at Inspect and after): `review-feature ✓, review-qa ✓, review-ux -, accept ○, debrief ○`.
 - **Tasks** — rollup (`Done N, Todo M, Canceled K`), then the open items:
   `<id>-<nn>, <title>, <status-date>`. Canceled/Backlog folded under a count.
 - **Dates** — started, last activity, age, idle (with the threshold applied).

@@ -347,13 +347,15 @@ def feature_review_owed(root, workdir, fid):
 
 def feature_review_state(root, workdir, fid):
     """The gates field of the feature-reviewer's read: `pass` or `fail` from the record's rows at the lane's store,
-    `owed` when the record holds rows at another store or unsound rows, `-` when no read is recorded."""
+    `owed` when the read on record is not current there (rows at another store, unsound rows, or a filed verdict whose
+    rows a later write dropped), `-` when no read was ever filed."""
+    filed = any(os.path.isfile(os.path.join(workdir, n % fid)) for n in ("review-feature-%s.md", "review-doc-editorial-%s.md"))
     try:
         import gate_record
         path = os.path.join(workdir, "gate-%s.md" % fid)
         rec = gate_record.load(path)
         if rec is None or not any(ln.startswith("feature-review: ") for ln in rec[1]):
-            return "-"
+            return "owed" if filed else "-"
         code, line = gate_record.check(root, path, ["feature-review"])
     except Exception:  # an unreadable record holds no read the board can show; the gates report the error
         return "owed" if os.path.isfile(os.path.join(workdir, "gate-%s.md" % fid)) else "-"
