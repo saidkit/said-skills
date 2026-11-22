@@ -144,7 +144,7 @@ Render the reason as `waiting: <reason>` in the feature's roster flags and as `W
 
 **Blockers** (cross-lane; usually empty single-lane). A task whose Approach / Out-of-scope names an open crossing (`*-handover-*.md` with no reply / no `## Reply`) -> `⛔ blocked: <task> -> <crossing>`.
 
-**Next action — by phase.** Scope -> `/said:scope-refine <handoff>` (or `/said:scope-grill <id>` if the input is thin/empty), Act -> `/said:architect <working>/<id>/scope.md` in the architect step, else `/said:impl <id>`, Inspect and Debrief -> `/said:review-feature <id> --base <rev> --capture-ref <file|none>` while the gate record holds no feature-reviewer PASS rows at the lane's store and no review-qa report is on disk, else the next un-run of `/said:review-qa <id>` -> `/said:review-ux <id>` -> `/said:accept <id>` -> `/said:debrief <id>`, Closed -> none.
+**Next action — by phase.** Scope -> `/said:scope-refine <handoff>` (or `/said:scope-grill <id>` if the input is thin/empty), Act -> `/said:architect <working>/<id>/scope.md` in the architect step, else `/said:impl <id>`, Inspect and Debrief -> `/said:review-feature <id> --base <rev> --capture-ref <file|none>` while the gate record holds no feature-reviewer PASS rows at the lane's store and no review-qa report is on disk, else the next un-run of `/said:review-qa <id>` -> `/said:accept <id>` -> `/said:debrief <id>`, Closed -> none.
 
 **On probe disagreement**, trust the `## <id>` section over the Summary Table, and say so.
 
