@@ -9,7 +9,7 @@ description: >
   on every lane; its own name is never listed in SAID.reviewers. On a doc lane it also answers for the `doc-editorial` id
   that lane lists, and adds the editorial rows to the same one verdict.
   Returns one verdict; never edits, never files anything. Use when a round's
-  last task is Done or held, spawned by /said:review-feature before
+  last task is Done, spawned by /said:review-feature before
   review-qa. NOT for a task close (review-qa), a surface Checker's verdict
   (cli-gate, web-ux) or a read of a gate record.
 tools: Read, Grep, Glob, Bash
