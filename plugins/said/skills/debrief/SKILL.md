@@ -8,7 +8,7 @@ description: >
   (Execute the homes debrief owns, no nod per row), Phase C (Close — append
   `## Lessons` section + an account block + a short `## Debrief close` footer).
   Every leak the Inspect record counts and every lesson leaves one trace (a rule,
-  a check or an observable); every ruling gets one propagation row; the lane
+  a check or an observable); every pending ruling gets one propagation row; the lane
   todo is swept at each close.
   Triggered ONLY by the explicit command "/said:debrief <feature-id>". NOT for per-task verification — that's
   `/said:review-ux`, `/said:review-qa`, Act. NOT for spec authoring — that's `/said:architect`, Act's Architect step. NOT for adding tasks — that's
