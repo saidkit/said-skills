@@ -329,6 +329,8 @@ def feature_review_failed(root, workdir, fid):
         rec = gate_record.load(path)
         if rec is None or rec[0] is None or rec[0] != gate_record.identity(root, path):
             return False
+        if not gate_record.sources_current(root, path):  # a moved docs companion owes the read, not the FAIL's tasks
+            return False
         return any(ln.startswith("feature-review: verdict | FAIL |") for ln in rec[1])
     except Exception:  # an unreadable record or an identity error is not a FAIL; the gates report it
         return False

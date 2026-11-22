@@ -4,7 +4,7 @@
   gate_record_row.py --root <lane-root> --out <record> --file <path> --open-p1 <n> --reviewer <id>
                      [--base <rev> [--task-base <rev>]]
   gate_record_row.py --kind feature-review --root <lane-root> --out <record> --workdir <dir> --feature <id>
-                     [--decisions <file>...]
+                     [--decisions <file>...] [--sources <file>...]
 
 The row is `skill-doctor: <file> open-P1=<n> reviewer=<id>`, with ` base=<sha>` after it when --base names the
 commit the review read the change from (written as its full sha), one per file: a second call for the same file
@@ -22,7 +22,8 @@ Uncovered decisions: the live rulings of a `rulings.md`, the `Q-<n>` ids of a `s
 first words of any other file (a ledger), fenced lines skipped; a missing one is owed, a named file that is not
 there, cannot be read or holds a malformed ruling line an error. It prints the rows
 it wrote. Exit 0 written, 1 refused (the validator's owed lines are printed, nothing written), 2 missing arguments or
-a record, lane or validator error (`error: <why>`, nothing written).
+a record, lane or validator error (`error: <why>`, nothing written). --sources (the lane-relative files the read was
+briefed with, given by review_feature.py) sets the store's sources part on a lane with a docs companion.
 """
 import argparse, os, re, sys
 
@@ -38,14 +39,15 @@ ap.add_argument("--workdir")
 ap.add_argument("--feature")
 ap.add_argument("--rows-from")
 ap.add_argument("--decisions", nargs="+")
+ap.add_argument("--sources", nargs="+")
 ap.add_argument("--base")
 ap.add_argument("--task-base")
 for a in ("root", "out", "file", "open-p1", "reviewer"):
     ap.add_argument("--" + a, required=False)
 a = ap.parse_args()
 fr = a.kind == "feature-review"
-if not fr and a.decisions:
-    ap.error("--decisions is taken by --kind feature-review only")
+if not fr and (a.decisions or a.sources):
+    ap.error("--decisions and --sources are taken by --kind feature-review only")
 if fr and (a.base or a.task_base):
     ap.error("--base and --task-base are taken by --kind skill-doctor only")
 if a.task_base and not a.base:
@@ -129,7 +131,8 @@ def mutate(store, rows, history):
 
 
 try:
-    gate_record.update(a.out, os.path.realpath(os.path.abspath(a.root)), mutate, expect=seen_at if fr else None)
+    gate_record.update(a.out, os.path.realpath(os.path.abspath(a.root)), mutate, expect=seen_at if fr else None,
+                       sources=a.sources if fr else None)
 except gate_record.Moved as e:
     print("feature review owed: %s" % e)
     sys.exit(1)

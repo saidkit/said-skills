@@ -7,7 +7,8 @@
   gate_record.py report   --root <lane-root> --record <record>
 
 Line grammar, one kind per line, read by a line parser:
-  store: git <sha> [dirty <sha256>] | store: content <sha256>   first line; the store identity
+  store: git <sha> [dirty <sha256>] [sources <sha256>] | store: content <sha256>   first line; the store identity
+  source: <lane-relative path>                                  one per file the feature read was briefed with
   gate-recompute: <unit> exit=<n> <PASS|EXPECTED|FAIL> [ids]   rows of the current store (gate_recompute.sh)
   skill-doctor: <file> open-P1=<n> reviewer=<id> [base=<sha>]  rows of the current store (gate_record_row.py)
   feature-review: <row>                                         rows of the current store
@@ -21,6 +22,12 @@ identity: `git <HEAD sha>` where the physical lane root is in git, else `content
   `SAID.working:` tree, the record itself, `.git` and `__pycache__`; a mount that is a file counts as that file; a
   symlink counts by its target text and is never followed. A mount that is missing, leaves the lane root or lies
   inside the working tree is a lane error.
+sources: where the lane is in git and its SAID.docs-root resolves outside the lane's work tree (a docs companion in
+  a repo of its own), the feature-review writer adds `sources <sha256>` to the store line, a digest over the path and
+  bytes of each `source:` file. Only the feature-review read compares it: a record without it, or with a digest the
+  files no longer give, reads that read owed, unless the working dir's debrief.md carries its `## Debrief close`
+  footer. At a write, feature-review rows whose sources moved are dropped; the other rows keep to the lane part. A
+  lane whose docs root is inside its work tree never gets the part.
 check: `current` (exit 0); `gate owed` (exit 1) when the record is absent or its store is not the current one
   (an unreadable record is a read error, never overwritten);
   `Inspect owed: <read>, ...` (exit 1) when a named read has no well-formed rows at the current store. Reads:
@@ -259,6 +266,72 @@ def identity(root, record=None):
     return "content " + digest(entries)
 
 
+SOURCES = " sources "
+
+
+def git_top(phys):
+    try:
+        r = subprocess.run(["git", "-C", phys, "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    except OSError:
+        return None
+    return os.path.realpath(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else None
+
+
+def docs_outside(root):
+    """True when the lane is in git and its SAID.docs-root resolves outside the lane's work tree."""
+    phys = os.path.realpath(os.path.abspath(root))
+    top = git_top(phys) if git_sha(phys) else None
+    docs = (lane_key(phys, "docs-root") or "").strip().strip("`'\"")
+    return bool(top and docs) and not inside(os.path.realpath(os.path.join(phys, docs)), top)
+
+
+def sources_digest(root, files):
+    """sha256 over each source file's lane-relative path and bytes; a file that cannot be read counts as missing."""
+    phys = os.path.realpath(os.path.abspath(root))
+    entries = []
+    for f in files:
+        try:
+            with open(os.path.join(phys, f), "rb") as fh:
+                h = hashlib.sha256(fh.read()).hexdigest()
+        except OSError:
+            h = "missing"
+        entries.append("%s\0%s\n" % (f, h))
+    return digest(entries)
+
+
+def load_sources(path):
+    """(sources digest or None, [source files]) of a record; (None, []) when it is absent or carries none."""
+    try:
+        with open(path, encoding="utf-8-sig") as fh:
+            lines = [ln.rstrip("\r") for ln in fh.read().split("\n")]
+    except FileNotFoundError:
+        return None, []
+    except (OSError, UnicodeDecodeError) as e:
+        raise Error("cannot read the record %s (left as it is): %s" % (path, e))
+    first = lines[0] if lines else ""
+    _, sep, src = first.partition(SOURCES)
+    return (src.strip() or None) if first.startswith("store: ") and sep else None, \
+        [ln[len("source: "):] for ln in lines[1:] if ln.startswith("source: ")]
+
+
+def closed(path):
+    """True when the record's working dir holds a debrief.md with its `## Debrief close` footer."""
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(path)), "debrief.md"), encoding="utf-8") as fh:
+            return any(re.match(r"##\s+Debrief close\b", ln, re.I) for ln in fh)
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def sources_current(root, path):
+    """True when the record's sources part holds for the feature-review read: a lane with no docs companion, a
+    closed feature, or a digest its source files still give."""
+    if not docs_outside(root) or closed(path):
+        return True
+    src, files = load_sources(path)
+    return bool(src) and src == sources_digest(root, files)
+
+
 def load(path):
     """(store identity or None, rows, history) of a record; None when the record is absent."""
     try:
@@ -270,7 +343,7 @@ def load(path):
         raise Error("cannot read the record %s (left as it is): %s" % (path, e))
     first = lines[0] if lines else ""
     if first.startswith("store: "):
-        store = first[len("store: "):].strip()
+        store = first[len("store: "):].partition(SOURCES)[0].strip()  # the lane part; load_sources reads the rest
     elif first.startswith("head: "):
         old = first[len("head: "):].strip()
         store = None if old in ("", "none") else "git " + old
@@ -281,15 +354,16 @@ def load(path):
     return store, rows, history
 
 
-def write(path, store, rows, history):
-    """Write the whole record atomically: a fresh temp file in its folder, flushed to disk, then renamed over it."""
+def write(path, store, rows, history, sources=None):
+    """Write the whole record atomically: a fresh temp file in its folder, flushed to disk, then renamed over it.
+    sources = (digest, files) adds the sources part and the `source:` lines."""
     folder = os.path.dirname(os.path.abspath(path))
     os.makedirs(folder, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=".gate-record-", dir=folder)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write("store: %s\n" % store)
-            for ln in rows + history:
+            fh.write("store: %s%s\n" % (store, SOURCES + sources[0] if sources else ""))
+            for ln in (["source: " + f for f in sources[1]] if sources else []) + rows + history:
                 fh.write(ln + "\n")
             fh.flush()
             os.fsync(fh.fileno())
@@ -303,19 +377,31 @@ def write(path, store, rows, history):
         raise
 
 
-def update(path, root, mutate, expect=None):
+def update(path, root, mutate, expect=None, sources=None):
     """Rewrite the record at the current store: rows of another store dropped, history kept, mutate(rows, history).
-    With `expect` (the identity the caller validated its rows at), a store that differs now is Moved: nothing is written."""
+    With `expect` (the identity the caller validated its rows at), a store that differs now is Moved: nothing is written.
+    sources (the feature-review writer's briefed files) sets the sources part on a lane with a docs companion; any
+    other write keeps the record's part while its files still give it, and else drops it with the feature-review rows."""
     store = identity(root, path)
     if expect is not None and store != expect:
         raise Moved("the lane's store changed while the rows were validated (%s, now %s)" % (expect, store))
     prior = load(path)
-    rows, history = [], []
+    rows, history, src = [], [], None
     if prior is not None:
         rows = prior[1] if prior[0] == store else []
         history = prior[2]
+        old, files = load_sources(path)
+        if old and rows:
+            if old == sources_digest(root, files) or closed(path):  # a closed feature keeps its part as recorded
+                src = (old, files)
+            else:
+                rows = [ln for ln in rows if not ln.startswith("feature-review: ")]
     rows, history = mutate(store, rows, history)
-    write(path, store, rows, history)
+    if sources is not None:
+        src = (sources_digest(root, list(sources)), list(sources)) if docs_outside(root) else None
+    elif not any(ln.startswith("feature-review: ") for ln in rows):
+        src = None
+    write(path, store, rows, history, src)
     return store
 
 
@@ -373,8 +459,9 @@ def check(root, path, reads, ident=None):
         elif r == "feature-review":
             mine = [ln for ln in rows if ln.startswith("feature-review: ")]
             sound = feature_review_problem(mine, fr_doc_lane(root)) is None  # a hand-edited or inconsistent set is never current
-            ok = sound and mine[0].startswith("feature-review: verdict | PASS | ")  # a FAIL verdict is owed until its rows are fixed
-            if sound and not ok:
+            fresh = sources_current(root, path)  # a moved docs companion owes the read again
+            ok = sound and fresh and mine[0].startswith("feature-review: verdict | PASS | ")  # a FAIL verdict is owed until its rows are fixed
+            if sound and fresh and not ok:
                 r = "feature-review FAIL"  # its own owed line: the FAIL rows go to tasks, the reviewer is not rerun
         else:
             rounds = [round_fields(ln) for ln in history if ln.startswith("round: ")]

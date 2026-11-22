@@ -94,6 +94,16 @@ def size(path):
         return 0
 
 
+def sources(root, fid, records):
+    """The files the read is briefed with, lane-relative: the spec, the task log, the lane's CLAUDE.md, the working
+    dir's rulings.md and scope.md (named even when absent, so one appearing moves the digest) and the other decision
+    records; the sources part of the store is a digest over them."""
+    working = lane_path(root, "working", fid)
+    files = [lane_path(root, "feature-spec", fid), lane_path(root, "task-log", fid), os.path.join(root, "CLAUDE.md"),
+             os.path.join(working, "rulings.md"), os.path.join(working, "scope.md")]
+    return [os.path.relpath(p, root) for p in files + [r for r in records if r not in files]]
+
+
 def decisions(working, spec_ledgers):
     out = [os.path.join(working, "rulings.md"), os.path.join(working, "scope.md")]
     return [p for p in out if os.path.isfile(p)] + list(spec_ledgers)
@@ -178,7 +188,8 @@ def file_reply(fid, root, reply, spec_ledgers):
         records = decisions(working, spec_ledgers)
         row = subprocess.run([sys.executable, os.path.join(BOARD, "gate_record_row.py"), "--kind", "feature-review",
                               "--root", root, "--out", os.path.join(working, "gate-%s.md" % fid), "--workdir", working,
-                              "--feature", fid] + (["--decisions"] + records if records else []),
+                              "--feature", fid] + (["--decisions"] + records if records else [])
+                             + ["--sources"] + sources(root, fid, records),
                              capture_output=True, text=True)
         rc = row.returncode
     finally:
