@@ -85,7 +85,7 @@ Legend (do NOT paste into the block -- these are notes, not part of any value):
 
 Then add three supporting sections to the same `CLAUDE.md`:
 
-**1. `## Earned rules` -- REQUIRED.** A lane whose `CLAUDE.md` has no `## Earned rules` heading HALTs the implement phase at close -- on ANY surface, including `none`. Start with the heading; add rules as they earn their place (an empty-but-present heading is a valid start).
+**1. `## Earned rules` -- REQUIRED.** A lane whose `CLAUDE.md` has no `## Earned rules` heading HALTs `/said:impl` at the task close -- on ANY surface, including `none`. Start with the heading; add rules as they earn their place (an empty-but-present heading is a valid start).
 
 ```markdown
 ## Earned rules
