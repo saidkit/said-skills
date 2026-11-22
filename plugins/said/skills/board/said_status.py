@@ -345,6 +345,26 @@ def feature_review_owed(root, workdir, fid):
         return False
 
 
+def feature_review_state(root, workdir, fid):
+    """The gates field of the feature-reviewer's read: `pass` or `fail` from the record's rows at the lane's store,
+    `owed` when the record holds rows at another store or unsound rows, `-` when no read is recorded."""
+    try:
+        import gate_record
+        path = os.path.join(workdir, "gate-%s.md" % fid)
+        rec = gate_record.load(path)
+        if rec is None or not any(ln.startswith("feature-review: ") for ln in rec[1]):
+            return "-"
+        code, line = gate_record.check(root, path, ["feature-review"])
+    except Exception:  # an unreadable record holds no read the board can show; the gates report the error
+        return "owed" if os.path.isfile(os.path.join(workdir, "gate-%s.md" % fid)) else "-"
+    if code == 0:
+        return "pass"
+    return "fail" if line == "Inspect owed: feature-review FAIL" else "owed"
+
+
+FR_GLYPH = {"pass": GLYPH["ok"], "-": GLYPH["pending"], "fail": "FAIL", "owed": "owed"}
+
+
 def _fr_doc_lane(root):
     import gate_record
     return gate_record.fr_doc_lane(root)
@@ -671,6 +691,7 @@ def analyze_lane(name, root, docs_dir, work_dir, prefixes, legacy_prefixes, toda
         if phase in ("Inspect", "Debrief") and dir_content and feature_review_failed(root, workdir, fid):
             phase, sub = "Act", "feature review FAIL"  # a failed feature review: Inspect does not start
         gates = gate_ticks(workdir, reviewers, fid) if os.path.isdir(workdir) else {"qa": False, "ux": False, "accept": False, "debrief_started": False}
+        gates["feature_review"] = feature_review_state(root, workdir, fid) if os.path.isdir(workdir) else "-"
 
         started = t["dates"][0] if t["dates"] else None
         last_task = t["dates"][-1] if t["dates"] else None
@@ -803,6 +824,8 @@ def bar(done, denom):
 
 def gate_str(f):
     parts = []
+    if f["gates"].get("feature_review") == "pass":
+        parts.append("feature-review" + GLYPH["ok"])
     if f["gates"]["qa"]:
         parts.append("qa" + GLYPH["ok"])
     if f["gates"]["ux"]:
@@ -927,6 +950,7 @@ def _feature_block(f, lane_label=None):
     out = (["lane: %s" % lane_label] if lane_label else []) + ["%s — %s" % (f["id"], cur), "", "  " + " -> ".join(pipe)]
     g = f["gates"]
     gline = ", ".join([
+        "review-feature " + FR_GLYPH.get(g.get("feature_review", "-"), GLYPH["pending"]),
         "review-qa " + (GLYPH["ok"] if g["qa"] else GLYPH["pending"]),
         "review-ux " + (GLYPH["ok"] if g["ux"] else GLYPH["pending"]),
         "accept " + (GLYPH["ok"] if g["accept"] else GLYPH["pending"]),

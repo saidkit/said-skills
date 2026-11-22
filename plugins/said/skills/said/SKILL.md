@@ -41,7 +41,7 @@ Every invocation ends with this block. No exceptions — including `status` mode
 ```
 feature: <id>
 phase: <Scope|Act|Inspect|Debrief|Closed> — <n> Todo
-gates: review-qa <pass|fail|deferred (F<NN>)|—>, review-ux <pass|fail|deferred (F<NN>)|—>, accept <pass|fail|deferred (F<NN>)|—>
+gates: review-feature <pass|fail|owed|->, review-qa <pass|fail|deferred (F<NN>)|—>, review-ux <pass|fail|deferred (F<NN>)|—>, accept <pass|fail|deferred (F<NN>)|—>
 said closed: yes|no
 goal: done | continue | stop — <reason>   # /goal reads this line: done|stop end the run, continue = re-invoke; an operator-question stop carries OPERATOR-QUESTION-HELD
 ```

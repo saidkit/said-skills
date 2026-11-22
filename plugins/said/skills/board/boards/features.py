@@ -194,6 +194,7 @@ def render_feature(data, fid, lane=None):
     g = f["gates"]
     gate_line = ", ".join([
         "Evals: ",
+        "review-feature %s" % {"pass": "✓", "fail": "FAIL", "owed": "owed"}.get(g.get("feature_review"), "○"),
         "review-qa %s" % ("✓" if g["qa"] else "○"), "review-ux %s" % ("✓" if g["ux"] else "○"),
         "accept %s" % ("✓" if g["accept"] else "○"), "debrief %s" % ("✓" if f["debrief_closed"] else "○"),
     ])
