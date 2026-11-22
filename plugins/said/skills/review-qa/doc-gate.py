@@ -31,7 +31,7 @@ Exit 0 = clean (WARNs allowed). Exit 1 = ≥1 FAIL. Exit 2 = usage/config error.
 
 Feature-agnostic: pass the lane's task logs and shippable-artifact roots; the
 gate knows nothing about any one feature. Ships inside the said plugin and is run
-natively by the deliver gate (review-qa) for a `surface: doc` lane — resolved
+natively by the Inspect gate (review-qa) for a `surface: doc` lane — resolved
 from the skill's own installed dir, never a vendored per-project copy.
 """
 from __future__ import annotations

@@ -362,7 +362,7 @@ def next_action(fid, phase, workdir, gates, sub, doc=False, fr_owed=False):
         return "/said:impl %s" % fid
     if phase in ("Inspect", "Debrief"):  # a gate still unrecorded comes before the debrief
         if fr_owed and not gates.get("qa"):  # the read's place in a round: before review-qa
-            return "/said:review-feature %s --base <rev> --capture-ref <file>" % fid
+            return "/said:review-feature %s --base <rev> --capture-ref <file|none>" % fid
         if not gates["qa"]:
             return "/said:review-qa %s" % fid
         if not gates["accept"]:

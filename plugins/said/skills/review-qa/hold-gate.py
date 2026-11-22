@@ -70,7 +70,7 @@ Exit 0 = every markered task PASS (an unmarkered task is unguarded, PASS). Exit 
 >=1 HOLD. Exit 2 = config error (nothing to check, a vacuous root, a markered task
 with no rulings list, a rulings list that does not open).
 
-Ships inside the said plugin beside the deliver skill that runs it (review-qa),
+Ships inside the said plugin beside the Inspect skill that runs it (review-qa),
 run natively -- never a vendored per-project copy. Feature-agnostic: pass task
 logs + the work's rulings list; it knows nothing about any one feature.
 """

@@ -2,7 +2,7 @@
 """The feature-reviewer's read of one feature: the code `/said:review-feature` runs in the session and
 board/inspect_run.py runs outside it, so the two forms build one brief and file one way.
 
-  review_feature.py prepare <feature-id> --root <lane-root> [--base <rev>] [--capture-ref <file>] [--ledger <file>]...
+  review_feature.py prepare <feature-id> --root <lane-root> [--base <rev>] [--capture-ref <file|none>] [--ledger <file>]...
   review_feature.py file <feature-id> --root <lane-root> --reply <file> [--ledger <file>]...
 
 prepare reads the record (`gate_record.py check --reads feature-review`) and prints one first line:
@@ -211,7 +211,7 @@ def keep_refused(fid, reply):
 def parse(argv):
     if len(argv) < 2 or argv[0] not in ("prepare", "file") or argv[1].startswith("-"):
         raise Error("usage: review_feature.py prepare|file <feature-id> --root <lane-root> [--base <rev>]"
-                    " [--capture-ref <file>] [--reply <file>] [--ledger <file>]...")
+                    " [--capture-ref <file|none>] [--reply <file>] [--ledger <file>]...")
     form, fid, opts, given, i = argv[0], feature_id(argv[1]), {}, [], 2
     allowed = ("--root", "--base", "--capture-ref", "--ledger") if form == "prepare" else ("--root", "--reply", "--ledger")
     while i < len(argv):

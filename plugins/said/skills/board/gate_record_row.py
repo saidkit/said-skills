@@ -15,7 +15,7 @@ lane is an error. The record is written through gate_record.py: its first line i
 lane root; a record written at another store keeps its round and matrix lines and drops its rows, so no
 `gate-recompute:` row is ever typed here and a stale one is never carried to a new store. The feature-review form
 runs the validator itself (said_status.feature_review_output, the code behind `said_status.py --feature-review`) on
-<workdir>/review-feature-<id>.md and writes only the `feature-review: ` rows it produced, replacing every earlier
+<workdir>/review-feature-<id>.md (on a doc lane review-doc-editorial-<id>.md) and writes only the `feature-review: ` rows it produced, replacing every earlier
 feature-review row of the record; it takes no rows from a file or stdin, so a row is never typed. With --decisions
 (the decision records the reviewer was briefed with), each decision id of those records needs a row in Covers or
 Uncovered decisions: the live rulings of a `rulings.md`, the `Q-<n>` ids of a `scope.md` section D, the `DL-`/`CL-`

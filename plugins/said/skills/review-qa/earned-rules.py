@@ -14,7 +14,7 @@ Usage:
       -> WARN "block grew since close" (a later rule is not a false close), absent line, heading present
       -> FAIL on/after --adr-date, WARN before (the heading is the lane's adoption marker; the date is the
       fallback for a rolled lane's pre-contract closes), no heading in CLAUDE.md -> WARN, never FAIL
-      (roll the lane; the HALT on an un-rolled lane is the implement skill's, at close time).
+      (roll the lane; the HALT on an un-rolled lane is the impl skill's, at close time).
       Then each CITED rule's linked record is checked against the strict grammar (the record = the rule
       line's FINAL arrow segment = one lane-root-relative path token, an optional `#anchor` stripped,
       nothing after it): conforming + resolves (opens as a regular file from the lane root by ANY path
