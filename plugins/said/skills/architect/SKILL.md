@@ -1,7 +1,7 @@
 ---
 name: architect
 description: >
-  SAID/Act, the Architect step — turns a refined `scope.md` (Phase 1 output)
+  SAID/Act, the Architect step — turns a refined `scope.md` (Scope output)
   into a feature spec + append-only tasks log via three-pass authoring
   (gather -> author -> plan). The spec is a recreation contract: a fresh
   implementer reading the spec alone must be able to rebuild the feature
@@ -13,7 +13,7 @@ description: >
 
 # Feature Architect — Act, the Architect step: Spec + Tasks Authoring
 
-This skill turns Phase 1's refined `scope.md` into the two artifacts the rest of Act (`/said:impl`) consumes: a feature spec at `docs/features/<feature>.md` and an append-only tasks log at `docs/features/<feature>.tasks.md`. Phase 1 is the input boundary (read `said:scope-grill` / `said:scope-refine` outputs); Phase 3 is the output boundary (`/said:impl` consumes what this skill writes).
+This skill turns Scope's refined `scope.md` into the two artifacts the rest of Act (`/said:impl`) consumes: a feature spec at `docs/features/<feature>.md` and an append-only tasks log at `docs/features/<feature>.tasks.md`. Scope is the input boundary (read `said:scope-grill` / `said:scope-refine` outputs); the impl step is the output boundary (`/said:impl` consumes what this skill writes).
 
 The skill itself is the orchestrator — there is NO separate agent. You — the main agent — drive three sequential passes (**gather** -> **author** -> **plan**) within ONE invocation.
 
@@ -37,7 +37,7 @@ If the operator's request is to **add a new task** to an already-architected fea
 
 If the operator's request is to **propagate new info** into an existing feature — BE handoff result, scope refinement, mid-implementation discovery, "process X and update spec + tasks", etc. — do NOT bounce. This is direct-edit work, not re-architecture. Proceed: read the source doc, list the deltas, apply surgical edits to spec + tasks per `docs/features/template-tasks.md` amendment carve-out (uncommitted task -> amend in place + `### Deviations` note; committed task -> append a new task ID). **After applying the spec edit, re-run the recreation-contract self-test** (Pass 2 § Recreation-contract self-test) against the updated spec — this branch owns the relocated spec-write + self-test (formerly `add-task` Step 4.5, moved here per the charter boundary). Report the diff. The 3-pass authoring flow below runs ONLY for INITIAL spec + tasks creation from a `scope.md`.
 
-If `scope.md` doesn't exist, or §D is neither empty nor resolved-with-an-operator-attributed-record -- BLOCK. Phase 1 is incomplete. Redirect: "scope.md §D unresolved (Phase 1 incomplete). Resolve §D items via `/said:scope-refine` regenerate or hand-edit, or supply the operator-attributed resolution record, then re-run `/said:architect`."
+If `scope.md` doesn't exist, or §D is neither empty nor resolved-with-an-operator-attributed-record -- BLOCK. Scope is incomplete. Redirect: "scope.md §D unresolved (Scope incomplete). Resolve §D items via `/said:scope-refine` regenerate or hand-edit, or supply the operator-attributed resolution record, then re-run `/said:architect`."
 
 ## Step 0 — Preflight
 
@@ -294,7 +294,7 @@ Per-task authoring rules (HARD — violations require rework):
 - **Covers:** one line right after `**Refs:**` naming the ids the task discharges, separated by `, `: ruling ids `WR-<seconds>`, ledger ids of the lane's decision ledger (`DL-`, `CL-`), todo and backlog line ids `@<ms>`, a UX rule as `<rules-file>#<rule-id>`, and source anchors `<file>#<heading-id>` (`scope.md#<heading-id>` on a lane without spec shards). A heading id is the heading's slug: lowercase, spaces to hyphens, punctuation dropped; never mint an id. Never a bare `R-` id: the earned rules a task applies go in its `Rules applied` line at close. A task that discharges no id writes `**Covers:** none`.
 - **Blocked-on question (optional field):** emit `**Blocked-on question:** <id>` as a FIELD (a peer of Status / Priority / Refs, never a `###` section) whenever the task depends on an operator question -- a §D item the task depends on, unresolved at scope time. The `<id>` is the resolved §D id, else an engine-minted `Q-<n>`. Derived explicitly from that dependency, never inferred; a task with no such dependency carries no field. A blocked task is held until it is lifted (see `template-tasks.md`). The hold is lifted by one line in the log's `## Lifted holds` section, `- <id> lifted-by: user@WR-<seconds> -- "<verbatim quote>" -- <date> [supersedes: <prior>]`, that cites the operator's answer as a ruling recorded with the `ruled` skill in the work's `rulings.md` (example: `- Q-1 lifted-by: user@WR-1790160000 -- "use the Postgres advisory lock" -- 2026-09-23`). `user` is a fixed role word (the role of the cited answer); the person's name belongs to the ruling.
 - **Problem:** What needs to be solved + context. For bugs, add `### Root cause` subsection.
-- **Approach:** "What to build" framing. Key decisions called out. **NO step-lists ("1. Do X. 2. Do Y.")** — methodology belongs to Phase 3 only. **NO function signatures, no detailed file lists, no implementation playbook.** **Do name the write-target** — the unit(s) / file(s) the task edits — as a key decision: a task-level fan-out derives each task's write-set from `Refs:` ∪ the files under the lane's mounts that the Approach names, so a task that names no target cannot be partitioned. Naming the target is not a file list.
+- **Approach:** "What to build" framing. Key decisions called out. **NO step-lists ("1. Do X. 2. Do Y.")** — methodology belongs to the impl step only. **NO function signatures, no detailed file lists, no implementation playbook.** **Do name the write-target** — the unit(s) / file(s) the task edits — as a key decision: a task-level fan-out derives each task's write-set from `Refs:` ∪ the files under the lane's mounts that the Approach names, so a task that names no target cannot be partitioned. Naming the target is not a file list.
   - **Cite applicable frozen rules inline** when relevant — anchors only, no verbatim paraphrase. Example: "Reshape onto the `<shape>` rule bundle per `<ux-spec> #NN, #MM`" (rule ids from the loaded registry). Implementer opens the cited specs per Reading list `(full read)`.
   - **Alternatives considered** subsection ONLY when a rejected option was reasonable to a cold reader. Skip otherwise.
   - **Code samples** ONLY when the sample IS the load-bearing decision (a `CLAUDE.md` patch literal, an end-state folder layout). Default to prose pointing at upstream ADR/UX-spec.
@@ -307,7 +307,7 @@ Per-task authoring rules (HARD — violations require rework):
   - **Quality gates**: one umbrella bullet. Example: `- [ ] Quality gates green; no regression outside scope.`
 
   Typical task ends with 5–10 Acceptance bullets total — keep tight; skip every category that doesn't apply (data-layer-only task has no visual parity; refactor with no schema change has no wire contract).
-- **Fix / Deviations / Gotchas:** HTML-comment placeholders only. Phase 3 close-of-task review fills them.
+- **Fix / Deviations / Gotchas:** HTML-comment placeholders only. The impl step's close-of-task review fills them.
 
 Write to `docs/features/<feature>.tasks.md`.
 
@@ -322,7 +322,7 @@ Report to operator:
 - Recreation-contract test result: passed first run / iterated `<n>` times / blocked on `<gap>`.
 - Spec/template ratio: `<spec lines>` / `<template lines>` = `<ratio>×`. Flag if > 2×.
 
-Hard exit. The skill writes spec + tasks; that's the entire Phase 2 output. Implementation is Phase 3's job.
+Hard exit. The skill writes spec + tasks; that's the Architect step's entire output. Implementation is the impl step's job.
 
 Suggested next step for the operator: "Act continues here. Run `/said:impl <feature-id>` to drive every `Status: Todo` task in order (whole-feature mode), or `/said:impl <task-id>` for a single task. Each task closes through `/said:review-ux` at Phase C (visual-surface features only)."
 
@@ -330,9 +330,9 @@ Suggested next step for the operator: "Act continues here. Run `/said:impl <feat
 
 These are positive boundaries of the skill's contract — not negative rules subsumed by the section procedures + recreation-contract test.
 
-- **Phase 2 stops at writing spec + tasks.** The operator triggers Phase 3 via `/said:impl`. Never auto-invoke implementation, never spawn coding agents, never begin code edits.
-- **Phase 2 is for INITIAL authoring only.** Adding a task to an existing feature -> `/said:add-task` (direct append per `template-tasks.md`).
+- **The Architect step stops at writing spec + tasks.** The operator triggers the impl step via `/said:impl`. Never auto-invoke implementation, never spawn coding agents, never begin code edits.
+- **This skill is for INITIAL authoring only.** Adding a task to an existing feature -> `/said:add-task` (direct append per `template-tasks.md`).
 - **Spec and tasks are two files, never one.** Earned design decision (S01-1). Spec is the pre-implementation contract; tasks.md is the post-implementation history.
-- **The §D-resolved preflight is non-negotiable.** §D must be empty, OR resolved WITH an operator-attributed record (Step 0 #2's cite-and-verify). An unresolved §D means Phase 1 is incomplete = Phase 2 starts on bad input -- BLOCK and redirect.
+- **The §D-resolved preflight is non-negotiable.** §D must be empty, OR resolved WITH an operator-attributed record (Step 0 #2's cite-and-verify). An unresolved §D means Scope is incomplete = the Architect step starts on bad input -- BLOCK and redirect.
 - **The recreation-contract test is the authoring gate.** Section procedures produce the right shape by construction; the test verifies. If a section grows large, re-run the procedure for that section — don't add caps or "no X" rules.
 - **The operator owns clarifying-question answers.** AC form, story type, granularity overrides — never auto-resolve silently.

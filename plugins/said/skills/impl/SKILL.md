@@ -24,11 +24,11 @@ Standing for the whole run — the head of this file is what a compaction re-att
 
 ## What this skill is
 
-This skill drives a Phase 2-architected task from `Status: Todo` to `Status: Done` through three phases: Phase A classifies + inventories the work against the task's Acceptance checklist; Phase B implements rule-by-rule under test-first discipline; Phase C verifies via the parity check + the quality gate + `/said:review-ux` + the close-of-task 5-step review, each `per profile.<slot>`. Phase 2 is the input boundary (this skill reads what `/said:architect` produced); commit + push are the output boundary (operator-triggered, never auto-driven).
+This skill drives an architected task from `Status: Todo` to `Status: Done` through three phases: Phase A classifies + inventories the work against the task's Acceptance checklist; Phase B implements rule-by-rule under test-first discipline; Phase C verifies via the parity check + the quality gate + `/said:review-ux` + the close-of-task 5-step review, each `per profile.<slot>`. The Architect step is the input boundary (this skill reads what `/said:architect` produced); commit + push are the output boundary (operator-triggered, never auto-driven).
 
 The skill itself is the orchestrator — there is NO separate agent. You — the main agent — drive three sequential phases within ONE invocation. Each phase declares its stance up front so verification work and implementation don't blur. **Operator pauses at every phase boundary are mandatory in the interactive forms; no auto-progression.** (The `arm` fan-out form is the exception — it forces autonomy and returns every pause as an owed item; see **Fan-out forms**.)
 
-**Single-pass goal.** Multiple "Pass 1 / Pass 2 / Pass 3" entries in a closed task's `### Fix` block = failure mode. The whole point of conformance-fold Acceptance (Phase 2 settlement) + 3-phase driver is to make every task close single-pass. If you find yourself thinking "I'll defer X to a Pass 2" mid-Phase B — STOP. Either widen Phase B to satisfy X now, or surface X as an operator question (declare scope-creep, or split into a new task via `/said:add-task`).
+**Single-pass goal.** Multiple "Pass 1 / Pass 2 / Pass 3" entries in a closed task's `### Fix` block = failure mode. The whole point of conformance-fold Acceptance (the Architect step's settlement) + 3-phase driver is to make every task close single-pass. If you find yourself thinking "I'll defer X to a Pass 2" mid-Phase B — STOP. Either widen Phase B to satisfy X now, or surface X as an operator question (declare scope-creep, or split into a new task via `/said:add-task`).
 
 ## When this fires
 

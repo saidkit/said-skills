@@ -1,8 +1,8 @@
 ---
 name: review-qa
 description: >
-  SAID Phase 3.5 — implementation-hygiene verification gate that runs between
-  Phase 3 (`/said:impl` close) and Phase 4 (`/said:debrief` entry).
+  SAID Inspect — implementation-hygiene verification gate that runs between
+  Act (`/said:impl` close) and Debrief (`/said:debrief` entry).
   Verifies (a) quality gates clean, (b) `### Fix` claim integrity (test
   counts, grep results, file presence/absence), (c) `Refs:` ADR/UX mechanical
   conformance against `docs/qa/feature-qa-checklist.md`. Project-agnostic in command
@@ -15,13 +15,13 @@ description: >
   Triggered ONLY by the explicit command "/said:review-qa
   <task-id|feature-id>", or its run form "/said:review-qa <feature-id>
   fast-track F<NN>". NOT for spec authoring (`/said:architect`,
-  Phase 2). NOT for implementation (`/said:impl`, Phase 3). NOT for AC
+  Act's Architect step). NOT for implementation (`/said:impl`, Act's impl step). NOT for AC
   verification (`/said:accept`, sibling).
 ---
 
 # Feature Review-QA — Implementation Hygiene Verification Gate
 
-This skill verifies implementation hygiene at task or feature close: quality gates clean, `### Fix` claims honest, cited `Refs:` rules satisfied where mechanically assertable. Sits between Phase 3 close and Phase 4 entry as a parallel sibling to `/said:accept` (behavioral contract side).
+This skill verifies implementation hygiene at task or feature close: quality gates clean, `### Fix` claims honest, cited `Refs:` rules satisfied where mechanically assertable. Sits between Act's close and Debrief's entry as a parallel sibling to `/said:accept` (behavioral contract side).
 
 **Read-only contract.** Never edits code, specs, or tasks. Surfaces verdicts (PASS / FAIL / WARN); operator decides remediation.
 
@@ -50,14 +50,14 @@ A fast-track run is a `## Fast-track F<NN>` block in the tasks log whose `closed
 
 ## Common compositions
 
-After Phase 3 closes (all targeted tasks `Status: Done`):
+After Act closes (all targeted tasks `Status: Done`):
 
 ```
 /said:impl <task-id|feature-id>      # task / batch closes
 /said:review-qa <task-id|feature-id> # implementation hygiene cleared ┐
 /said:accept <task-id|feature-id>    # behavioral contract verified   ┘ siblings, parallel
                                         # both green
-/said:debrief <feature-id>           # Phase 4 entry allowed (preflight reads review-qa report)
+/said:debrief <feature-id>           # Debrief entry allowed (preflight reads review-qa report)
 ```
 
 The feature-mode gate recompute, Covers read and round also run as one command outside the session: `python3 <skill-dir>/../board/inspect_run.py <feature-id> --root <lane-root>`. It writes the same record through the same scripts and refuses (exit 3) while another run holds the lane; the verdict stays this skill's.
@@ -230,7 +230,7 @@ Gate effect for `/said:debrief`:
 - `docs/qa/feature-qa-checklist.md` — project-side lookup table (cited rule -> mechanical assertion); operator-maintained.
 - `said:impl` Step 0 #8 — command-resolution chain reference.
 - `said:accept` — sibling skill (behavioral contract verification).
-- `said:debrief` — Phase 4 driver this skill gates.
+- `said:debrief` — Debrief driver this skill gates.
 
 ## Re-read self-check (acceptance)
 

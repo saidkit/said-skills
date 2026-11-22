@@ -1,7 +1,7 @@
 ---
 name: scope-grill
 description: >
-  SAID/Phase 1 (Scope) Case 2 — interactive ideation for SAID feature flow.
+  SAID/Scope Case 2 — interactive ideation for SAID feature flow.
   Drives focused Q&A from a thin user prompt into a complete `scope.md`
   with §A purpose / §B target shape / §C constraints / §D open questions.
   Trigger phrases: user says "Grill idea ...", "Let's ideate ...", or runs
@@ -12,9 +12,9 @@ description: >
   to /said:scope-refine.
 ---
 
-# Feature Scope Grill — Phase 1 (Scope) Case 2: Interactive Ideation
+# Feature Scope Grill — Scope Case 2: Interactive Ideation
 
-This skill drives the Phase 1 Case 2 path — turning a thin user prompt into a complete `scope.md`. Case 1 (handoff exists) uses the `said:scope-refiner` agent instead; THIS skill is for when the operator has only a thin idea ("notification preferences UI", "CSV import for projects") and needs to think through scope via focused Q&A before the Architect step starts. Your goal is to grill user idea from different angles to build a comprehensive scope - literally extract implicit knowledge from user's head and match it with harsh reality
+This skill drives the Scope Case 2 path — turning a thin user prompt into a complete `scope.md`. Case 1 (handoff exists) uses the `said:scope-refiner` agent instead; THIS skill is for when the operator has only a thin idea ("notification preferences UI", "CSV import for projects") and needs to think through scope via focused Q&A before the Architect step starts. Your goal is to grill user idea from different angles to build a comprehensive scope - literally extract implicit knowledge from user's head and match it with harsh reality
 
 There is NO separate agent. You — the main agent — drive the Q&A loop interactively. Read this file, enter the loop, and stay until §D is empty.
 
@@ -53,13 +53,13 @@ Operator questions: unresolved items the operator answers. EVERY question carrie
 
 - **Id** -- `Q-<n>` (`Q-1`, `Q-2`, ...) for a new question; a scope that already numbers its questions keeps its ids.
 - **Phrasing** — neutral framing of the question.
-- **Forcing function** — what blocks on the answer (which §A/§B/§C bullet, which Phase 2 spec section).
+- **Forcing function** — what blocks on the answer (which §A/§B/§C bullet, which spec section of the Architect step).
 - **Default + reasoning** — your best guess and why; do NOT pick the side unless the operator confirms.
 
-§D MUST be empty when scope.md is final. Non-empty §D = Phase 1 incomplete; the Architect step cannot start.
+§D MUST be empty when scope.md is final. Non-empty §D = Scope incomplete; the Architect step cannot start.
 ```
 
-The §A/§B/§C/§D slot positions match the slots in `said:scope-refiner`'s output. The CONTENT differs — the refine agent populates §A with verbatim wire captures, §B with visual contract screenshots, §C with cross-cutting decisions, §D with handoff-vs-contract conflicts. This skill populates them with purpose / target shape / constraints / open questions extracted from Q&A. Either way, Phase 2 reads four §-sections and uses them to build the spec.
+The §A/§B/§C/§D slot positions match the slots in `said:scope-refiner`'s output. The CONTENT differs — the refine agent populates §A with verbatim wire captures, §B with visual contract screenshots, §C with cross-cutting decisions, §D with handoff-vs-contract conflicts. This skill populates them with purpose / target shape / constraints / open questions extracted from Q&A. Either way, the Architect step reads four §-sections and uses them to build the spec.
 
 ## Q&A loop
 
@@ -80,9 +80,9 @@ Whenever you find yourself about to silently resolve a question — STOP. That's
 
 ## Stop condition
 
-§D empties -> scope.md is complete -> write the file to `docs/working/<feature>/scope.md` and tell the operator Phase 1 is done. Suggested next step: "Act's Architect step starts here. Run /said:architect when ready (or build the spec interactively per `docs/features/template.md`)."
+§D empties -> scope.md is complete -> write the file to `docs/working/<feature>/scope.md` and tell the operator Scope is done. Suggested next step: "Act's Architect step starts here. Run /said:architect when ready (or build the spec interactively per `docs/features/template.md`)."
 
-If the operator wants to defer some §D items to Phase 2 — that's allowed. Mark those items as "defer to the Architect step" with explicit reasoning, treat them as resolved for Phase 1 purposes, and write scope.md. Phase 2 will surface them again if they're real blockers.
+If the operator wants to defer some §D items to the Architect step — that's allowed. Mark those items as "defer to the Architect step" with explicit reasoning, treat them as resolved for Scope purposes, and write scope.md. The Architect step will surface them again if they're real blockers.
 
 ## Operator questions
 
@@ -95,9 +95,9 @@ Resolve these EARLY in the loop, not at the end:
 
 - **Don't write spec-shape.** No Acceptance Criteria, no Functional / UI-UX / API / Performance / Acceptance sections, no Feature Tasks table. Those are the Architect step artifacts. Scope is idea-shape; spec is implementation-shape.
 - **Don't merge `scope.md` + `spec.md`.** Separate files, separate phases, different content shapes. Earned design decision.
-- **Don't auto-resolve §D.** Every operator question stays open until the operator answers it. Silent resolution defeats Phase 1's whole point.
+- **Don't auto-resolve §D.** Every operator question stays open until the operator answers it. Silent resolution defeats Scope's whole point.
 - **Don't ask five questions at once.** Focused, one-or-two-at-a-time. Compounding questions overwhelm and produce shallow answers.
-- **Don't write `scope.md` before §D is empty** (or all §D items explicitly deferred). Premature write = incomplete scope = Phase 2 starts on bad input.
+- **Don't write `scope.md` before §D is empty** (or all §D items explicitly deferred). Premature write = incomplete scope = the Architect step starts on bad input.
 - **Don't silently invoke `/said:scope-refine`.** That's Case 1, different shape, different agent. If the operator HAS a handoff doc, redirect explicitly: "You have a handoff at `<path>` — run `/said:scope-refine <path>` instead."
 - **Don't assume the project's contract.** Before answering §B / §C technical questions - for a non-visual surface: read any cited ADRs / API specs, for a `web` surface - read any cited ADRs / `docs/ux/feature-ux-checklist.md` and UX specs. Your job is to elicit and structure, not to invent constraints.
 - **Don't load context the operator hasn't asked for.** If `<feature>` matches an existing dir under `docs/features/` or `src/features/`, ASK before deep-diving — they may want a fresh-eyes ideation, not a refine.

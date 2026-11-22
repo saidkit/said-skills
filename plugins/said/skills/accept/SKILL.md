@@ -1,8 +1,8 @@
 ---
 name: accept
 description: >
-  SAID Phase 3.5 — Acceptance Criteria verification gate that runs between
-  Phase 3 (`/said:impl` close) and Phase 4 (`/said:debrief` entry).
+  SAID Inspect — Acceptance Criteria verification gate that runs between
+  Act (`/said:impl` close) and Debrief (`/said:debrief` entry).
   Verifies the behavioral contract a feature/task committed to: did the
   `### Acceptance` items / spec § Acceptance Criteria actually pass? Read-only
   by contract; never edits code, specs, or tasks. Sibling skill
@@ -11,14 +11,14 @@ description: >
   Triggered ONLY by the explicit command "/said:accept
   <task-id|feature-id> [--feature-only]", or its run form "/said:accept
   <feature-id> fast-track F<NN>". NOT for spec authoring (that's
-  `/said:architect`, Phase 2). NOT for implementation (that's
-  `/said:impl`, Phase 3). NOT for hygiene (that's `/said:review-qa`,
+  `/said:architect`, Act's Architect step). NOT for implementation (that's
+  `/said:impl`, Act's impl step). NOT for hygiene (that's `/said:review-qa`,
   sibling).
 ---
 
 # Feature Accept — Behavioral Contract Verification Gate
 
-This skill verifies that AC promises a feature/task made — bullet conditions OR Gherkin scenarios — actually pass post-implementation. Sits between Phase 3 close and Phase 4 entry as a parallel sibling to `/said:review-qa` (hygiene side).
+This skill verifies that AC promises a feature/task made — bullet conditions OR Gherkin scenarios — actually pass post-implementation. Sits between Act's close and Debrief's entry as a parallel sibling to `/said:review-qa` (hygiene side).
 
 **Read-only contract.** Never edits code, specs, or tasks. Surfaces verdicts; operator decides remediation path (re-open via `/said:impl`, or follow-up via `/said:add-task`).
 
@@ -50,14 +50,14 @@ A fast-track run is a `## Fast-track F<NN>` block in the tasks log whose `closed
 
 ## Common compositions
 
-After Phase 3 closes (all targeted tasks `Status: Done`):
+After Act closes (all targeted tasks `Status: Done`):
 
 ```
 /said:impl <task-id|feature-id>     # task / batch closes
 /said:accept <task-id|feature-id>   # behavioral contract verified   ┐
 /said:review-qa <task-id|feature-id># implementation hygiene cleared ┘ siblings, parallel
                                        # both green
-/said:debrief <feature-id>          # Phase 4 entry allowed (preflight reads accept report)
+/said:debrief <feature-id>          # Debrief entry allowed (preflight reads accept report)
 ```
 
 The record this skill reads may come from the one-command Inspect run outside the session, `python3 ${CLAUDE_SKILL_DIR}/../board/inspect_run.py <feature-id> --root <lane-root>`; it is read as the record `review-qa` writes is read.
@@ -208,8 +208,8 @@ Gate effect for `/said:debrief`:
 
 - `docs/features/template.md` — spec target shape (§ Acceptance Criteria section).
 - `docs/features/template-tasks.md` — task entry shape (`### Acceptance` section).
-- `said:impl` — Phase 3 driver this skill follows (post-task-close).
-- `said:debrief` — Phase 4 driver this skill gates (Phase 4 reads accept report).
+- `said:impl` — Act driver this skill follows (post-task-close).
+- `said:debrief` — Debrief driver this skill gates (Debrief reads accept report).
 - `said:review-qa` (when built) — hygiene sibling; runs in parallel.
 
 ## Re-read self-check (acceptance)

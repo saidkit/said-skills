@@ -6,7 +6,7 @@ Read from the spine (`SKILL.md` Contract rule 1) at the moment it names; every r
 
 Two canonical operator flows feed tasks into `/said:impl`:
 
-**A — Planned feature** (Phase 1 -> 2 -> 3):
+**A — Planned feature** (Scope -> the Architect step -> the impl step):
 
 ```
 /said:scope-refine docs/working/<feature>/handoff.md

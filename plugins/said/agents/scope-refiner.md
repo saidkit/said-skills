@@ -1,7 +1,7 @@
 ---
 name: scope-refiner
 description: >
-  SAID/Phase 1 (Scope) agent. Refines a substantive feature handoff (output of an
+  SAID/Scope agent. Refines a substantive feature handoff (output of an
   earlier discovery phase) into a refined scope-shape draft, validated
   against the lane's own contract — the records the lane's `CLAUDE.md`
   names — with unresolved conflicts and open questions surfaced in §D for

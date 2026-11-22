@@ -53,6 +53,9 @@ The phases are Scope, Act, Inspect, Debrief, Closed. In the project's instructio
 - the Eval step is retired: `said`'s Inspect ends `/said:accept` -> `/said:debrief`. An instruction that runs or
   waits on an Eval after `accept`, or on a `QA-eval-<id>.md` file, drops that step; existing `QA-eval-*` files stay
   as history. A multi-lane feature's e2e/UAT close in `/said:flow` is not the Eval and stays.
+- in an open `scope.md`, a section D item marked `defer to Phase 2` -> `defer to the Architect step`, the marker
+  `/said:scope-grill` writes. The feature read takes only that marker: an item left with the old one is a decision
+  the read must cover.
 
 A reader of `/said:board --json` sees the new phase values; a script that matched the old ones is updated the same
 way. Check with V3.
@@ -69,13 +72,18 @@ lines with it; any other use is a leftover.
 
 - `README.md`: 2
 - `agents/scope-refiner.md`: 5
-- `skills/add-task/SKILL.md`: 2
-- `skills/architect/SKILL.md`: 4
+- `skills/accept/SKILL.md`: 1
+- `skills/add-task/SKILL.md`: 4
+- `skills/architect/SKILL.md`: 7
+- `skills/debrief/SKILL.md`: 1
 - `skills/flow/SKILL.md`: 9
+- `skills/impl/SKILL.md`: 2
+- `skills/impl/references/phase-a.md`: 1
+- `skills/review-qa/SKILL.md`: 1
 - `skills/said/SKILL.md`: 7
-- `skills/setup/references/lane-schema.json`: 1
-- `skills/scope-grill/SKILL.md`: 8
+- `skills/scope-grill/SKILL.md`: 11
 - `skills/scope-refine/SKILL.md`: 3
+- `skills/setup/references/lane-schema.json`: 1
 - `skills/uxtoc/SKILL.md`: 1
 
 ## Verify

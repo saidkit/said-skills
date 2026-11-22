@@ -483,7 +483,7 @@ def waiting_reason(workdir):
     # gate) requires a structured could-not-run field the gate does not yet emit; the free-form
     # per-reviewer probe prose is unsound to parse (mixed reviewers / multi-line recording drop a
     # real hold). Roster-surfacing it is deferred to that structured field; the close still holds
-    # it via debrief's Phase-3.5 gate. So the axis surfaces the one signal it can trust.
+    # it via debrief's Inspect gate check. So the axis surfaces the one signal it can trust.
     # anchored to the report's own verdict bullet: a recorded probe line (which can carry builder-authored
     # recompute rows) never reads as the verdict
     # the file is append-only: a re-run appends a new verdict, so only its LAST verdict line is current
@@ -1842,7 +1842,7 @@ def _fr_rule_ids(root):
 
 
 FR_SECTION_D = re.compile("## \u00a7D(?:$|[ :-])")  # the scope's section D heading, not `## \u00a7Draft`
-FR_DEFERRED = "defer to phase 2"  # the scope skills' marker of a deferred section D item (any case)
+FR_DEFERRED = "defer to the architect step"  # scope-grill's marker of a deferred section D item (any case)
 
 
 def _fr_decision_ids(paths):

@@ -1,7 +1,7 @@
 ---
 name: scope-refine
 description: >
-  SAID/Phase 1 (Scope) Case 1 — refines a substantive technical handoff
+  SAID/Scope Case 1 — refines a substantive technical handoff
   (handoff doc OR current branch state) into a `scope.md` for Act's
   Architect step. Resolves input from operator argument, spawns the
   `said:scope-refiner` agent (codebase audit, and the lane's probe
@@ -13,7 +13,7 @@ description: >
   NOT for thin-input ideation — that's `/said:scope-grill` Case 2.
 ---
 
-# Feature Scope Refine — Phase 1 (Scope) Case 1: Handoff or Branch-State Refinement
+# Feature Scope Refine — Scope Case 1: Handoff or Branch-State Refinement
 
 ## Contract
 
@@ -24,7 +24,7 @@ description: >
 5. **Wait for every agent.** No agent runs in the background; its reply or its file comes before the next command.
 6. **Section D reaches the operator unchanged.** Print it verbatim; never resolve, default or empty an item (Step 3).
 
-This skill drives the Phase 1 Case 1 path — turning a substantive handoff into a refined `scope.md`. Case 2 (thin idea, no handoff) uses `/said:scope-grill` instead; THIS skill is for branch continuation, refactoring, or any work where a real handoff doc OR current git state already carries the substance.
+This skill drives the Scope Case 1 path — turning a substantive handoff into a refined `scope.md`. Case 2 (thin idea, no handoff) uses `/said:scope-grill` instead; THIS skill is for branch continuation, refactoring, or any work where a real handoff doc OR current git state already carries the substance.
 
 The skill itself is a thin wrapper. The `said:scope-refiner` agent does the substantive work — Stage 0 contract reads, Stage 1 handoff index, Stage 2 codebase audit (one report per in-scope dir, by `said:scope-auditor` agents or inline, as the agent's text says), Stage 3 the lane's probe procedure when one is passed, Stage 4 contract classification, Stage 5 scope.md write, Stage 6 self-check. Your job here is to resolve inputs, size the lane's rule documents (Step 1c), spawn the agent on a small lane or run the rule chain on a large one (Step 2L), and carry §D items visibly back to the operator.
 
@@ -274,7 +274,7 @@ Spawn `said:scope-refiner` via the Agent tool with the resolved inputs. The agen
 Example spawn prompt:
 
 ```
-Run Phase 1 (Scope) refinement.
+Run Scope refinement.
 
 - handoff-path: docs/working/<wip-path>.md
 - output-path: docs/working/scope-refine/scope.md
@@ -302,20 +302,20 @@ After the agent returns (small lane) or step 12 of the chain (large lane):
 - **Probes** — when no probe procedure was passed: one line saying that no live probe ran. On a large lane with a probe procedure passed: one line saying that the chain runs no live probe and the procedure was not run.
 - **§D — Conflicts and open questions** — print the section verbatim. Each entry names a conflict (handoff vs contract divergence) or an open question (handoff residual or checklist gap).
 - **Recommended next step** — depends on §D state:
-  - **§D empty** -> "Phase 1 (Scope) is done. Act's Architect step starts. Run `/said:architect` when ready, or build the spec interactively per `docs/features/template.md`."
-  - **§D non-empty** -> "Phase 1 (Scope) is BLOCKED on §D. Resolve each item, then either re-run `/said:scope-refine` to regenerate, or hand-edit `scope.md` so §D is empty before proceeding to `/said:architect`."
+  - **§D empty** -> "Scope is done. Act's Architect step starts. Run `/said:architect` when ready, or build the spec interactively per `docs/features/template.md`."
+  - **§D non-empty** -> "Scope is BLOCKED on §D. Resolve each item, then either re-run `/said:scope-refine` to regenerate, or hand-edit `scope.md` so §D is empty before proceeding to `/said:architect`."
 
 DO NOT silently resolve §D items. The agent surfaces conflicts in §D deliberately; this skill carries them through to the operator unchanged. When unattended (a subagent with no operator, or a top-level run with no operator turn to answer), an operator question (a §D item) is never resolved, defaulted, or emptied: it routes into the announce-once-then-hold class -- the `goal: stop` line (the line the `said` and `flow` skills print) carries `OPERATOR-QUESTION-HELD` -- exactly as `said`/`flow` hold an operator question, then holds.
 
 ## Step 4: Do NOT auto-fix or auto-architect
 
-The skill stops after presenting §D. If the operator wants conflicts resolved or wants the spec written, that's a separate explicit invocation. Phase 1 only writes `scope.md`; it does NOT write `spec.md`, task lists, or code.
+The skill stops after presenting §D. If the operator wants conflicts resolved or wants the spec written, that's a separate explicit invocation. Scope only writes `scope.md`; it does NOT write `spec.md`, task lists, or code.
 
 ## Anti-patterns
 
 - **Don't merge with `/said:scope-grill`.** Different cases (Case 1 = handoff exists, Case 2 = thin idea), different drivers (this spawns the agent; grill is interactive and agent-less), different content shapes inside §A/§B/§C/§D. Conflating them produces shape-incoherent `scope.md`.
 - **Don't auto-resolve §D.** Conflicts and open questions are operator questions by design. Carry them visibly to the operator; never pick the side yourself.
-- **Don't write `spec.md`.** This is Phase 1. `spec.md` is the Architect step's. The earned-design-decision splits them deliberately.
+- **Don't write `spec.md`.** This is Scope. `spec.md` is the Architect step's. The earned-design-decision splits them deliberately.
 - **Don't ask the operator the full input questionnaire** when most inputs resolve from path / branch / git state. Reach for an `ASK` only on the gap that genuinely can't be derived.
 - **Don't size the lane or run a chain step by hand.** `size` decides small or large. On a large lane every step of Step 2L runs as written: never pick the sections to read, never write or repair a table, a look, a card or a draft yourself, never drop a step whose check failed. A gap the script names goes back to its agent at most once; then BLOCK.
 - **Don't show a reader another reading.** The readers of each `zone-<k>` see only their zone part, the handoff and the decisions.

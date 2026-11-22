@@ -24,9 +24,9 @@ description: >
 
 This skill appends a new task entry to an existing `<feature>.tasks.md` file. It exists because tasks routinely surface mid-implementation — bugs caught at runtime, scope-creep additions, follow-ups from close-of-task leak scans — and the discipline for authoring them deserves enforcement (template-tasks.md authoring rules, no step-lists in Approach, code samples only when load-bearing, condensed Refs discipline). Manual append-only editing technically works, but loses the enforcement.
 
-This skill is the **add** half of Phase 2's task lifecycle. The **execute** half (implementing a task per Phase 3 close-of-task review discipline) is `/said:impl` — invoked separately by the operator once the task is in the backlog.
+This skill is the **add** half of Act's task lifecycle. The **execute** half (implementing a task per the impl step's close-of-task review discipline) is `/said:impl` — invoked separately by the operator once the task is in the backlog.
 
-**Boundary.** This skill REQUIRES an existing tasks file. If the feature has no tasks file yet, it's an INITIAL Phase 2 case — redirect to `/said:architect`.
+**Boundary.** This skill REQUIRES an existing tasks file. If the feature has no tasks file yet, it's an INITIAL Architect step case — redirect to `/said:architect`.
 
 **Main context only — the one writer of the append-only log.** This skill appends to a shared append-only file and its Step 1 needs the operator, so it runs in the main context. Inside a subagent or a fan-out arm there is no operator and no second writer is allowed (one log, one writer): a task discovered there is returned as an **owed item** for main to append via this skill — never appended from the arm.
 
@@ -46,7 +46,7 @@ The user invokes:
 
 Flags compose: `/said:add-task <feature-id> bug lane=<LANE> priority=High` is valid. Operator may type `<feature-id>` in any case; the skill normalizes to UPPERCASE (canonical grammar requires uppercase IDs in docs / tasks files; lowercase is reserved for commit-msg scopes only). Symmetric with `/said:impl`.
 
-If `docs/features/<feature-id>.tasks.md` doesn't exist, this is the WRONG skill. Redirect: "No tasks file at `docs/features/<feature-id>.tasks.md` — this is an INITIAL Phase 2 case. Use `/said:architect` to author the spec + initial tasks log first."
+If `docs/features/<feature-id>.tasks.md` doesn't exist, this is the WRONG skill. Redirect: "No tasks file at `docs/features/<feature-id>.tasks.md` — this is an INITIAL Architect step case. Use `/said:architect` to author the spec + initial tasks log first."
 
 If the operator's request is to MODIFY an existing task (rename, fix typo, update Status) -- this is the WRONG skill. Tasks are append-only per `template-tasks.md`. Redirect: "Existing task modification violates the append-only discipline. Status updates are one exception -- change only the Status: line and add `### Fix` per close-of-task review; the `closed:` line of a fast-track block is the other (the `fast-track F<NN> closed` form). For substantive changes, append a new task ID."
 
@@ -149,7 +149,7 @@ Before writing, validate the answers against template-tasks.md discipline. Rewri
 - **Blocked-on question (optional field).** When the operator's answer names an operator question this task depends on (`Blocked-on question: <id>`), place `**Blocked-on question:** <id>` as a field after `**Covers:**` (a field, never a `###` section); `none` -> omit it. The id is engine-minted (a resolved §D id, else `Q-<n>`), explicit and never inferred from prose. A blocked task is held until it is lifted (`template-tasks.md`). The hold is lifted by one line in the log's `## Lifted holds` section, `- <id> lifted-by: user@WR-<seconds> -- "<verbatim quote>" -- <date> [supersedes: <prior>]`, that cites the operator's answer as a ruling recorded with the `ruled` skill in the work's `rulings.md` (example: `- Q-1 lifted-by: user@WR-1790160000 -- "use the Postgres advisory lock" -- 2026-09-23`). `user` is a fixed role word (the role of the cited answer); the person's name belongs to the ruling.
 - **Fast-track field.** When the feature has an open run (a `## Fast-track F<NN>` block with an empty `closed:`), the new task joins it: place `**Fast-track:** F<NN>` after `**Covers:**` (after `**Blocked-on question:**` when both are present), a field, never a `###` section. A feature with no open run gets no field.
 - **Status: `Todo (YYYY-MM-DD)`** with today's creation date.
-- **Fix / Deviations / Gotchas: HTML-comment placeholders.** Phase 3 close-of-task review fills them.
+- **Fix / Deviations / Gotchas: HTML-comment placeholders.** The impl step's close-of-task review fills them.
 
 If a §D-class question surfaces during Q&A — an operator question the skill cannot silently resolve (cross-cutting choice, contract conflict, sequencing ambiguity) — STOP authoring. Surface the question explicitly; wait for the operator's answer; then proceed. Do not bake guesses into the new task.
 
@@ -258,14 +258,14 @@ Report to operator:
 **Auto-mode addendum to report** (when `auto` was set):
 - Step 3 outcome: Covered / Gap (flagged + stopped) / Contradicts (flagged + stopped) — any Gap/Contradicts names the `/said:architect propagate-new-info` action owed before `/said:impl`.
 
-Hard exit. Do NOT begin implementation. Do NOT spawn coding agents. Phase 3 implementation is the operator's separate call — the new task is now in the backlog; the operator picks when to work it.
+Hard exit. Do NOT begin implementation. Do NOT spawn coding agents. The impl step is the operator's separate call — the new task is now in the backlog; the operator picks when to work it.
 
-Suggested next step: "Task `<new-task-id>` appended. Run `/said:impl <new-task-id>` to drive Phase 3 — feature-id auto-derived from the task-id prefix."
+Suggested next step: "Task `<new-task-id>` appended. Run `/said:impl <new-task-id>` to drive the impl step — feature-id auto-derived from the task-id prefix."
 
 ## Anti-patterns
 
 - **Don't auto-resolve clarifying questions.** If the operator's answers leave gaps that would force a guess on substance (Approach, Acceptance), ASK rather than fill.
-- **Don't write step-lists in `### Approach`.** The single most violatable rule, inherited from `/said:architect` Pass 3. Methodology belongs to Phase 3.
+- **Don't write step-lists in `### Approach`.** The single most violatable rule, inherited from `/said:architect` Pass 3. Methodology belongs to the impl step.
 - **Don't include code samples that aren't load-bearing.** Same rule as `/said:architect` Pass 3.
 - **Don't duplicate spec's Context-to-load in Reading list.** Per-task delta only.
 - **Don't begin implementation.** This skill writes the task entry; that's the entire output. NEVER spawn coding agents; NEVER invoke `/said:impl` automatically (the operator triggers it after this skill exits); NEVER begin code edits.

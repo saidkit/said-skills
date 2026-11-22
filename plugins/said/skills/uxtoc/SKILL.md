@@ -84,7 +84,7 @@ Drop: file-naming conventions, codebase organization (which dir an entity lives 
 
 Do not invent. If the spec is silent on a sub-attribute (e.g., an element declares no `align`), omit the line entirely - do not write "align: not specified".
 
-**Explicit-empty rule.** When the spec explicitly says a slot is empty with a reason (e.g. "no header actions in Phase 1 - create flow is Phase 2"), preserve it as `<slot>: none - <reason>`. Silent-empty (slot not mentioned) still drops per the rule above; explicit-empty is informative and survives.
+**Explicit-empty rule.** When the spec explicitly says a slot is empty with a reason (e.g. "no header actions in the first release - create flow comes in the second"), preserve it as `<slot>: none - <reason>`. Silent-empty (slot not mentioned) still drops per the rule above; explicit-empty is informative and survives.
 
 **Key-collision warn (across a unit's containers).** DESIGNED is `(unit, key)`, so one field name keying two of a unit's containers collapses to one element - silently un-gating one. When a key would collide across two containers of one unit, WARN (advisory) and apply the qualify convention from the element-projection RULE (append the container name, e.g. `<key>-<container>`) so both stay distinct DESIGNED elements; never silently collapse. A genuinely unique key raises no warning.
 
