@@ -51,11 +51,23 @@ def reader_tools(path=AGENT_FILE):
     body = " ".join(text.split())
     if GIT_SET not in body or "Bash" not in tools:
         raise Halt("agents/feature-reviewer.md names no read-only git set")
-    git = [g.strip(" `") for g in body.split(GIT_SET, 1)[1].split(". ", 1)[0].split(",")]
+    git = [g.strip(" `") for g in (body + " ").split(GIT_SET, 1)[1].split(". ", 1)[0].split(",")]
     if not git or not all(g.startswith("git ") for g in git):
         raise Halt("agents/feature-reviewer.md git set is not a list of `git <command>`")
     return ",".join([t for t in tools if t != "Bash"] + ["Bash(%s:*)" % g for g in git])
 Halt = review_feature.Error
+
+
+def round_verdict(root, working, fid):
+    """The verdict file when its `target-sha:` is the lane's HEAD, else None: an older read never reads as this one."""
+    path = review_feature.out_path(root, working, fid)[0]
+    head = (review_feature.git(root, "rev-parse", "HEAD") or "").strip()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            top = [fh.readline() for _ in range(5)]
+    except (OSError, UnicodeDecodeError):
+        return None
+    return path if head and "target-sha: %s\n" % head in top else None
 
 
 def parse(argv):
@@ -158,8 +170,8 @@ def main(argv):
                 covers += [flag, os.path.join(root, docs, name)]
         for p in opts["ledgers"]:
             covers += ["--ledger", p]
-        verdict = review_feature.out_path(root, working, fid)[0]
-        if os.path.isfile(verdict):  # the matrix reviewer column reads the round's verdict
+        verdict = round_verdict(root, working, fid)
+        if verdict:  # the matrix reviewer column reads the round's verdict
             covers += ["--reviewer", verdict]
         c = subprocess.run(covers, capture_output=True, text=True)
         if c.returncode == 2:
