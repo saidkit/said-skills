@@ -32,7 +32,7 @@ old plugin does not read; a stamp set before the other steps claims a walk that 
 
 A lane whose `SAID.docs-root` resolves outside its git work tree (a docs companion in a repo of its own) gets a
 `sources <sha256>` part on the gate record's `store:` line at its next feature read. A one-part line stays valid:
-the feature-review read reads owed once on such a lane, and the next `/said:review-feature` writes the two-part
+an open feature's feature-review read reads owed once on such a lane, and the next `/said:review-feature` writes the two-part
 line. A lane whose docs root is inside its work tree keeps the one-part line.
 
 ## Step 2 -- Rename the gate-reader key

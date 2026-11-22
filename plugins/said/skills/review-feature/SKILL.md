@@ -15,7 +15,7 @@ description: >
 
 ## Contract
 
-1. **One read per round, only when owed.** Spawn the reader only after `review_feature.py prepare` prints `review-feature: ready`. A `current` record is never read again, and a recorded FAIL is not read again: its FAIL rows go to `/said:add-task`.
+1. **One read per round, only when owed.** Spawn the reader only after `review_feature.py prepare` prints `review-feature: ready`. A `current` record is never read again, and a recorded FAIL is not read again while its sources hold: its FAIL rows go to `/said:add-task`.
 2. **The scripts write; this skill never does.** The brief is the one `prepare` printed, passed verbatim, and on the one re-spawn passed verbatim plus the refusal line (Step 3). `review_feature.py file` runs the row writer and files the verdict only when the writer accepts it: rows are never typed, and the verdict file and the gate record are never edited by hand.
 3. **The reader is cold and the only judge.** Spawn `said:feature-reviewer` cold with the printed brief alone, and on the one re-spawn its refusal line (Step 3); this skill judges nothing about the build.
 4. **One outcome line ends every run** (**Outcome**); the caller routes it.
