@@ -8,12 +8,14 @@ board/inspect_run.py runs outside it, so the two forms build one brief and file 
 prepare reads the record (`gate_record.py check --reads feature-review`) and prints one first line:
   review-feature: current                  the record holds the read's rows at this store; nothing to read
   review-feature: FAIL recorded            the recorded verdict is FAIL; it is not read again
-  review-feature: owed (no read: <why>)    the read is owed and cannot run (no --base, no HEAD, no capture file)
+  review-feature: owed (no read: <why>)    the read is owed and cannot run (no --base, no HEAD, no capture file,
+                                           or the capture reference names the gate record)
   review-feature: ready                    then `out: <verdict file>`, `estimate: ...` and the brief between the
                                            lines `--- brief` and `--- end`
 Exit 0 ready, 1 any other state, 2 an input error (`error: <why>`). The capture reference is a non-empty file in the
-working dir, named relative to it; the decision records are the working dir's rulings.md and scope.md when they exist,
-then each --ledger (a file inside the lane root).
+working dir, named relative to it and never the gate record, or `none` on a feature with no capture; the decision
+records are the working dir's rulings.md and scope.md when they exist, then each --ledger (a file inside the lane
+root).
 
 file runs gate_record_row.py --kind feature-review with the same decision records over a reply that carries a
 `verdict: PASS` or `verdict: FAIL` line, and files it only when the writer accepts it, as
@@ -138,9 +140,13 @@ def prepare(fid, root, base, ref, spec_ledgers):
     base_sha = (git(root, "rev-parse", "--verify", base + "^{commit}") or "").strip()
     if not head or not base_sha:
         return {"state": "owed", "why": "no read: the lane has no HEAD or --base %s is no commit" % base}
-    full_ref = os.path.realpath(os.path.join(working, ref)) if ref else ""
-    if not ref or not full_ref.startswith(os.path.realpath(working) + os.sep) or size(full_ref) == 0:
+    full_ref = os.path.realpath(os.path.join(working, ref)) if ref and ref != "none" else ""
+    if ref == "none":
+        pass  # no capture: the writer accepts `none` only with a Captures group of `none`
+    elif not ref or not full_ref.startswith(os.path.realpath(working) + os.sep) or size(full_ref) == 0:
         return {"state": "owed", "why": "no read: --capture-ref names no non-empty file in the working dir"}
+    if full_ref == os.path.realpath(record):
+        return {"state": "owed", "why": "no read: --capture-ref names the gate record, not a capture"}
     records = decisions(working, spec_ledgers)
     spec = lane_path(root, "feature-spec", fid)
     if not os.path.isfile(spec) or not os.path.isfile(lane_path(root, "task-log", fid)):

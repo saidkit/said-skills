@@ -23,7 +23,7 @@ description: >
 ## When this fires
 
 - `/said:review-feature <feature-id> --base <rev> --capture-ref <file> [--ledger <file>]... [--root <lane-root>]`
-  - `--base`: the feature's base commit. `--capture-ref`: a non-empty capture file in the feature's `SAID.working:` dir, named relative to it.
+  - `--base`: the feature's base commit. `--capture-ref`: a non-empty capture file in the feature's `SAID.working:` dir, named relative to it, never the gate record; on a feature with no capture, the literal `none` (the reader then writes its Captures group as `none`).
   - `--ledger`: one per ledger file the spec cites under `## Context to load`; the script adds the working dir's `rulings.md` and `scope.md` itself when they exist.
   - `--root`: the lane root, the directory whose `CLAUDE.md` holds the lane's `## Lane` block; default the current lane's.
 

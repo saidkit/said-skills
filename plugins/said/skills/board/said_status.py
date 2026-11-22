@@ -1123,6 +1123,8 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
     cap = hdr.get("capture-evidence-ref")
     if not cap:
         return False, "no capture-evidence-ref"
+    if cap == "none":
+        return False, "`none` is the feature read's no-capture sentinel, never a Checker's capture"
     if cap == "recomputed":  # `recomputed`: a sentinel, not a file — valid only where the recompute below actually re-derives the verdict
         if ((meta or {}).get("said-capture") != "process-spawn"
                 or not (meta or {}).get("said-recompute")
@@ -1712,7 +1714,7 @@ def _fr_cells(line):
     return [c.strip() for c in line[1:-1].split("|")]
 
 
-def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False):
+def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False, record_path=""):
     """(verdict, [(group, cells)]) of a reviewer's verdict text, or raise FeatureReviewRefused(why); doc: a doc lane's
     verdict, checker-id doc-editorial and the seventh group Editorial."""
     import gate_record  # the verdict's groups and columns, one place; lazy: the analyzer runs without it
@@ -1736,12 +1738,16 @@ def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False):
     ref = head["capture-evidence-ref"]
     wd = os.path.realpath(workdir)
     full = os.path.realpath(os.path.join(wd, ref)) if ref and "\x00" not in ref else ""
-    if not ref or os.path.isabs(ref) or not full.startswith(wd + os.sep) or not os.path.isfile(full):
+    if ref == "none":
+        pass  # no capture: the Captures group must be the single line `none`, checked after the rows
+    elif not ref or os.path.isabs(ref) or not full.startswith(wd + os.sep) or not os.path.isfile(full):
         raise FeatureReviewRefused("capture-evidence-ref is not a relative regular file inside the working dir")
-    if os.path.getsize(full) == 0:
+    elif os.path.getsize(full) == 0:
         raise FeatureReviewRefused("capture-evidence-ref names an empty file")
-    if verdict_path and (full == os.path.realpath(verdict_path) or os.path.exists(verdict_path) and os.path.samefile(full, verdict_path)):
+    elif verdict_path and (full == os.path.realpath(verdict_path) or os.path.exists(verdict_path) and os.path.samefile(full, verdict_path)):
         raise FeatureReviewRefused("capture-evidence-ref names the verdict file itself, not a capture")
+    elif record_path and full == os.path.realpath(record_path):
+        raise FeatureReviewRefused("capture-evidence-ref names the gate record, not a capture")
     if head["verdict"] not in ("PASS", "FAIL"):
         raise FeatureReviewRefused("verdict is neither PASS nor FAIL")
     rows, group, cols, state, want, got = [], None, (), "", 0, 0
@@ -1794,6 +1800,8 @@ def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False):
         raise FeatureReviewRefused("group %s has no rows and no `none` line" % group)
     if want != len(FR_GROUPS):
         raise FeatureReviewRefused("only %d of the %d groups are present" % (want, len(FR_GROUPS)))
+    if ref == "none" and any(g == "Captures" for g, _ in rows):
+        raise FeatureReviewRefused("capture-evidence-ref is `none` over a Captures row")
     fails = sum(1 for _, c in rows if c[-1] == "FAIL")
     if head["verdict"] == "PASS" and fails:
         raise FeatureReviewRefused("verdict PASS with %d FAIL row(s)" % fails)
@@ -1903,7 +1911,7 @@ def _fr_owed(why):
 
 
 def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decision_ids=(), dirty=lambda: 0, doc=False,
-                         cites=None):
+                         cites=None, record_path=""):
     """(rc, lines) of a verdict text with no file or git read of its own: parse it against the head sha, then
     `dirty()` (the count of uncommitted files outside the working dir), a row per rule id and a Covers or Uncovered
     decisions row per decision id; rc 0 and the row lines, or rc 1 and the owed lines. cites(cell text) gives the
@@ -1912,7 +1920,7 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
     calls this."""
     import gate_record
     try:
-        verdict, rows = _fr_parse(text, sha, workdir, verdict_path, doc)
+        verdict, rows = _fr_parse(text, sha, workdir, verdict_path, doc, record_path)
         n = dirty()
         if n:
             raise FeatureReviewRefused("%d uncommitted file(s) outside the working dir" % n)
@@ -2000,7 +2008,7 @@ def feature_review_output(root, workdir, feature, decisions=()):
     try:
         import cite_check  # the one cite check, shared with the scope chain
         return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc,
-                                    lambda cell: cite_check.text_faults(root, cell))
+                                    lambda cell: cite_check.text_faults(root, cell), os.path.join(workdir, "gate-%s.md" % feature))
     except gate_record.Error as e:
         return 2, ["error: %s" % e]
 

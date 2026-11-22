@@ -14,7 +14,8 @@ task log is an error before any estimate:
      and runs gate_record_row.py --kind feature-review, which validates it and writes its rows. A read spends model
      tokens: without --yes the runner prints the estimate and its yes token and runs no read; --yes runs it only when
      the token is the one the current estimate prints (it covers HEAD, the base and the uncommitted changes). --base (the feature's base commit) and --capture-ref (a
-     non-empty capture file in the working dir) are needed for the read. A reply with no verdict line is not filed;
+     non-empty capture file in the working dir, never the gate record, or `none` on a feature with no capture) are needed
+     for the read. A reply with no verdict line is not filed;
      a reply the writer refuses is not filed either, and is kept in a temp file outside the lane whose path is printed.
   2. gate_recompute.sh over every unit (SAID_GATE_UNITS is never passed), writing the record.
   3. covers-read.py over the task log, its output in <working>/covers-<id>.txt (--ledger names the decision ledgers).
