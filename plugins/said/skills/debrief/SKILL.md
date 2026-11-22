@@ -17,7 +17,7 @@ description: >
 
 # Feature Debrief — Debrief: Per-Feature Retrospective Driver
 
-This skill drives a closed feature through a feature-level retrospective: reconciles spec + tasks against shipped reality, proposes forward-looking rules for the durable ADR/UX-spec hosts the operator owns, compacts the spec back to template shape, captures distilled lessons, and records the close in an account block with a short footer pointing to it. Act is the input boundary (every task `Status: Done`, quality gates green, manual UX/QA pass complete); operator commit is the output boundary.
+This skill drives a closed feature through a feature-level retrospective: reconciles spec + tasks against shipped reality, proposes forward-looking rules for the durable ADR/UX-spec hosts the operator owns, compacts the spec back to template shape, captures distilled lessons, and records the close in an account block with a short footer pointing to it. Inspect is the input boundary (every task `Status: Done`, quality gates green, manual UX/QA pass complete); operator commit is the output boundary.
 
 The skill itself is the orchestrator: you, the main agent, drive three sequential phases within ONE invocation, and every decision, pause and write stays with you. Above the gate-reader threshold the read-only `said:gate-reader` agent reads Phase A's sections A.1-A.4 and proposes rows (Step 0 #8); nothing else leaves the main session. **Debrief writes the homes it owns** (the feature spec, the tasks log, the feature's working folder, the todo lines it files) **and only proposes edits to documents the operator owns** (the lane `CLAUDE.md`, an ADR, a UX spec, another spec the operator authored): each proposal becomes a `## Pending proposals` entry and a todo line. Phase A stops once, while a proposal or a rulings row awaits an answer (the operator's, or in a supervised run the supervisor's: Phase A STOP); with none open, Phase B starts. Phase B asks no nod per row (its only waits are the rulings step's typed `rejected` and `superseded` lines), and nothing found later adds a stop. Phase C closes only when footer + lessons + handoff (or N/A each) are all settled.
 
@@ -37,11 +37,14 @@ If operator asks to author a new feature — wrong skill, redirect to `/said:arc
 
 ## Common compositions (upstream -> this skill)
 
-After Act closes (all tasks Done, all quality gates green, operator's manual UX/QA pass complete):
+After Inspect closes (all tasks Done, all quality gates green, operator's manual UX/QA pass complete):
 
 ```
 /said:impl <feature-id>          # final task closes; whole-feature mode confirms green
                                     # operator runs manual UX/QA pass
+/said:review-feature <feature-id> --base <rev> --capture-ref <file|none>   # Inspect opens: the feature read
+/said:review-qa <feature-id>     # implementation hygiene cleared
+/said:accept <feature-id>        # behavioral contract verified
 /said:debrief <feature-id>
 ```
 
