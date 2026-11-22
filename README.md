@@ -53,7 +53,7 @@ Skills are then invoked as `said:scope-refine`, `said:architect`, `said:impl`, `
 
 1. Install the engine.
 2. Apply a starter for your stack (or fill the binding by hand per the adoption guide).
-3. Walk the chain: `/said:scope-grill <idea>` → `/said:architect` → `/said:impl` → `/said:debrief`.
+3. Walk the chain: `/said:scope-grill <idea>` → `/said:architect` → `/said:impl` → `/said:review-feature` → `/said:review-qa` → `/said:accept` → `/said:debrief`.
    Or paste the macro block ([guides/operator-macros.md](guides/operator-macros.md)) and type `said!! <directive>` to run the whole chain.
 
 ## What's in this repo
