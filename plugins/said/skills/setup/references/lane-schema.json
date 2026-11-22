@@ -43,7 +43,7 @@
   ],
   "required_sections": [
     {"heading": "## Lane", "match": "exact", "severity_if_missing": "BLOCKER", "remediation": "add the ## Lane block carrying the SAID.<axis> keys; a repo with no lane block is invisible to the whole cycle"},
-    {"heading": "## Earned rules", "match": "leading-words", "severity_if_missing": "BLOCKER", "remediation": "add a ## Earned rules heading (one rule per '- ' line, each with an R-* id and a link to its record); an absent heading HALTs the impl skill at a task close"},
+    {"heading": "## Earned rules", "match": "leading-words", "severity_if_missing": "BLOCKER", "remediation": "add a ## Earned rules heading (one rule per '- ' line, each with an R-* id and a link to its record); an absent heading HALTs the impl skill before it builds"},
     {"heading": "## Significant ADRs", "match": "leading-words", "severity_if_missing": "ADVISORY", "remediation": "add the ## Significant ADRs (skill-referenced) shortname table binding each cited shortname to this lane's record file"},
     {"heading": "## Claude Code Reminders", "match": "leading-words", "severity_if_missing": "ADVISORY", "remediation": "add ## Claude Code Reminders including the drive line 're-read ## Earned rules and name the ids you apply before each implementation step'"}
   ],
