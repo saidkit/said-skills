@@ -1860,11 +1860,31 @@ def deal_questions(folder, out, cap=QUESTION_PART, reverse=False):
         res.append(('part-%d' % k, sorted({r[1] for r in p}, key=lambda x: int(x[1:])), len(p)))
     return res
 
+def declared_handoff(lane, path):
+    """True when a relative path outside the lane names the declared --handoff file, compared physically, and that
+    file is itself outside the lane"""
+    if not HANDOFF or path.startswith('/') or CITES.inside(path):
+        return False
+    real = lambda p: os.path.realpath(os.path.join(lane, p))
+    top = os.path.realpath(lane)
+    out = os.path.relpath(real(HANDOFF), top).split(os.sep)[0] == '..'  # an inside handoff keeps its inside cite only
+    return out and real(path) == real(HANDOFF) and os.path.isfile(real(path))
+
+def recorded_handoff(run):
+    """the --handoff value step 1 wrote to the run's hash record, else ''"""
+    rec = os.path.join(run, INPUTS_FILE)
+    return next((c[1] for c in tsv(rec, 3) if c[0] == 'handoff'), '') if os.path.isfile(rec) else ''
+
 def cite_line(lane, cite):
+    m = CITES.CITE.match(cite)
+    if m and declared_handoff(lane, m.group(1)):  # the Scope input is the one outside path a record may cite
+        n = int(m.group(2))
+        return (m.group(1), n) if 1 <= n <= len(lines_of(lane, m.group(1))) else None
     return CITES.cite_line(lane, cite, lambda p: os.path.isfile(p), lambda p: lines_of(lane, p))
 
-def is_handoff(path):
-    return bool(HANDOFF) and (path == HANDOFF or (os.path.basename(path) == os.path.basename(HANDOFF) and HANDOFF.endswith(path)))
+def is_handoff(path, lane=None):
+    return bool(HANDOFF) and (path == HANDOFF or (os.path.basename(path) == os.path.basename(HANDOFF) and HANDOFF.endswith(path))
+                              or (lane is not None and declared_handoff(lane, path)))
 
 def question_check(folder, who, lane):
     if who not in ('A', 'B'):
@@ -1891,7 +1911,7 @@ def question_check(folder, who, lane):
         at = cite_line(lane, c[4])
         if at is None:
             faults.append('%s:%d cites %s: no line of a lane file' % (QLOOK_FILE, n, c[4]))
-        elif c[3] == 'answered' and (not is_handoff(at[0])):
+        elif c[3] == 'answered' and (not is_handoff(at[0], lane)):
             faults.append('%s:%d answered cites %s, not the handoff' % (QLOOK_FILE, n, c[4]))
         elif c[3] in ('rule-settles', 'no-bear') and at[0] not in rules:
             faults.append('%s:%d %s cites %s, not a rule document' % (QLOOK_FILE, n, c[3], c[4]))
@@ -4085,6 +4105,8 @@ def main(argv):
             return 0
         if cmd == 'audit-check' and len(a) == 2:
             lane = os.path.realpath(os.path.abspath(opt['--lane'])) if '--lane' in opt else os.getcwd()
+            if '--handoff' not in opt:
+                HANDOFF = recorded_handoff(os.path.dirname(a[0]))  # step 10 runs it without --handoff
             faults = audit_report_check(a[0], os.path.basename(a[1]), lane)
             print('audit %s: faults %d' % (os.path.basename(a[1]), len(faults)))
             for m in faults:
