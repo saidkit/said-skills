@@ -28,7 +28,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 - **Changed:** the lane key `SAID.gate-reviewer-threshold` is `SAID.gate-reader-threshold`, same value. Rename it in the lane block: the old key is ignored, the gates use the default 150000, and `/said:setup` reports nothing for it; the upgrade playbook's V2 check finds it. In `review-qa`, `accept` and `debrief` the step is "Gate reader above the threshold" and the plan header line reads `gate reader: on, ...` or `gate reader: off`.
 - **Changed:** the skill `said:retrieval` is `said:precedent`, one name with the `precedent!!` operator macro: `skills/retrieval/` is `skills/precedent/`, and `architect`, `scope-grill`, `scope-refine` and `agents/supervisor.md` run it by the new name. There is no alias: point the macro and any instruction that names the skill at `/said:precedent` (`upgrade/said-0.28.0.md` Step 3). Its stop line `retrieval complete: yes | no` keeps its words.
 - **Removed:** the Eval step is retired. `skills/said/SKILL.md` runs no Eval after `accept` and probes no `*QA-UAT*`, `*QA-eval*` or `*evaluation*` result file: the Inspect chain ends `/said:accept` -> `/said:debrief`, and the `Eval` field leaves the `gates:` line. On a `doc` lane the re-run of `doc-gate` after `accept` and its `QA-eval-<id>.md` record are gone; the round's feature review files the editorial verdict and `accept` reads it. `skills/review-ux/SKILL.md` drops its line on the Eval artifact. `/said:flow`'s feature e2e/UAT close of a multi-lane feature is not the Eval and is unchanged. Existing `QA-eval-*` files are read by nothing and can stay.
-- **Fixed:** `evals/impl-compacted-context/README.md` no longer names a path into the authoring project's private evaluation records.
+- **Fixed:** `evals/impl-compacted-context/README.md`, and five entries of this file released in 0.3.3 to 0.11.0, no longer name a path into the authoring project's private specs and evaluation records.
 - **Fixed:** on a lane whose docs root is a repo of its own, a fix to a source of the feature read (the spec, the task log, the lane's `CLAUDE.md`, `rulings.md`, `scope.md`, a ledger) never moved the gate record's store, so a recorded FAIL was never read again: the store line now carries `sources <sha256>` over those files, compared by the feature-review read alone; a closed feature is never owed on its account, and a lane whose docs root is inside its work tree keeps the one-part line.
 - **Changed:** `skills/review-feature/review_feature.py file` files a reply only when the row writer accepts it: a refused reply leaves no file at the verdict path, and an earlier file there is put back. It stays in the skill's scratchpad file; `board/inspect_run.py` keeps a refused headless reply in a temp file outside the lane and prints its path. The writer's refusal of a row with more cells than its group's columns names the fix, `a cell holds a pipe: write [pipe]`; the grammar is unchanged, and `\|` stays refused.
 - **Changed:** the capture reference of `/said:review-feature` is never the gate record, and a feature with no capture passes the literal `none`, its Captures group then `none`; the reviewer gate fails a Checker verdict that cites `none`, except a doc lane's feature read that the writer accepts.
@@ -239,7 +239,7 @@ Follow-ups to the completeness and glyph work (completeness executed-capture + b
 - **Changed:** `said_completeness.py` now realizes the cli **oracle tier** — where a capture manifest declares a per-unit `cmd:`, it executes that command's own `--help` **read-only** (command-path + `--help` only; every invocation flag stripped; a flag is verified by a **two-witness** rule -- an options-section+column cluster corroborated by the `usage:` synopsis, so a flag named only in prose is not miscounted) and verifies the designed `Flags` against it; a manifest `built:` line cannot bluff an oracle element. A tool whose `--help` is not two-witness parseable (hand-formatted / truncated synopsis) falls to declared-evidence (manifest) with a WARN -- a documented coverage ceiling, not full author-independence. The completeness recipe row moves `said-capture: manifest` -> **`process-spawn`**. A non-cli (web) capture runs a front-declared probe as given (the front owns its read-only-ness; hermetic fixture shipped).
 - **Added:** a **built-floor** — an all-dropped (zero-built) manifest FAILs (`BUILT intersect DESIGNED` must be non-empty); a legitimate partial-drop still PASSes. Closes the vacuous-completeness hole.
 - **Changed:** the medium-agnostic engine (`uxtoc` / `architect` / `said_completeness.py`) carries **no incidental medium vocabulary** - `uxtoc` emits purely from the loaded grammar (the emit template lives in the grammar, so no engine-side emit template remains).
-- **Added:** an enforcing **plain-ASCII gate** (`docs/evaluation/plain-ascii/`) over `plugins/said/**` (the plain-ASCII rule enforced; em-dash `U+2014` carved out); the shipped surface is purged of banned watermark glyphs.
+- **Added:** an enforcing **plain-ASCII gate** over `plugins/said/**` (the plain-ASCII rule enforced; em-dash `U+2014` carved out); the shipped surface is purged of banned watermark glyphs.
 
 ## [0.10.0] — 2026-09-13
 
@@ -363,8 +363,6 @@ The `doc` lane conforms to the gates every lane runs. **Breaking** for a lane th
 - **Fixed:** the board re-ran the expensive derive on every interaction — it now caches until an
   explicit refresh (a full page load or the Update button).
 
-PRD: `docs/specs/board/REQUIREMENTS.md`.
-
 ## [0.3.5] — 2026-08-29
 
 **`said:board`** — multi-lane usability + stability:
@@ -381,8 +379,6 @@ PRD: `docs/specs/board/REQUIREMENTS.md`.
   also matched connected clients (an open dashboard tab). `stop` now signals listeners only, and trusts
   a recorded server pid only when it is a current listener.
 
-PRD: `docs/specs/board/REQUIREMENTS.md`.
-
 ## [0.3.4] — 2026-08-09
 Unified phases names - "Gates"/"Delivery" -> "Deliver" across all skills
 Unified gates - added "review-ux" next to "review-qa"
@@ -392,7 +388,6 @@ sign-off) under `/goal` no longer busy-waits: `/goal`'s evaluator is binary, so 
 end the loop — the skills now **announce the block once** (owed verdict + how to unblock: reply, or
 `/goal clear`) and then **hold** on every re-fire — no re-done work, no faked verdict, no repeated
 "still waiting". Corrects the earlier "`stop` ends the loop" wording (`stop` is surfaced, not enforced).
-PRD: `docs/specs/said/REQUIREMENTS.md` (W16/D-8).
 
 ## [0.3.3] — 2026-08-09
 
@@ -406,8 +401,7 @@ redirects a ≥2-lane feature to `said:flow`; main-context and depth-safe (never
 Reconstructs phase by inspection (re-entrant across compaction); omission is never silent (→
 `goal: stop`). A **Step-0 request classifier** picks the entry (RESUME · SHORT · NEW · TINY · DONE) so a
 bug/tweak/follow-up that fits an existing feature takes the short `triage → add-task → impl → gates`
-path (Scope+Architect skipped), and a new ask on a Closed feature is never a silent `goal: done`. PRD:
-`docs/specs/said/REQUIREMENTS.md`.
+path (Scope+Architect skipped), and a new ask on a Closed feature is never a silent `goal: done`.
 
 ## [0.3.2] — 2026-08-09
 
