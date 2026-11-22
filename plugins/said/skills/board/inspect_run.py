@@ -37,7 +37,24 @@ sys.path.insert(0, os.path.join(HERE, "..", "review-feature"))
 import gate_record  # noqa: E402  the one reader and writer of the record
 import review_feature  # noqa: E402  the read's one code path: the brief, the filing and the row write
 
-TOOLS = "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)"
+AGENT_FILE = os.path.join(HERE, "..", "..", "agents", "feature-reviewer.md")
+GIT_SET = "`Bash` is for read-only git only:"
+
+
+def reader_tools(path=AGENT_FILE):
+    """The headless reader's --allowedTools, read from the agent's own file: its `tools:` line, with Bash narrowed to
+    the git commands its Contract names, so the two cannot drift."""
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    head = text.split("\n---", 1)[0].split("\n")
+    tools = [t.strip() for ln in head if ln.startswith("tools:") for t in ln[len("tools:"):].split(",") if t.strip()]
+    body = " ".join(text.split())
+    if GIT_SET not in body or "Bash" not in tools:
+        raise Halt("agents/feature-reviewer.md names no read-only git set")
+    git = [g.strip(" `") for g in body.split(GIT_SET, 1)[1].split(". ", 1)[0].split(",")]
+    if not git or not all(g.startswith("git ") for g in git):
+        raise Halt("agents/feature-reviewer.md git set is not a list of `git <command>`")
+    return ",".join([t for t in tools if t != "Bash"] + ["Bash(%s:*)" % g for g in git])
 Halt = review_feature.Error
 
 
@@ -96,7 +113,7 @@ def feature_review(fid, opts, root):
     if opts["yes"] != token:
         print("feature-review: refused, --yes is not the token of this estimate (%s); no read" % token)
         return
-    cmd = [os.environ.get("SAID_CLAUDE_BIN") or "claude", "-p", "--agent", review_feature.AGENT, "--allowedTools", TOOLS,
+    cmd = [os.environ.get("SAID_CLAUDE_BIN") or "claude", "-p", "--agent", review_feature.AGENT, "--allowedTools", reader_tools(),
            "--output-format", "text"]
     try:
         r = subprocess.run(cmd, input=p["brief"], capture_output=True, text=True, cwd=root, timeout=3600)
@@ -141,6 +158,9 @@ def main(argv):
                 covers += [flag, os.path.join(root, docs, name)]
         for p in opts["ledgers"]:
             covers += ["--ledger", p]
+        verdict = review_feature.out_path(root, working, fid)[0]
+        if os.path.isfile(verdict):  # the matrix reviewer column reads the round's verdict
+            covers += ["--reviewer", verdict]
         c = subprocess.run(covers, capture_output=True, text=True)
         if c.returncode == 2:
             raise Halt("covers-read.py: %s" % c.stdout.strip()[-300:])
