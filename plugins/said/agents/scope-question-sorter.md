@@ -1,5 +1,5 @@
 ---
-name: scope-question-kind
+name: scope-question-sorter
 description: >
   The question look: sorts each question of the checked table into one kind (choice, rule-settles, answered, no-bear) with the line it rests on. Invoked only by /said:scope-refine on a large lane. NOT for direct use, or for a lane one agent reads whole.
 tools: Read, Grep, Glob, Write

@@ -1,5 +1,5 @@
 ---
-name: scope-first-pass
+name: scope-section-screener
 description: >
   Puts out the rule sections that surely do not bear on a handoff and names the decisions that touch the rest, judged by heading and first line. Invoked only by /said:scope-refine on a large lane. NOT for direct use, or for a lane one agent reads whole.
 tools: Read, Write, Bash

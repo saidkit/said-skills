@@ -1,5 +1,5 @@
 ---
-name: scope-exception-check
+name: scope-exception-finder
 description: >
   The second look at the conflicts: for each conflict of the checked table, searches the lane's rules for an exception that lets the decision stand (keep, drop, ask). Invoked only by /said:scope-refine on a large lane. NOT for direct use, or for a lane one agent reads whole.
 tools: Read, Grep, Glob, Write

@@ -144,7 +144,7 @@ Agent prompts name every path from the lane root. Every command that reads the l
 5. **Heading passes, the silence pass, the code audit and the tiers.**
    - `$CHAIN decisions-in $RUN` (copies `decisions.tsv` into `read-1/` with `made-on.tsv`, the hashes of the list, `kinds.tsv` and both card sets; when `read-1/` was made on another list, kinds file or card set, it first sets aside every output of steps 6 to 11 as `<name>.failed-<k>`, so each of those steps is made again)
    - `$CHAIN sections . $RUN/pieces.tsv $RUN/sec`
-   - **Heading passes.** `mkdir -p $RUN/pass-1 $RUN/pass-2`, then `cp $RUN/sec/sections.tsv $RUN/pass-1/sections.tsv`, `$CHAIN reverse $RUN/sec/sections.tsv $RUN/pass-2/sections.tsv`, and `cp $RUN/decisions.tsv` into both folders. Start two `said:scope-first-pass` agents, one a folder, in one assistant message, each with exactly this prompt (`<p>` its folder):
+   - **Heading passes.** `mkdir -p $RUN/pass-1 $RUN/pass-2`, then `cp $RUN/sec/sections.tsv $RUN/pass-1/sections.tsv`, `$CHAIN reverse $RUN/sec/sections.tsv $RUN/pass-2/sections.tsv`, and `cp $RUN/decisions.tsv` into both folders. Start two `said:scope-section-screener` agents, one a folder, in one assistant message, each with exactly this prompt (`<p>` its folder):
 
      ```
      Task: the first pass.
@@ -156,7 +156,7 @@ Agent prompts name every path from the lane root. Every command that reads the l
      ```
 
      Run each check command yourself. Exit 1 -> save its output as `<p>/subjects-faults.txt` and start that pass once more with the same prompt and the line `- round 2: the check exited 1; its faults: <p>/subjects-faults.txt. Fix subjects.tsv, then run the check command again.` Exit 1 again -> BLOCK with the faults.
-   - **Silence pass.** `$CHAIN pair-silent $RUN` (writes `$RUN/pass-3/sections.tsv`: every rule section with no `touched` and no `out` row of either pass, each with its card line as a sixth field, and `$RUN/pass-3/decisions.tsv`). It prints `silent 0` -> make an empty `$RUN/pass-3/subjects.tsv` with `: > $RUN/pass-3/subjects.tsv` and run `$CHAIN pass-3 $RUN --round 1`. Otherwise start one `said:scope-first-pass` agent with exactly the prompt of the heading passes, `<p>` = `$RUN/pass-3`, then run `$CHAIN pass-3 $RUN --round 1` yourself. For each round `k`:
+   - **Silence pass.** `$CHAIN pair-silent $RUN` (writes `$RUN/pass-3/sections.tsv`: every rule section with no `touched` and no `out` row of either pass, each with its card line as a sixth field, and `$RUN/pass-3/decisions.tsv`). It prints `silent 0` -> make an empty `$RUN/pass-3/subjects.tsv` with `: > $RUN/pass-3/subjects.tsv` and run `$CHAIN pass-3 $RUN --round 1`. Otherwise start one `said:scope-section-screener` agent with exactly the prompt of the heading passes, `<p>` = `$RUN/pass-3`, then run `$CHAIN pass-3 $RUN --round 1` yourself. For each round `k`:
      - exit 0 -> the silence pass is closed: no listed section is silent;
      - exit 1 -> save its output as `<p>/subjects-faults-r<k>.txt` and start the pass once more with the same prompt and the line `- round <k+1>: the check exited 1; its faults: <p>/subjects-faults-r<k>.txt. Fix subjects.tsv, then run the check command again.`, then `$CHAIN pass-3 $RUN --round <k+1>`;
      - exit 3 -> STOP with its lines: a round that added no row, or a section still silent after round 3. Never a round 4.
@@ -196,7 +196,7 @@ Agent prompts name every path from the lane root. Every command that reads the l
 
 8. **One look and the confirm look.** `$CHAIN pairs-subject . $RUN` (writes `subject-pairs.tsv`: the pairs whose two sections share subject words), then `$CHAIN pairs $RUN --lane . --handoff $H` (writes `checks.tsv` and `pairs.tsv`). It prints `against rows 0` -> no look runs; go to 9. Otherwise:
    - `$CHAIN look-copy $RUN $RUN/look-a`, then `$CHAIN pairs-deal $RUN/look-a $RUN/look-a/parts --cap 60` (it prints its parts, `part-<k>: ...`, at most 60 pairs a part).
-   - For every part `<k>`, start `said:scope-exception-check` on `$RUN/look-a/parts/part-<k>`, the looks of all parts in one assistant message, each with exactly this prompt (`<l>` its part folder):
+   - For every part `<k>`, start `said:scope-exception-finder` on `$RUN/look-a/parts/part-<k>`, the looks of all parts in one assistant message, each with exactly this prompt (`<l>` its part folder):
 
      ```
      Task: the second look.
@@ -211,7 +211,7 @@ Agent prompts name every path from the lane root. Every command that reads the l
    - Run `$CHAIN pairs <l> --lane . --handoff $H` yourself on every part folder; the looks never run a script. Exit 1 -> run it again as `$CHAIN pairs <l> --lane . --handoff $H > <l>/pairs-faults.txt` and start that look on that part once more with the same prompt and the line `- round 2: the check exited 1; its faults: <l>/pairs-faults.txt. Fix look.tsv and pairs-look.tsv.` Exit 1 again -> BLOCK with the faults.
    - `$CHAIN pairs-merge $RUN/look-a $RUN/look-a/parts`, then `$CHAIN pairs $RUN/look-a --lane . --handoff $H`; exit 1 -> BLOCK with its output.
    - `cp $RUN/look-a/look.tsv $RUN/look-a/pairs-look.tsv $RUN/`, then `$CHAIN pairs $RUN --lane . --handoff $H`; exit 1 -> BLOCK with its output.
-   - **The confirm look.** `$CHAIN confirm-items $RUN . --handoff $H` (writes `$RUN/confirm/C<nn>.md`, one item a row `look.tsv` keeps, and `$RUN/confirm/items.tsv`). It prints `items 0` -> go to 9. Otherwise start one `said:scope-confirm-look` agent with exactly this prompt, every item file `C<nn>.md` of `$RUN/confirm` named in the order of their numbers:
+   - **The confirm look.** `$CHAIN confirm-items $RUN . --handoff $H` (writes `$RUN/confirm/C<nn>.md`, one item a row `look.tsv` keeps, and `$RUN/confirm/items.tsv`). It prints `items 0` -> go to 9. Otherwise start one `said:scope-conflict-confirmer` agent with exactly this prompt, every item file `C<nn>.md` of `$RUN/confirm` named in the order of their numbers:
 
      ```
      Task: the confirm look.
@@ -223,7 +223,7 @@ Agent prompts name every path from the lane root. Every command that reads the l
 
 9. **Questions.** `$CHAIN questions $RUN` (writes `questions.tsv`: the `asks` rows of the table). It prints `questions 0` -> go to 10. Otherwise:
    - `mkdir -p $RUN/qlook-a $RUN/qlook-b`; `cp $RUN/questions.tsv $RUN/decisions.tsv $RUN/qlook-a/` and the same into `$RUN/qlook-b/`; then `$CHAIN questions-deal $RUN $RUN/qlook-a/parts` and `$CHAIN questions-deal $RUN $RUN/qlook-b/parts --reverse` (each prints its parts, at most 70 questions a part, so one part a look up to 70 questions; the two lists are the same; `--reverse` writes each part's rows in the opposite order).
-   - For every part `<k>`, start `said:scope-question-kind` on `$RUN/qlook-a/parts/part-<k>` and `said:scope-question-kind` on `$RUN/qlook-b/parts/part-<k>`, the looks of all parts in one assistant message, each with exactly this prompt (`<q>` its part folder):
+   - For every part `<k>`, start `said:scope-question-sorter` on `$RUN/qlook-a/parts/part-<k>` and `said:scope-question-sorter` on `$RUN/qlook-b/parts/part-<k>`, the looks of all parts in one assistant message, each with exactly this prompt (`<q>` its part folder):
 
      ```
      Task: the question look.

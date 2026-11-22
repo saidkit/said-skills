@@ -1,5 +1,5 @@
 ---
-name: scope-confirm-look
+name: scope-conflict-confirmer
 description: >
   The confirm look: reads the item files of the conflicts the second look kept, one at a time in the order given, and answers each item's question in one line (holds, does not hold or cannot tell, with one sentence). Invoked only by /said:scope-refine on a large lane. NOT for direct use, or for a lane one agent reads whole.
 tools: Read
