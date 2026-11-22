@@ -140,13 +140,12 @@ def prepare(fid, root, base, ref, spec_ledgers):
     base_sha = (git(root, "rev-parse", "--verify", base + "^{commit}") or "").strip()
     if not head or not base_sha:
         return {"state": "owed", "why": "no read: the lane has no HEAD or --base %s is no commit" % base}
-    full_ref = os.path.realpath(os.path.join(working, ref)) if ref and ref != "none" else ""
-    if ref == "none":
-        pass  # no capture: the writer accepts `none` only with a Captures group of `none`
-    elif not ref or not full_ref.startswith(os.path.realpath(working) + os.sep) or size(full_ref) == 0:
-        return {"state": "owed", "why": "no read: --capture-ref names no non-empty file in the working dir"}
-    if full_ref == os.path.realpath(record):
-        return {"state": "owed", "why": "no read: --capture-ref names the gate record, not a capture"}
+    if ref != "none":  # `none`: no capture; the writer accepts it only with a Captures group of `none`
+        full_ref = os.path.realpath(os.path.join(working, ref)) if ref else ""
+        if not full_ref.startswith(os.path.realpath(working) + os.sep) or size(full_ref) == 0:
+            return {"state": "owed", "why": "no read: --capture-ref names no non-empty file in the working dir"}
+        if os.path.exists(record) and os.path.samefile(full_ref, record):  # a link or a spelling of the record
+            return {"state": "owed", "why": "no read: --capture-ref names the gate record, not a capture"}
     records = decisions(working, spec_ledgers)
     spec = lane_path(root, "feature-spec", fid)
     if not os.path.isfile(spec) or not os.path.isfile(lane_path(root, "task-log", fid)):

@@ -2,7 +2,7 @@
 """The feature-level Inspect in one command, outside the driving session: the cold read, the gate recompute, the
 Covers read, the round and the sign-off, every write through the bundled scripts.
 
-  inspect_run.py <feature-id> --root <lane-root> [--base <rev>] [--capture-ref <file>] [--ledger <file>]...
+  inspect_run.py <feature-id> --root <lane-root> [--base <rev>] [--capture-ref <file|none>] [--ledger <file>]...
                  [--yes <token>]
 
 Steps, in order, one run per lane at a time (a second run while one holds the lane is refused; the lock is a file in
@@ -43,7 +43,7 @@ Halt = review_feature.Error
 
 def parse(argv):
     if not argv or argv[0].startswith("-"):
-        raise Halt("usage: inspect_run.py <feature-id> --root <lane-root> [--base <rev>] [--capture-ref <file>]"
+        raise Halt("usage: inspect_run.py <feature-id> --root <lane-root> [--base <rev>] [--capture-ref <file|none>]"
                    " [--ledger <file>]... [--yes <token>]")
     fid, opts, ledgers, i = review_feature.feature_id(argv[0]), {}, [], 1
     while i < len(argv):

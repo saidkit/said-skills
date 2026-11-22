@@ -1117,15 +1117,23 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
     hits = sorted(glob.glob(os.path.join(workdir, "review-%s-*.md" % glob.escape(cid))))
     if not hits:
         return False, "missing verdict artifact (review-%s-*.md)" % cid
-    hdr = parse_verdict_header(_pick_verdict(hits, head_sha))
+    picked = _pick_verdict(hits, head_sha)
+    hdr = parse_verdict_header(picked)
     if hdr.get("verdict", "").upper() != "PASS":
         return False, "verdict != PASS (%s)" % (hdr.get("verdict") or "absent")
     cap = hdr.get("capture-evidence-ref")
     if not cap:
         return False, "no capture-evidence-ref"
-    if cap == "none":
+    if cap == "none" and cid == "doc-editorial":  # a doc lane's feature read: the writer's own parse is the check
+        try:
+            with open(picked, encoding="utf-8") as fh:
+                _fr_parse(fh.read(), head_sha, workdir, verdict_path=picked, doc=True)
+        except (OSError, UnicodeDecodeError, FeatureReviewRefused) as e:
+            return False, "`none` on a feature read the writer refuses: %s" % _fr_clean(str(e), 120)
+        cap_path = cap
+    elif cap == "none":
         return False, "`none` is the feature read's no-capture sentinel, never a Checker's capture"
-    if cap == "recomputed":  # `recomputed`: a sentinel, not a file — valid only where the recompute below actually re-derives the verdict
+    elif cap == "recomputed":  # `recomputed`: a sentinel, not a file — valid only where the recompute below actually re-derives the verdict
         if ((meta or {}).get("said-capture") != "process-spawn"
                 or not (meta or {}).get("said-recompute")
                 or (meta or {}).get("said-judge") not in ("oracle", "metric")):
@@ -1746,7 +1754,7 @@ def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False, record_path="
         raise FeatureReviewRefused("capture-evidence-ref names an empty file")
     elif verdict_path and (full == os.path.realpath(verdict_path) or os.path.exists(verdict_path) and os.path.samefile(full, verdict_path)):
         raise FeatureReviewRefused("capture-evidence-ref names the verdict file itself, not a capture")
-    elif record_path and full == os.path.realpath(record_path):
+    elif record_path and os.path.exists(record_path) and os.path.samefile(full, record_path):
         raise FeatureReviewRefused("capture-evidence-ref names the gate record, not a capture")
     if head["verdict"] not in ("PASS", "FAIL"):
         raise FeatureReviewRefused("verdict is neither PASS nor FAIL")
