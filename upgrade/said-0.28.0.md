@@ -43,7 +43,7 @@ The phases are Scope, Act, Inspect, Debrief, Closed. In the project's instructio
 - the phase Architect -> "Act, the Architect step" (the spec and task log are written in Act's first step; the
   skill `/said:architect` keeps its name);
 - the phase Implement -> Act;
-- the phase Deliver -> Inspect for the gates (`review-qa`, `review-ux`, `accept`) and Debrief for `/said:debrief`;
+- the phase Deliver -> Inspect for the gates (`review-qa`, `accept`) and Debrief for `/said:debrief`; `review-ux` moves to Act;
 - `said:review-ux-agent` -> `said:web-ux-reviewer`, `said:gate-reviewer` -> `said:gate-reader`, the agent
   `said:cli-gate` -> `said:cli-gate-reviewer`, `said:scope-refine-agent` -> `said:scope-refiner`,
   `said:scope-audit` -> `said:scope-auditor`. The Checker id `cli-gate` in `SAID.reviewers:` keeps its name:

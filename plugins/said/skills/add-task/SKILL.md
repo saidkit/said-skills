@@ -216,7 +216,7 @@ Insert a `---` separator before the new task block (matching the calibration tar
 
 ## Fast-track runs
 
-A fast-track run defers a named set of tasks' per-task Inspect gates (review-ux, the code review, review-qa, accept) to one close over the set. Its switch is a recorded, operator-confirmed skip of per-task gates, the same class `debrief` records as a Gate-skip line: the block records the operator's words; there is no transcript check and no ruling lookup. Both forms run in the main context only, like every write to the log. Of the preflight, the fast-track forms run Step 0 items 1-3 and 5 (feature id, tasks file, companion spec, and item 5's read of the log in full, without its task-id computation); they parse no other flag and read no lane registry. Task ids given to the open form are normalized to UPPERCASE, as the feature id is.
+A fast-track run defers a named set of tasks' per-task gates (review-ux, the code review, review-qa, accept) to one close over the set. Its switch is a recorded, operator-confirmed skip of per-task gates, the same class `debrief` records as a Gate-skip line: the block records the operator's words; there is no transcript check and no ruling lookup. Both forms run in the main context only, like every write to the log. Of the preflight, the fast-track forms run Step 0 items 1-3 and 5 (feature id, tasks file, companion spec, and item 5's read of the log in full, without its task-id computation); they parse no other flag and read no lane registry. Task ids given to the open form are normalized to UPPERCASE, as the feature id is.
 
 **Open: `fast-track "<task ids>"`.** Skip Steps 1-3 (no task entry is authored). Append, after a `---` separator:
 
