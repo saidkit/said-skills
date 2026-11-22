@@ -8,10 +8,10 @@ This is the **engine** (stack-agnostic). Pair it with a per-stack **starter** fo
 
 | Phase | Skills | Produces |
 |---|---|---|
-| **1 — Scope** | `said:scope-grill` (thin idea), `said:scope-refine` (handoff / branch / external product specs) | `scope.md` (purpose / target shape / constraints / open questions) |
-| **2 — Act** | the Architect step: `said:uxtoc` (optional), `said:architect`, `said:add-task`; then `said:impl`, `said:review-ux` | feature spec (recreation contract) + append-only `*.tasks.md`; tasks driven Todo -> Done test-first, per-task UX gate |
-| **3 — Inspect** | `said:review-feature` (the sources read against the build, once per round), `said:review-qa`, `said:accept` (acceptance contract) | the feature-reviewer's verdict and its rows in the gate record; pass/fail reports |
-| **4 — Debrief** | `said:debrief` | retrospective + backports |
+| **Scope** | `said:scope-grill` (thin idea), `said:scope-refine` (handoff / branch / external product specs) | `scope.md` (purpose / target shape / constraints / open questions) |
+| **Act** | the Architect step: `said:uxtoc` (optional), `said:architect`, `said:add-task`; then `said:impl`, `said:review-ux` | feature spec (recreation contract) + append-only `*.tasks.md`; tasks driven Todo -> Done test-first, per-task UX gate |
+| **Inspect** | `said:review-feature` (the sources read against the build, once per round), `said:review-qa`, `said:accept` (acceptance contract) | the feature-reviewer's verdict and its rows in the gate record; pass/fail reports |
+| **Debrief** | `said:debrief` | retrospective + backports |
 | **Helper** | `said:triage` | read-only root-cause investigation |
 | **Observe** | `said:board` (web page by default, `--cli` terminal, `--json` data) | read-only board — where every feature sits in the phase chain, what's stalled or waiting, and the exact command that advances it |
 | **Manage** | `said:backlog` | the backlog file written through one engine: lint against its own grammar, add an entry, move an entry to an idea record, supersede, promote a record to a lane's feature (plan, one confirm), set a priority, migrate a former-grammar file; never a todo line |
