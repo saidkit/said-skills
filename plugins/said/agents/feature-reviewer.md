@@ -74,8 +74,8 @@ line `none` under its heading, never as a table row. A row is a
 verdict on evidence you opened, never a guess: a PASS row cites the line that
 carries the item, a FAIL row cites the line that contradicts it or says what is
 missing.
-Write each cite as `path:line`, the path in full from the lane root: `docs/working/PROJ-01/scope.md:73`, never `scope.md:73`; the line's words may follow in double quotes. Never shorten a path inside the lane to its file name. `/said:review-feature` checks every `path:line` in a row as a cite, in backticks or quotes too: a path outside the lane, a file that is not there, a line that is not there or quoted words not on that line turn the row FAIL.
-So a row cites only a file you opened under the lane root, and holds no other path-shaped string, not even in words quoted from a line you cite. An example, a placeholder or a path quoted from a source, such as the example path in the cite paragraph above, is named in words, never as a `path:line`: cite its line and write "the example path there". A source outside the lane root gets no cite: name it in words, with no path and no line.
+Write each cite as `path:line`, the path in full and relative to the lane root, never absolute: `docs/working/PROJ-01/scope.md:73`, never `scope.md:73`; the line's words may follow in double quotes. Never shorten a path inside the lane to its file name. `/said:review-feature` checks every `path:line` in a row as a cite, in backticks or quotes too: a path outside the lane, a file that is not there, a line that is not there or quoted words not on that line turn the row FAIL.
+So a row cites only a file you opened under the lane root, and holds no other `path:line`-shaped string, not even in words quoted from a line you cite. An example, a placeholder or a path quoted from a source, such as the example path in the cite paragraph above, is named in words, never as a `path:line`: cite its line and write "the example path there". A source outside the lane root gets no cite: name it in words, with no path and no line.
 
 1. **Covers.** One row per id named in any task's `**Covers:**` line (a ruling
    id, a todo or backlog id, a ledger id, a rule anchor, or a source anchor).
@@ -133,7 +133,7 @@ Keep each row to one or two lines.
 
 ## Output
 
-Last step, before you return: re-check every cite's path against the lane root. Each must open from the root exactly as written; write out in full any path you shortened, and put in words any `path:line` that names a file you did not open, such as an example path quoted from a source. Every `path:line`-shaped token left in the reply, quoted words included, must be a file you opened.
+Last step, before you return: re-check every cite against the lane root. Each path must open from the root exactly as written, its line must exist and its quoted words must be on that line; write out in full any path you shortened, and put in words any `path:line` that names a file you did not open, such as an example path quoted from a source. Every `path:line`-shaped token left in the reply, quoted words included, must be a file you opened.
 
 Return the whole verdict as your final message and nothing else. The first five
 lines are the header: one `key: value` per line, each key once, in this order, no
@@ -182,7 +182,7 @@ The spawning step refuses the whole reply, and records nothing, unless it keeps 
 
 - After the header's blank line, the first line is `## Covers`. Nothing comes before it: no note, no summary. A remark on how you read (a sample, a grep) is one row of Other defects.
 - The group headings come in the order above, each once: six, and seven on a doc lane. Under each heading is either the single line `none` or one table: the column line exactly as shown, its separator row, then the rows. Nothing else follows inside the group; a blank line ends the table.
-- Every row has exactly its group's number of cells, none empty, and no cell holds a `|`. Write a quoted pipe as `[pipe]`.
+- Every row has exactly its group's number of cells, none empty, and no cell holds a `|`. Write a quoted pipe as `[pipe]`, except in the words after a cite, which must match the line: there quote a part of the line with no pipe.
 - The last cell of a row is the bare word `PASS`, `FAIL` or `NOT-READ`, nothing after it. `N/A` is allowed in Earned rules only. What a NOT-READ row needed goes in an earlier cell of the same row.
 - A row never starts with `none`; a group with nothing to report is the single line `none`.
 
