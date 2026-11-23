@@ -21,6 +21,7 @@ import glob
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import unicodedata
@@ -1145,6 +1146,8 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
         return False, "reviewer %r does not resolve to a Checker (nominal — no said-checker match)" % cid
     hits = sorted(glob.glob(os.path.join(workdir, "review-%s-*.md" % glob.escape(cid))))
     if not hits:
+        if _oracle_kind(meta):  # no step writes this Checker's verdict file
+            return _recompute_reviewer(workdir, meta, "recomputed", root, surface)
         return False, "missing verdict artifact (review-%s-*.md)" % cid
     picked = _pick_verdict(hits, head_sha)
     hdr = parse_verdict_header(picked)
@@ -1177,6 +1180,26 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
     tgt = hdr.get("target-sha")
     if head_sha and tgt != head_sha:  # absent tgt fails too — never skip the staleness check
         return False, "stale/missing target-sha (%s != HEAD %s)" % (tgt[:8] if tgt else "absent", head_sha[:8])
+    return _recompute_reviewer(workdir, meta, cap_path, root, surface)
+
+
+def _oracle_kind(meta):
+    """A process-spawn oracle or metric Checker whose said-recompute runs the lane gate, from any Checker form."""
+    meta = meta or {}
+    if meta.get("said-capture") != "process-spawn" or meta.get("said-judge") not in ("oracle", "metric"):
+        return False
+    cmd = meta.get("said-recompute") or ""
+    if re.search(r"[;|&<>()`#\n]", cmd):  # its exit status must be the script's own
+        return False
+    try:
+        words = shlex.split(cmd)
+    except ValueError:
+        return False
+    return len(words) == 2 and words[0] in ("sh", "bash") and os.path.basename(words[1]) == "gate_recompute.sh"
+
+
+def _recompute_reviewer(workdir, meta, cap_path, root, surface):
+    """(ok, reason) of a Checker's own recompute; a judge that is not deterministic passes on its verdict."""
     judge = (meta or {}).get("said-judge")
     if judge in ("oracle", "metric"):  # deterministic -> must recompute, never trust the file
         cmd = (meta or {}).get("said-recompute")
@@ -1196,6 +1219,8 @@ def validate_reviewer(workdir, cid, meta, head_sha, root=".", surface=None):
                "SAID_GRAMMAR": os.path.join(os.path.abspath(root), _lane_key(root, "docs-root") or "docs", "ux", "feature-ux-grammar.md")}
         if surface:
             env["SAID_SURFACE"] = surface
+        for key in ("SAID_GATE_UNITS", "SAID_GATE_OUT"):  # a caller's unit list or record never narrows this run
+            env.pop(key, None)
         proc = subprocess.run(cmd, shell=True, cwd=root, capture_output=True, env=env)
         stdout = proc.stdout.decode("utf-8", "replace")
         rows = _gate_recompute_rows(stdout)  # per-harness rows on both paths; display only
