@@ -137,7 +137,9 @@ audit-dirs   the directories the handoff names in backquotes (a path ending /), 
              lane root or as the end of exactly one lane directory path; one that is gone takes its feature directory
              found so, the ancestor two names deep, else its nearest existing ancestor (state parent); writes
              audit/dirs.tsv and a task file for each one found; an absent or ambiguous one gets a line in the
-             draft and no audit
+             draft and no audit. A handoff outside the lane names paths from its root: the nearest directory above
+             it whose CLAUDE.md declares SAID.lanes (printed with the row count), else its own directory; a path
+             under this lane is found lane-relative, one under another row's root is state other-lane (no audit)
 cites        cites.tsv: every `#<n>` item the handoff cites in a rule document (`<name>.md`, at most three words,
              then `#<n>`, more `#<n>` after it): the handoff's words for it beside the item's first line (a line
              `<n>. ` under a heading holding the word before the first `#`, else the one such line), one row a
@@ -198,7 +200,7 @@ tiers        join/zone.tsv: the rule sections touched by pass-1 or pass-2, with 
 tier-join    table-0.tsv: zone-1's table, a unit it found nothing in taking zone-2's rows (as table-join), then
              band-1's rows as they are; refused when a band unit is a unit of the zone. The hole round reads it
 """
-import hashlib, importlib.util, math, os, re, sys
+import hashlib, importlib.util, math, os, re, subprocess, sys
 
 sys.dont_write_bytecode = True
 
@@ -1986,7 +1988,58 @@ def lane_dirs(lane):
             out.append(os.path.relpath(os.path.join(base, d), lane).replace(os.sep, '/') + '/')
     return out
 
-def named_dirs(lane, handoff_text, hint=None):
+STATUS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'board', 'said_status.py')
+
+def path_under(p, top):
+    return p == top or p.startswith(top.rstrip(os.sep) + os.sep)
+
+def registry_rows(d):
+    """the SAID.lanes rows of d/CLAUDE.md as [(token, physical root)], read whole by the board's registry reader with
+    its count; [] when the file declares none"""
+    r = subprocess.run([sys.executable, '-I', '-B', STATUS, '--registry', '--root', d], capture_output=True, text=True)
+    ls = r.stdout.splitlines()
+    m = re.match('^count: (\\d+)$', ls[-1]) if ls else None
+    rows = [l.split(':root=', 1) for l in ls[:-1]]
+    if r.returncode != 0 or not m or int(m.group(1)) != len(rows) or any(len(x) != 2 for x in rows):
+        raise Refused('refused: the SAID.lanes registry of %s: %s' % (os.path.join(d, 'CLAUDE.md'), (ls or [r.stderr.strip() or 'no output'])[-1]))
+    return [(k, os.path.realpath(os.path.join(d, v))) for k, v in rows]
+
+def handoff_root(lane):
+    """(root, rows, registry file or None) the directory tokens of a handoff outside the lane resolve from: the nearest
+    directory at or above the handoff whose CLAUDE.md declares SAID.lanes, else the handoff's own directory; None for a
+    handoff inside the lane or its docs root"""
+    top = os.path.realpath(lane)
+    hp = os.path.realpath(os.path.join(top, HANDOFF))
+    if path_under(hp, top) or path_under(hp, os.path.realpath(os.path.join(top, docs_root(top)))):
+        return None
+    d = os.path.dirname(hp)
+    while True:
+        if os.path.isfile(os.path.join(d, 'CLAUDE.md')):
+            rows = registry_rows(d)
+            if rows:
+                return d, rows, os.path.join(d, 'CLAUDE.md')
+        if os.path.dirname(d) == d:
+            return os.path.dirname(hp), [], None
+        d = os.path.dirname(d)
+
+def token_place(lane, root, t):
+    """(lane-relative token, 'lane') under this lane or its docs root, (None, 'other-lane') under another registry
+    row, (t, None) under neither; all compared physically, the longest root that holds the token wins, this lane on a
+    tie"""
+    top = os.path.realpath(lane)
+    dr = docs_root(top)
+    full = os.path.realpath(os.path.join(root[0], t))  # a link on the way, the lane's own docs link included
+    mine = [(top, ''), (os.path.realpath(os.path.join(top, dr)), dr + '/')]
+    cands = [(r, p) for r, p in mine if path_under(full, r)] + [(r, None) for k, r in root[1] if path_under(full, r)]
+    if not cands:
+        return t, None
+    best = max(cands, key=lambda c: len(c[0]))
+    if best[1] is None:
+        return None, 'other-lane'
+    sub = os.path.relpath(full, best[0]).replace(os.sep, '/')
+    return (best[1] + ('' if sub == '.' else sub + '/')) or './', 'lane'
+
+def named_dirs(lane, handoff_text, hint=None, root=None):
     if hint is not None:
         toks = [] if hint.strip() == '-' else [t.strip() for t in hint.split(',') if t.strip()]
         toks = [t if t.endswith('/') else t + '/' for t in toks]
@@ -2000,13 +2053,19 @@ def named_dirs(lane, handoff_text, hint=None):
     every = None
     out = []
     for t in toks:
-        if os.path.isdir(os.path.join(lane, t)):
-            out.append((t, t, 'audit', []))
+        look = t
+        if root is not None and hint is None:  # a handoff outside the lane names paths from its own root
+            look, where = token_place(lane, root, t)
+            if where == 'other-lane':
+                out.append((t, '-', 'other-lane', []))
+                continue
+        if os.path.isdir(os.path.join(lane, look)):
+            out.append((t, look, 'audit', []))
             continue
         if every is None:
             every = lane_dirs(lane)
-        m = [d for d in every if d.endswith('/' + t)]
-        up = None if m else parent_dir(lane, t, every)
+        m = [d for d in every if d.endswith('/' + look)]
+        up = None if m else parent_dir(lane, look, every)
         if up:
             out.append((t, up, 'parent', [up]))
             continue
@@ -2034,12 +2093,12 @@ def dir_files(lane, d):
         fs += [os.path.join(base, f) for f in sorted(files)]
     return (len(fs), sum((os.path.getsize(f) for f in fs)))
 
-def audit_dirs(lane, run, hint=None):
+def audit_dirs(lane, run, hint=None, root=None):
     out = os.path.join(run, AUDIT_DIR)
     if os.path.exists(out):
         raise Refused('refused: %s exists; the audit list is written once a run' % out)
     hl = lines_of(lane, HANDOFF)
-    found = named_dirs(lane, '\n'.join(hl), hint)
+    found = named_dirs(lane, '\n'.join(hl), hint, root)
     table = read_table(run) if os.path.isfile(os.path.join(run, 'table.tsv')) else []
     decs = {}
     dp = os.path.join(run, 'decisions.tsv')
@@ -2154,7 +2213,9 @@ def audit_text(folder):
     if rows is None:
         return ''
     au = [c for c in rows if c[0] != '-']
-    lines_ = ['', AUDIT_HEAD, '', 'Audit path: spawn; dirs %d; absent or ambiguous %d' % (len(au), len(rows) - len(au)), '']
+    ol = [c for c in rows if c[3] == 'other-lane']
+    lines_ = ['', AUDIT_HEAD, '', 'Audit path: spawn; dirs %d; absent or ambiguous %d%s' % (len(au), len(rows) - len(au) - len(ol),
+              '; other lanes %d' % len(ol) if ol else ''), '']
     if not rows:
         lines_.append('The handoff names no directory, or the scope-hint names none: no audit ran.')
     for c in rows:
@@ -2162,6 +2223,8 @@ def audit_text(folder):
             lines_.append('- `%s`: named in the handoff, no such directory in the lane; not audited.' % c[1])
         elif c[3] == 'ambiguous':
             lines_.append('- `%s`: named in the handoff, more than one lane directory ends so; not audited.' % c[1])
+        elif c[3] == 'other-lane':
+            lines_.append('- `%s`: named in the handoff, a directory of another lane of the registry; not audited.' % c[1])
         elif c[3] == 'parent':
             lines_.append('- `%s`: named in the handoff, no such directory in the lane; its ancestor `%s` is audited (%s).' % (c[1], c[2], c[0]))
     for c in au:
@@ -4095,7 +4158,11 @@ def main(argv):
         if cmd == 'audit-dirs' and len(a) == 2:
             if '--handoff' not in opt:
                 raise Refused('refused: audit-dirs needs --handoff')
-            rows, same = again([os.path.join(a[1], AUDIT_DIR)], audit_dirs, a[0], a[1], opt.get('--hint'))
+            hr = None if opt.get('--hint') is not None else handoff_root(a[0])
+            if hr is not None:
+                rel = lambda x: os.path.relpath(x, a[0]).replace(os.sep, '/')
+                print('handoff root: %s (%s)' % (rel(hr[0]), 'registry %s, rows %d' % (rel(hr[2]), len(hr[1])) if hr[2] else 'no registry'))
+            rows, same = again([os.path.join(a[1], AUDIT_DIR)], audit_dirs, a[0], a[1], opt.get('--hint'), hr)
             if same:
                 print('unchanged: %s holds what this command writes' % os.path.join(a[1], AUDIT_DIR))
             if not rows:
