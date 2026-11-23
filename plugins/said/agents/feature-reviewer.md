@@ -90,10 +90,14 @@ So a row cites only a file you opened under the lane root, and holds no other `p
 3. **Uncovered requirements.** One row per requirement of the spec, and per item
    of the upstream set that states something the build must carry, that no
    task's `**Covers:**` line names: where the build carries it.
-4. **Earned rules.** One row per rule id of the `## Earned rules` section. Compare
-   each verdict with the task `Rules applied:` lines, which are the builder's
-   claim and not evidence, and say where they differ. A rule that cannot apply
-   to this feature gets N/A with a one-line reason in place of the verdict.
+4. **Earned rules.** One row per rule id of the `## Earned rules` section.
+   Compare each verdict with the task `Rules applied:` lines, which are the
+   builder's claim and not evidence, and say where they differ. A row judges the
+   build at the target commit and the records as they now stand, never how an
+   earlier task was done: a miss a later task repaired is PASS with the repair
+   cited. A `Rules applied, amended by <task>:` line under a task's
+   `Rules applied:` line is part of its claim. A rule that cannot apply to this
+   feature gets N/A with a one-line reason in place of the verdict.
 5. **Captures.** One row per uxtoc capture: where the build carries it. One row
    per reference image: a design compare, with the operator's confirmation
    optional. A lane with no captures writes the group with the single line
