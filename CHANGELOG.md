@@ -2,6 +2,12 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.28.2] - 2026-11-23
+
+- **Fixed:** `board/cite_check.py` `resolve()` refuses an absolute path or a path with a `..` part on its own, before any file test, so a caller that skips the `inside()` check cannot name a file outside the lane. Before, only its callers held that check.
+- **Fixed:** `agents/feature-reviewer.md` points at the example path in its cite paragraph. Before, it pointed at a worked example the file does not have.
+- **Fixed:** `review-qa`'s `covers-read.py` resolves a bare file name in a `**Covers:**` anchor (`PROJ-01.md#<heading>`) through the shared cite check, in the folders the feature review uses: a file at the lane root first, else the one file of that name in `--working`, the `SAID.feature-spec:` dir or a `SAID.mounts:` folder; no match or two matches read `missing`, and a `..` or absolute path stays `outside`. Before, a bare spec name read `missing`, so one id passed `review-feature` and failed `review-qa`.
+
 ## [0.28.1] - 2026-11-23
 
 - **Fixed:** the scope-refine rule chain accepts a cite of the declared `--handoff` when that file lies outside the lane (a `..` path from the lane root): `audit-check` and `question-check` read the cited line from it, and every other path outside the lane still fails. Before, every correct cite of such a handoff failed as no such line and the chain stopped.
