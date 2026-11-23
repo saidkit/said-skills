@@ -14,11 +14,13 @@ before its first `### ` heading; its ids are separated by `, ` (`none` names non
   <file>#<fragment>   the file under --root has a heading (indented at most 3 spaces) whose slug is the fragment
                       (lowercase, spaces to hyphens, other punctuation dropped) or a line whose first word is the
                       fragment. A file at the root shadows a same-named file in --working. A bare file name not at
-                      the root names the one file of that name in --working, the `SAID.feature-spec:` folder (direct
-                      children) or a `SAID.mounts:` folder (any depth); with none or two it is `missing`.
+                      the root names the one file of that name in --working, the declared `SAID.working:` folder of
+                      the feature named by --working's last part, the `SAID.feature-spec:` folder (direct children)
+                      or a `SAID.mounts:` folder (any depth); with none or two it is `missing`.
                       Without --working none of these folders is searched, so a bare name that is not a file at the
-                      root is `missing`. The id is `outside` when no file inside the root is found and a candidate
-                      leaves it
+                      root is `missing`. With --working, a file reached through a link of a declared folder counts as
+                      inside. The id is `outside` when no file inside the root or those folders is found and a
+                      candidate leaves it
 A store whose flag is not given leaves its ids `unchecked`; a given --rulings file that does not exist makes
 every ruling id `missing`. A bare `R-` id, a control character or a space inside an id is `malformed`.
 Output, one line each, every text shown as printable ASCII and capped:
@@ -191,6 +193,7 @@ class Stores(object):
         self.tops = (self.root,) + self._docs_root()  # the lane, and its declared docs root where a link leads
         self.working = os.path.realpath(os.path.abspath(args["working"])) if args["working"] else None
         self.dirs = self._bare_dirs(args)
+        self.tops += self._declared_dirs(args)
         self.rulings = self._rulings(args["rulings"])
         self.line_ids = self._line_ids(args["todo"], args["backlog"])
         self.ledger = self._ledger(args["ledger"])
@@ -248,7 +251,7 @@ class Stores(object):
         return (os.path.realpath(os.path.join(self.root, value)),)
 
     def _bare_dirs(self, args):
-        """The folders a bare file name resolves in: the feature read's, plus --working where the lane declares none."""
+        """The folders a bare file name resolves in: the feature read's, plus --working (resolve() counts one file once)."""
         if not self.working:
             return ()
         cite_check, said_status = _sibling("cite_check"), _sibling("said_status")
@@ -259,6 +262,14 @@ class Stores(object):
             if rel != "." and cite_check.inside(rel):  # resolve() counts one physical file once
                 dirs.append(rel)
         return tuple(dirs)
+
+    def _declared_dirs(self, args):
+        """The physical folders of the lane's declared working, feature-spec and mounts folders."""
+        if not self.working:
+            return ()
+        feature = os.path.basename(os.path.abspath(args["working"]))
+        dirs = _sibling("said_status")._fr_cite_dirs(self.root, feature)
+        return tuple(os.path.realpath(os.path.join(self.root, d[:-3] if d.endswith("/**") else d)) for d in dirs)
 
     def anchor_file(self, rel):
         hit, bare = None, "/" not in rel
