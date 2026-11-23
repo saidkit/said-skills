@@ -3,8 +3,8 @@
 prints and writes no file.
 
 A cite is `<path>:<line>` or `<path>:<line>-<line>`, the path relative to the lane root. A path that is absolute or
-has a `..` part is outside the lane; the test is on the text of the path, so a link inside the lane is followed. The
-cite holds when the file is there and every line it names exists. A caller may pass dirs, lane-relative folders: a
+has a `..` part is outside the lane; the test is on the text of the path, so a link inside the lane is followed. A
+caller that passes the lane's declared routes also has each file admitted by route (see admitted). The cite holds when the file is there and every line it names exists. A caller may pass dirs, lane-relative folders: a
 bare file name (no /) that is not a file at the lane root then names the one file of that name in them, and with none
 or two such files it is no such file; one file reached by two spellings or through a link counts once. A quote is the
 words in double quotes directly after the cite; it holds when, whitespace folded, the words stand on the cited line
@@ -54,6 +54,29 @@ def inside(path):
     return not (path.startswith('/') or '..' in path.split('/'))
 
 
+def _under(top, real):
+    return real == top or real.startswith(top.rstrip(os.sep) + os.sep)
+
+
+def admitted(lane, path, routes):
+    """True when a lane-relative path is inside by declared route. Its target must stay in the lane, in the declared
+    route the path is spelled under (whatever that route links to, `/` included), or in another declared route's
+    target (never a route whose target holds the lane, which would admit every link). A `..` or absolute spelling is
+    never inside."""
+    if not inside(path):
+        return False
+    real, spelled, home = os.path.realpath(os.path.join(lane, path)), posixpath.normpath(path), os.path.realpath(lane)
+    if _under(home, real):
+        return True
+    for route in routes:
+        route = posixpath.normpath(route).strip('/')
+        target = os.path.realpath(os.path.join(lane, route))
+        own = spelled == route or spelled.startswith(route + '/')
+        if _under(target, real) and (own or not _under(target, home)):  # a route holding the lane admits only its own
+            return True
+    return False
+
+
 def resolve(lane, path, dirs=(), isfile=None):
     """The lane-relative path a cite names: the path itself when that file is under the lane root; else, for a bare
     name (no /), the one file of that name under dirs (lane-relative folders: a direct child of each, or at any depth
@@ -75,6 +98,8 @@ def resolve(lane, path, dirs=(), isfile=None):
             seen.append((d, deep))
     found, physical = [], set()
     for d, deep in seen:
+        if deep and _under(os.path.realpath(os.path.join(lane, d)), os.path.realpath(lane)):
+            continue  # a folder holding the lane is never walked
         for top, subs, names in os.walk(os.path.join(lane, d)):
             subs[:] = sorted(subs) if deep else []  # a plain folder: its direct children only
             rel = posixpath.normpath(posixpath.join(d, os.path.relpath(top, os.path.join(lane, d)).replace(os.sep, '/')))
@@ -112,9 +137,9 @@ def quote_at(line, words):
     return False
 
 
-def text_faults(lane, text, dirs=()):
+def text_faults(lane, text, dirs=(), routes=None):
     """[(cite, why)] for every cite in the text that fails, in text order. dirs: the folders a bare file name may
-    resolve in (see resolve); none by default."""
+    resolve in (see resolve); none by default. routes: the lane's declared routes; given, a file must be admitted."""
     out = []
     for m in IN_TEXT.finditer(text):
         path, a, b, words = m.group(1), int(m.group(2)), m.group(3), m.group(4)
@@ -127,6 +152,9 @@ def text_faults(lane, text, dirs=()):
         path = resolve(lane, path, dirs)
         if path is None:
             out.append((cite, 'no such file'))
+            continue
+        if routes is not None and not admitted(lane, path, routes):
+            out.append((cite, 'outside the lane'))
             continue
         try:
             ls = read_lines(lane, path)

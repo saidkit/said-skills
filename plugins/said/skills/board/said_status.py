@@ -1968,14 +1968,14 @@ def _fr_workdir_ok(root, workdir, feature):
     return os.path.realpath(os.path.join(root, value)) == os.path.realpath(workdir)
 
 
-def _fr_cite_dirs(root, feature):
+def _fr_cite_dirs(root, feature=None):
     """The lane-relative folders a bare file name in a row's cite resolves in: the feature's `SAID.working:` dir and
-    the dir of its `SAID.feature-spec:` (direct children), and each `SAID.mounts:` folder (`<folder>/**`, any depth),
-    each when declared and inside the lane."""
+    the dir of its `SAID.feature-spec:` (direct children; with a feature), and each `SAID.mounts:` folder
+    (`<folder>/**`, any depth), each when declared and inside the lane."""
     import gate_record
     import cite_check
     out = []
-    for key in ("working", "feature-spec"):
+    for key in ("working", "feature-spec") if feature else ():
         value = (gate_record.lane_key(root, key) or "").strip().strip("`'\"")
         for token in ("<id>", "<feature-id>", "<feature>"):
             value = value.replace(token, feature)
@@ -1986,6 +1986,17 @@ def _fr_cite_dirs(root, feature):
         m = m.strip("`'\"").strip("/")
         if m and cite_check.inside(m):
             out.append(m + "/**")
+    return tuple(out)
+
+
+def _fr_routes(root, feature=None):
+    """The lane's declared routes, lane-relative: the bare-name folders and the docs root. The one inside policy."""
+    import gate_record
+    import cite_check
+    out = [d[:-3] if d.endswith("/**") else d for d in _fr_cite_dirs(root, feature)]
+    docs = (gate_record.lane_key(root, "docs-root") or "").strip().strip("`'\"").strip("/")
+    if docs and cite_check.inside(docs):
+        out.append(docs)
     return tuple(out)
 
 
@@ -2110,6 +2121,7 @@ def feature_review_output(root, workdir, feature, decisions=()):
     try:
         import cite_check  # the one cite check, shared with the scope chain
         dirs = _fr_cite_dirs(root, feature)  # a bare file name resolves in the feature's own folders
+        routes = _fr_routes(root, feature)
         log = (gate_record.lane_key(root, "task-log") or "").strip().strip("`'\"").replace("<id>", feature)
         log = os.path.realpath(os.path.join(root, log)) if log else None
 
@@ -2118,7 +2130,7 @@ def feature_review_output(root, workdir, feature, decisions=()):
             return bool(log and hits) and all(h and os.path.realpath(os.path.join(root, h)) == log for h in hits)
 
         return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc,
-                                    lambda cell: cite_check.text_faults(root, cell, dirs),
+                                    lambda cell: cite_check.text_faults(root, cell, dirs, routes),
                                     os.path.join(workdir, "gate-%s.md" % feature), in_log)
     except gate_record.Error as e:
         return 2, ["error: %s" % e]

@@ -17,9 +17,9 @@ before its first `### ` heading; its ids are separated by `, ` (`none` names non
                       the root names the one file of that name in --working, the declared `SAID.working:` folder of
                       the feature named by --working's last part, the `SAID.feature-spec:` folder (direct children)
                       or a `SAID.mounts:` folder (any depth); with none or two it is `missing`.
-                      Without --working none of these folders is searched, so a bare name that is not a file at the
-                      root is `missing`. With --working, a file whose real location is under a declared folder,
-                      including one the folder itself links to, counts as inside. The id is `outside` when no file
+                      Without --working only the mounts are searched, so a bare name that is not a file at the
+                      root is `missing`. A file is inside by declared route: spelled under a declared folder, whatever
+                      that folder links to, or with its real location in the lane or a declared folder's target. The id is `outside` when no file
                       inside the root or those folders is found and a candidate leaves it
 A store whose flag is not given leaves its ids `unchecked`; a given --rulings file that does not exist makes
 every ruling id `missing`. A bare `R-` id, a control character or a space inside an id is `malformed`.
@@ -178,22 +178,16 @@ def first_word(line):
     return s
 
 
-def _inside(root, path):
-    return path == root or path.startswith(root + os.sep)
-
-
-def _spelled_inside(rel):
-    """A path that names a place inside the lane by its spelling: relative, with no `..` part."""
-    return not os.path.isabs(rel) and ".." not in rel.replace(os.sep, "/").split("/")
-
-
 class Stores(object):
     def __init__(self, args):
         self.root = os.path.realpath(os.path.abspath(args["root"]))
-        self.tops = (self.root,) + self._docs_root()  # the lane, and its declared docs root where a link leads
         self.working = os.path.realpath(os.path.abspath(args["working"])) if args["working"] else None
+        spelled = os.path.relpath(os.path.abspath(args["working"]), os.path.abspath(args["root"])) if args["working"] else ""
+        self.spelled_working = os.path.join(self.root, spelled) if spelled and ".." not in spelled.split(os.sep) else self.working
         self.dirs = self._bare_dirs(args)
-        self.tops += self._declared_dirs(args)
+        feature = os.path.basename(os.path.abspath(args["working"])) if args["working"] else None
+        self.routes = _sibling("said_status")._fr_routes(self.root, feature) \
+            + tuple(d[:-3] if d.endswith("/**") else d for d in self.dirs)
         self.rulings = self._rulings(args["rulings"])
         self.line_ids = self._line_ids(args["todo"], args["backlog"])
         self.ledger = self._ledger(args["ledger"])
@@ -242,19 +236,11 @@ class Stores(object):
                 words.update(first_word(ln) for ln in read_lines(p))
         return words
 
-    def _docs_root(self):
-        """The physical folder of the lane's declared `SAID.docs-root:`, when it is spelled inside the lane."""
-        gate_record = _sibling("gate_record")
-        value = (gate_record.lane_key(self.root, "docs-root") or "").strip().strip("`'\"")
-        if not value or not _spelled_inside(value):
-            return ()
-        return (os.path.realpath(os.path.join(self.root, value)),)
-
     def _bare_dirs(self, args):
         """The folders a bare file name resolves in: the feature read's, plus --working (resolve() counts one file once)."""
-        if not self.working:
-            return ()
         cite_check, said_status = _sibling("cite_check"), _sibling("said_status")
+        if not self.working:
+            return tuple(said_status._fr_cite_dirs(self.root))  # the mounts count without --working
         given = os.path.abspath(args["working"])
         dirs = list(said_status._fr_cite_dirs(self.root, os.path.basename(given)))
         for top, sub in ((os.path.abspath(args["root"]), given), (self.root, self.working)):
@@ -263,27 +249,21 @@ class Stores(object):
                 dirs.append(rel)
         return tuple(dirs)
 
-    def _declared_dirs(self, args):
-        """The physical folders of the lane's declared working, feature-spec and mounts folders."""
-        if not self.working:
-            return ()
-        feature = os.path.basename(os.path.abspath(args["working"]))
-        dirs = _sibling("said_status")._fr_cite_dirs(self.root, feature)
-        return tuple(os.path.realpath(os.path.join(self.root, d[:-3] if d.endswith("/**") else d)) for d in dirs)
-
     def anchor_file(self, rel):
+        cite_check = _sibling("cite_check")
+        if not cite_check.inside(rel):
+            return None, "outside"
         hit, bare = None, "/" not in rel
         if bare:
-            hit = _sibling("cite_check").resolve(self.root, rel, self.dirs)  # the feature read's rule
+            hit = cite_check.resolve(self.root, rel, self.dirs)  # the feature read's rule
         if hit:
             cands = [os.path.join(self.root, hit)]
         else:  # no single file: these only tell `outside` from `missing`
-            cands = ([os.path.join(self.working, rel)] if bare and self.working else []) + [os.path.join(self.root, rel)]
-        tops = self.tops if _spelled_inside(rel) else (self.root,)  # a `..` or absolute spelling never reaches the docs root
+            cands = ([os.path.join(self.spelled_working, rel)] if bare and self.working else []) + [os.path.join(self.root, rel)]
         left = False
         for c in cands:
             real = os.path.realpath(c)
-            if not any(_inside(t, real) for t in tops):
+            if not cite_check.admitted(self.root, os.path.relpath(c, self.root).replace(os.sep, "/"), self.routes):
                 left = left or os.path.exists(real) or os.path.islink(c)
                 continue
             if os.path.isfile(real) and (hit or not bare):
