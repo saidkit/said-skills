@@ -18,9 +18,9 @@ before its first `### ` heading; its ids are separated by `, ` (`none` names non
                       the feature named by --working's last part, the `SAID.feature-spec:` folder (direct children)
                       or a `SAID.mounts:` folder (any depth); with none or two it is `missing`.
                       Without --working none of these folders is searched, so a bare name that is not a file at the
-                      root is `missing`. With --working, a file reached through a link of a declared folder counts as
-                      inside. The id is `outside` when no file inside the root or those folders is found and a
-                      candidate leaves it
+                      root is `missing`. With --working, a file whose real location is under a declared folder,
+                      including one the folder itself links to, counts as inside. The id is `outside` when no file
+                      inside the root or those folders is found and a candidate leaves it
 A store whose flag is not given leaves its ids `unchecked`; a given --rulings file that does not exist makes
 every ruling id `missing`. A bare `R-` id, a control character or a space inside an id is `malformed`.
 Output, one line each, every text shown as printable ASCII and capped:
