@@ -4,7 +4,9 @@ prints and writes no file.
 
 A cite is `<path>:<line>` or `<path>:<line>-<line>`, the path relative to the lane root. A path that is absolute or
 has a `..` part is outside the lane; the test is on the text of the path, so a link inside the lane is followed.
-The cite holds when the file is there and every line it names exists. A quote is the words in double quotes
+The cite holds when the file is there and every line it names exists. A caller may pass dirs, lane-relative
+folders: a bare file name (no /) that is not a file at the lane root then names the one file of that name in them,
+and with none or two such files it is no such file. A quote is the words in double quotes
 directly after the cite; it holds when, whitespace folded, the words stand on the cited line (on one of the lines of
 a range), read as written or with each ' read as ", and also when they stand there with the markdown emphasis
 markers dropped from both the line and the words: a pair of ** or * around text, or of backticks, is unwrapped
@@ -16,6 +18,7 @@ Prints one `<cite>: <why>` line per failing cite, in text order. Exit 0 every ci
 is missing or unreadable (`error: <why>`).
 """
 import os
+import posixpath
 import re
 import sys
 
@@ -51,17 +54,36 @@ def inside(path):
     return not (path.startswith('/') or '..' in path.split('/'))
 
 
-def cite_line(lane, cite, isfile=None, lines=None):
+def resolve(lane, path, dirs=(), isfile=None):
+    """The lane-relative path a cite names: the path itself when that file is under the lane root; else, for a bare
+    name (no /), the one file of that name under dirs (lane-relative folders); None when none or more than one."""
+    isfile = isfile or os.path.isfile
+    if isfile(os.path.join(lane, path)):
+        return path
+    if '/' in path or not dirs:
+        return None
+    seen = []
+    for d in dirs:
+        d = posixpath.normpath(d).strip('/')
+        if d not in ('', '.') and d not in seen:  # one folder named twice, in any spelling, is one place
+            seen.append(d)
+    found = [d + '/' + path for d in seen if isfile(os.path.join(lane, d, path))]
+    return found[0] if len(found) == 1 else None
+
+
+def cite_line(lane, cite, isfile=None, lines=None, dirs=()):
     """(path, line) of a `path:line` cite whose file is in the lane and whose line exists, else None. isfile(full
-    path) and lines(lane-relative path) default to the disk; a caller with its own view of the files passes its own."""
+    path) and lines(lane-relative path) default to the disk; a caller with its own view of the files passes its own.
+    dirs: the folders a bare file name may resolve in (see resolve); none by default."""
     isfile = isfile or os.path.isfile
     lines = lines or (lambda p: read_lines(lane, p))
     m = CITE.match(cite)
     if not m or not inside(m.group(1)):
         return None
-    if not isfile(os.path.join(lane, m.group(1))) or not 1 <= int(m.group(2)) <= len(lines(m.group(1))):
+    path = resolve(lane, m.group(1), dirs, isfile)
+    if path is None or not 1 <= int(m.group(2)) <= len(lines(path)):
         return None
-    return (m.group(1), int(m.group(2)))
+    return (path, int(m.group(2)))
 
 
 def quote_at(line, words):
@@ -73,8 +95,9 @@ def quote_at(line, words):
     return False
 
 
-def text_faults(lane, text):
-    """[(cite, why)] for every cite in the text that fails, in text order."""
+def text_faults(lane, text, dirs=()):
+    """[(cite, why)] for every cite in the text that fails, in text order. dirs: the folders a bare file name may
+    resolve in (see resolve); none by default."""
     out = []
     for m in IN_TEXT.finditer(text):
         path, a, b, words = m.group(1), int(m.group(2)), m.group(3), m.group(4)
@@ -84,7 +107,8 @@ def text_faults(lane, text):
         if not inside(path):
             out.append((cite, 'outside the lane'))
             continue
-        if not os.path.isfile(os.path.join(lane, path)):
+        path = resolve(lane, path, dirs)
+        if path is None:
             out.append((cite, 'no such file'))
             continue
         try:

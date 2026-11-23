@@ -1942,6 +1942,22 @@ def _fr_workdir_ok(root, workdir, feature):
     return os.path.realpath(os.path.join(root, value)) == os.path.realpath(workdir)
 
 
+def _fr_cite_dirs(root, feature):
+    """The lane-relative folders a bare file name in a row's cite resolves in: the feature's `SAID.working:` dir and
+    the dir of its `SAID.feature-spec:`, each when declared and inside the lane."""
+    import gate_record
+    import cite_check
+    out = []
+    for key in ("working", "feature-spec"):
+        value = (gate_record.lane_key(root, key) or "").strip().strip("`'\"")
+        for token in ("<id>", "<feature-id>", "<feature>"):
+            value = value.replace(token, feature)
+        value = (os.path.dirname(value) if key == "feature-spec" else value).strip("/")
+        if value and cite_check.inside(value):
+            out.append(value)
+    return tuple(out)
+
+
 def _fr_owed(why):
     return 1, ["feature-review: header | FAIL | %s" % why, "feature review owed: %s" % why]
 
@@ -2043,8 +2059,9 @@ def feature_review_output(root, workdir, feature, decisions=()):
     dirty = (lambda: len(gate_record.git_dirty(root, ["."], wd, set()))) if toks and toks[0] == "git" else (lambda: 0)
     try:
         import cite_check  # the one cite check, shared with the scope chain
+        dirs = _fr_cite_dirs(root, feature)  # a bare file name resolves in the feature's own folders
         return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc,
-                                    lambda cell: cite_check.text_faults(root, cell), os.path.join(workdir, "gate-%s.md" % feature))
+                                    lambda cell: cite_check.text_faults(root, cell, dirs), os.path.join(workdir, "gate-%s.md" % feature))
     except gate_record.Error as e:
         return 2, ["error: %s" % e]
 
