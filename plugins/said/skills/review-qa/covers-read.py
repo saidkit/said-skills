@@ -11,10 +11,12 @@ before its first `### ` heading; its ids are separated by `, ` (`none` names non
   WR-<10 digits>[-<digits>]  a line of --rulings: live (pending, landed), superseded, rejected, or missing
   @<digits>           an entry id of a --todo or --backlog file (read with the board's todo-md reader)
   DL-<id>, CL-<id>    a --ledger line whose first word is the id (after list, heading and bold marks)
-  <file>#<fragment>   the file under --root (a bare file name is looked up in --working first) has a heading
-                      (indented at most 3 spaces) whose slug is the fragment (lowercase, spaces to hyphens,
-                      other punctuation dropped) or a line whose first word is the fragment; every candidate
-                      path is tried, and the id is `outside` when none inside the root exists and one leaves it
+  <file>#<fragment>   the file under --root has a heading (indented at most 3 spaces) whose slug is the fragment
+                      (lowercase, spaces to hyphens, other punctuation dropped) or a line whose first word is the
+                      fragment. A bare file name not at the root names the one file of that name in --working, the
+                      `SAID.feature-spec:` folder (direct children) or a `SAID.mounts:` folder (any depth); with none
+                      or two it is `missing`. The id is `outside` when no file inside the root is found and a
+                      candidate leaves it
 A store whose flag is not given leaves its ids `unchecked`; a given --rulings file that does not exist makes
 every ruling id `missing`. A bare `R-` id, a control character or a space inside an id is `malformed`.
 Output, one line each, every text shown as printable ASCII and capped:
@@ -50,10 +52,14 @@ GATE = _gate()
 shown = GATE.shown
 
 
-def _todo_md():
+def _board():
     board = os.path.normpath(os.path.join(HERE, "..", "board"))
     if board not in sys.path:
         sys.path.insert(0, board)
+
+
+def _todo_md():
+    _board()
     import todo_md
     return todo_md
 
@@ -175,6 +181,7 @@ class Stores(object):
         self.root = os.path.realpath(os.path.abspath(args["root"]))
         self.tops = (self.root,) + self._docs_root()  # the lane, and its declared docs root where a link leads
         self.working = os.path.realpath(os.path.abspath(args["working"])) if args["working"] else None
+        self.dirs = self._bare_dirs(args)
         self.rulings = self._rulings(args["rulings"])
         self.line_ids = self._line_ids(args["todo"], args["backlog"])
         self.ledger = self._ledger(args["ledger"])
@@ -225,20 +232,41 @@ class Stores(object):
 
     def _docs_root(self):
         """The physical folder of the lane's declared `SAID.docs-root:`, when it is spelled inside the lane."""
-        board = os.path.normpath(os.path.join(HERE, "..", "board"))
-        if board not in sys.path:
-            sys.path.insert(0, board)
+        _board()
         import gate_record
         value = (gate_record.lane_key(self.root, "docs-root") or "").strip().strip("`'\"")
         if not value or not _spelled_inside(value):
             return ()
         return (os.path.realpath(os.path.join(self.root, value)),)
 
+    def _bare_dirs(self, args):
+        """The folders a bare file name resolves in: the feature read's, plus --working where the lane declares none."""
+        if not self.working:
+            return ()
+        _board()
+        import cite_check
+        import said_status
+        given = os.path.abspath(args["working"])
+        dirs = list(said_status._fr_cite_dirs(self.root, os.path.basename(given)))
+        seen = set(os.path.realpath(os.path.join(self.root, d)) for d in dirs if not d.endswith("/**"))
+        for top, sub in ((os.path.abspath(args["root"]), given), (self.root, self.working)):
+            rel = os.path.relpath(sub, top).replace(os.sep, "/")
+            real = os.path.realpath(os.path.join(self.root, rel))
+            if rel != "." and cite_check.inside(rel) and real not in seen:  # one folder, one spelling
+                seen.add(real)
+                dirs.append(rel)
+        return tuple(dirs)
+
     def anchor_file(self, rel):
-        cands = []
-        if "/" not in rel and self.working:
-            cands.append(os.path.join(self.working, rel))
-        cands.append(os.path.join(self.root, rel))
+        hit, bare = None, "/" not in rel
+        if bare:
+            _board()
+            import cite_check
+            hit = cite_check.resolve(self.root, rel, self.dirs)  # the feature read's rule
+        if hit:
+            cands = [os.path.join(self.root, hit)]
+        else:  # no single file: these only tell `outside` from `missing`
+            cands = ([os.path.join(self.working, rel)] if bare and self.working else []) + [os.path.join(self.root, rel)]
         tops = self.tops if _spelled_inside(rel) else (self.root,)  # a `..` or absolute spelling never reaches the docs root
         left = False
         for c in cands:
@@ -246,7 +274,7 @@ class Stores(object):
             if not any(_inside(t, real) for t in tops):
                 left = left or os.path.exists(real) or os.path.islink(c)
                 continue
-            if os.path.isfile(real):
+            if os.path.isfile(real) and (hit or not bare):
                 return real, None
         return None, ("outside" if left else "missing")
 
