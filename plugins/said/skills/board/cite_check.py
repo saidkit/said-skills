@@ -59,10 +59,9 @@ def _under(top, real):
 
 
 def admitted(lane, path, routes):
-    """True when a lane-relative path is inside by declared route. Its target must stay in the lane, in the declared
-    route the path is spelled under (whatever that route links to, `/` included), or in another declared route's
-    target (never a route whose target holds the lane, which would admit every link). A `..` or absolute spelling is
-    never inside."""
+    """True when a lane-relative path is inside by declared route. Its target must stay in the lane or in the target of
+    the declared route the path is spelled under (whatever that route links to, `/` included). A `..` or absolute
+    spelling is never inside."""
     if not inside(path):
         return False
     real, spelled, home = os.path.realpath(os.path.join(lane, path)), posixpath.normpath(path), os.path.realpath(lane)
@@ -71,8 +70,7 @@ def admitted(lane, path, routes):
     for route in routes:
         route = posixpath.normpath(route).strip('/')
         target = os.path.realpath(os.path.join(lane, route))
-        own = spelled == route or spelled.startswith(route + '/')
-        if _under(target, real) and (own or not _under(target, home)):  # a route holding the lane admits only its own
+        if (spelled == route or spelled.startswith(route + '/')) and _under(target, real):
             return True
     return False
 
