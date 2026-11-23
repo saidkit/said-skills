@@ -56,8 +56,8 @@ def inside(path):
 
 def resolve(lane, path, dirs=(), isfile=None):
     """The lane-relative path a cite names: the path itself when that file is under the lane root; else, for a bare
-    name (no /), the one file of that name under dirs (lane-relative folders, each searched to any depth); None when
-    none or more than one."""
+    name (no /), the one file of that name under dirs (lane-relative folders: a direct child of each, or at any depth
+    under a folder written `<folder>/**`); None when none or more than one."""
     isfile = isfile or os.path.isfile
     if isfile(os.path.join(lane, path)):
         return path
@@ -66,12 +66,14 @@ def resolve(lane, path, dirs=(), isfile=None):
     seen = []
     for d in dirs:
         d = posixpath.normpath(d).strip('/')
-        if d not in ('', '.') and d not in seen:  # one folder named twice, in any spelling, is one place
-            seen.append(d)
+        deep = d == '**' or d.endswith('/**')
+        d = posixpath.normpath(d[:-2]).strip('/') if deep else d
+        if d not in ('', '.') and (d, deep) not in seen:  # one folder named twice, in any spelling, is one place
+            seen.append((d, deep))
     found = []
-    for d in seen:
+    for d, deep in seen:
         for top, subs, names in os.walk(os.path.join(lane, d)):
-            subs.sort()
+            subs[:] = sorted(subs) if deep else []  # a plain folder: its direct children only
             rel = posixpath.normpath(posixpath.join(d, os.path.relpath(top, os.path.join(lane, d)).replace(os.sep, '/')))
             hit = rel + '/' + path
             if path in names and hit not in found and isfile(os.path.join(lane, hit)):  # overlapping folders find one file once
