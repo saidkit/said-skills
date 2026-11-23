@@ -159,7 +159,7 @@ Entering a lane — by fork, rotation, or because it is already loaded — the p
 |---|---|
 | **Scope** | `/said:scope-refine <handoff-path>` — the handover plus audit findings are the handoff. `/said:scope-grill` only for a genuinely thin idea |
 | **Act** | no spec or no task log yet (the Architect step): `/said:architect <scope-path>`; then `/said:impl <feature-id>` — whole-feature mode |
-| **Inspect, then Debrief** | `/said:review-feature <feature-id> --root <that lane's root> --base <rev> --capture-ref <file\|none> [--ledger <file>]...` -> (FAIL -> its FAIL rows to `/said:add-task <feature-id>`, the other lanes go on, then this one, `goal: continue`; owed or error -> `goal: stop -- <its last line>`) -> `/said:review-qa <feature-id>` -> `/said:accept <feature-id>`, each FAIL halts -> `/said:debrief <feature-id>` through Phase C; the `## Debrief close` footer is the Debrief->Closed transition. **This is the single source for the gate chain; Rule 7 invokes it per lane** |
+| **Inspect, then Debrief** | `/said:review-feature <feature-id> --root <that lane's root> --base <rev> [--mount-base <mount>=<rev>]... --capture-ref <file\|none> [--ledger <file>]...` -> (FAIL -> its FAIL rows to `/said:add-task <feature-id>`, the other lanes go on, then this one, `goal: continue`; owed or error -> `goal: stop -- <its last line>`) -> `/said:review-qa <feature-id>` -> `/said:accept <feature-id>`, each FAIL halts -> `/said:debrief <feature-id>` through Phase C; the `## Debrief close` footer is the Debrief->Closed transition. **The one gate chain; Rule 7 runs it per lane** |
 | **Closed** | nothing — do not re-enter |
 
 ### 4.2 Fork vs rotate
