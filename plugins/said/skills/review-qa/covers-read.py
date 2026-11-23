@@ -13,10 +13,11 @@ before its first `### ` heading; its ids are separated by `, ` (`none` names non
   DL-<id>, CL-<id>    a --ledger line whose first word is the id (after list, heading and bold marks)
   <file>#<fragment>   the file under --root has a heading (indented at most 3 spaces) whose slug is the fragment
                       (lowercase, spaces to hyphens, other punctuation dropped) or a line whose first word is the
-                      fragment. A bare file name not at the root names the one file of that name in --working, the
-                      `SAID.feature-spec:` folder (direct children) or a `SAID.mounts:` folder (any depth); with none
-                      or two it is `missing`. The id is `outside` when no file inside the root is found and a
-                      candidate leaves it
+                      fragment. A file at the root shadows a same-named file in --working. A bare file name not at
+                      the root names the one file of that name in --working, the `SAID.feature-spec:` folder (direct
+                      children) or a `SAID.mounts:` folder (any depth); with none or two it is `missing`.
+                      Without --working no extra folder is searched. The id is `outside` when no file inside the root
+                      is found and a candidate leaves it
 A store whose flag is not given leaves its ids `unchecked`; a given --rulings file that does not exist makes
 every ruling id `missing`. A bare `R-` id, a control character or a space inside an id is `malformed`.
 Output, one line each, every text shown as printable ASCII and capped:
@@ -58,10 +59,17 @@ def _board():
         sys.path.insert(0, board)
 
 
-def _todo_md():
+def _sibling(name):
+    """A board module; a broken one is a read error."""
     _board()
-    import todo_md
-    return todo_md
+    try:
+        return importlib.import_module(name)
+    except Exception as e:
+        raise ReadError("cannot load %s: %s" % (name, shown(e, 120)))
+
+
+def _todo_md():
+    return _sibling("todo_md")
 
 
 def read_lines(path):
@@ -232,8 +240,7 @@ class Stores(object):
 
     def _docs_root(self):
         """The physical folder of the lane's declared `SAID.docs-root:`, when it is spelled inside the lane."""
-        _board()
-        import gate_record
+        gate_record = _sibling("gate_record")
         value = (gate_record.lane_key(self.root, "docs-root") or "").strip().strip("`'\"")
         if not value or not _spelled_inside(value):
             return ()
@@ -243,26 +250,19 @@ class Stores(object):
         """The folders a bare file name resolves in: the feature read's, plus --working where the lane declares none."""
         if not self.working:
             return ()
-        _board()
-        import cite_check
-        import said_status
+        cite_check, said_status = _sibling("cite_check"), _sibling("said_status")
         given = os.path.abspath(args["working"])
         dirs = list(said_status._fr_cite_dirs(self.root, os.path.basename(given)))
-        seen = set(os.path.realpath(os.path.join(self.root, d)) for d in dirs if not d.endswith("/**"))
         for top, sub in ((os.path.abspath(args["root"]), given), (self.root, self.working)):
             rel = os.path.relpath(sub, top).replace(os.sep, "/")
-            real = os.path.realpath(os.path.join(self.root, rel))
-            if rel != "." and cite_check.inside(rel) and real not in seen:  # one folder, one spelling
-                seen.add(real)
+            if rel != "." and cite_check.inside(rel):  # resolve() counts one physical file once
                 dirs.append(rel)
         return tuple(dirs)
 
     def anchor_file(self, rel):
         hit, bare = None, "/" not in rel
         if bare:
-            _board()
-            import cite_check
-            hit = cite_check.resolve(self.root, rel, self.dirs)  # the feature read's rule
+            hit = _sibling("cite_check").resolve(self.root, rel, self.dirs)  # the feature read's rule
         if hit:
             cands = [os.path.join(self.root, hit)]
         else:  # no single file: these only tell `outside` from `missing`
