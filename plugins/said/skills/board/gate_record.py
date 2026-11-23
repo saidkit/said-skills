@@ -344,7 +344,9 @@ def identity(root, record=None):
         leave = feature_file(phys)
         repos = {m: mount_repo(phys, m.strip("`'\"")) for m in mounts}
         mine = [m for m in mounts if not repos[m]]
-        shown = subprocess.run(["git", "-C", phys, "show", "HEAD:./CLAUDE.md"], capture_output=True)
+        held = os.path.realpath(os.path.join(phys, "CLAUDE.md"))  # a linked file is read at its own repo's HEAD
+        shown = subprocess.run(["git", "-C", os.path.dirname(held), "show", "HEAD:./" + os.path.basename(held)],
+                               capture_output=True)
         at_head = claude_sections(phys, ("Lane",), shown.stdout.decode("utf-8-sig", "surrogateescape") if shown.returncode == 0 else "")
         now = claude_sections(phys, ("Lane",))
         tree = ["lane\0%s\n" % at_head]
