@@ -152,4 +152,5 @@ except (gate_record.Error, OSError) as e:
 if fr:
     print("\n".join(new_rows))
     if klass:
-        print("record-class: %d row(s) (%s), FAIL reads on this store: %d" % (len(klass), ", ".join(klass), seen_class))
+        held = " -- OPERATOR-QUESTION-HELD" if seen_class >= 2 and gate_record.fr_record_only(new_rows) else ""
+        print("record-class: %d row(s) (%s), FAIL reads on this store: %d%s" % (len(klass), ", ".join(klass), seen_class, held))

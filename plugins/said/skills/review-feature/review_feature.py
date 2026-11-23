@@ -184,7 +184,7 @@ def prepare(fid, root, base, ref, spec_ledgers, mount_bases=None):
     held = gate_record.load(record)
     if held and held[0] == gate_record.identity(root, record) and gate_record.record_fails(held[1]) >= 2 \
             and gate_record.fr_record_only(held[1]) and gate_record.sources_current(root, record):  # a repair reads again
-        return {"state": "owed", "why": "no read: a record-class FAIL came back on this store: it goes to the operator, no new task"}
+        return {"state": "owed", "why": "no read: a record-class FAIL came back on this store: it goes to the operator, no new task -- OPERATOR-QUESTION-HELD"}
     if not base:
         return {"state": "owed", "why": "no read: --base <rev> names the feature's base commit"}
     head = (git(root, "rev-parse", "HEAD") or "").strip()
