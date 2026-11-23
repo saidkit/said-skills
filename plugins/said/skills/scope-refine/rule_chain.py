@@ -139,7 +139,10 @@ audit-dirs   the directories the handoff names in backquotes (a path ending /), 
              audit/dirs.tsv and a task file for each one found; an absent or ambiguous one gets a line in the
              draft and no audit. A handoff outside the lane names paths from its root: the nearest directory above
              it whose CLAUDE.md declares SAID.lanes (printed with the row count), else its own directory; a path
-             under this lane is found lane-relative, one under another row's root is state other-lane (no audit)
+             under this lane is found lane-relative, one under another row's root is state other-lane (no audit).
+             A path under a declared SAID.mounts route is in the lane wherever its link lands, and the walk follows
+             that link; any other symlink but the docs root is not followed. A --hint directory no handoff line names
+             takes the whole handoff as its target shape
 cites        cites.tsv: every `#<n>` item the handoff cites in a rule document (`<name>.md`, at most three words,
              then `#<n>`, more `#<n>` after it): the handoff's words for it beside the item's first line (a line
              `<n>. ` under a heading holding the word before the first `#`, else the one such line), one row a
@@ -1980,12 +1983,62 @@ def qjoin_rows(folder):
 def moved_keys(folder):
     return {(c[0], c[1], c[2]) for c in qjoin_rows(folder) if c[3] in ('rules', 'same', 'notbear', 'onelook')}
 
+def declared_mounts(lane):
+    """the `SAID.mounts:` routes of the ## Lane block, read whole, each without its slashes"""
+    if not os.path.isfile(os.path.join(lane, 'CLAUDE.md')):
+        return ()
+    key = re.compile('^\\s*-?\\s*`?SAID\\.mounts`?:(.*)$')
+    hits = [m.group(1).strip().strip('`') for m in (key.match(l) for l in lane_block(lane)) if m]
+    v = hits[0].strip() if hits else 'none'
+    if v == 'none':
+        return ()
+    v = v[1:-1] if v.startswith('[') and v.endswith(']') else v
+    names = [x.strip().strip('`') for x in v.split(',')]
+    return tuple(p for p in ((x[2:] if x.startswith('./') else x).strip('/') for x in names) if p)
+
+def link_allowed(lane, rel):
+    """True for the docs-root link and a declared mount's link; never a link to the lane or a folder above it"""
+    rel = rel.strip('/')
+    if rel == docs_root(lane):
+        return True
+    return rel in declared_mounts(lane) and not path_under(os.path.realpath(lane), os.path.realpath(os.path.join(lane, rel)))
+
+def route_blocked(lane, rel):
+    """True when any symlink on the lane-relative route is neither the docs root nor a declared mount"""
+    at = ''
+    for part in rel.strip('/').split('/'):
+        at = at + '/' + part if at else part
+        if os.path.islink(os.path.join(lane, at)) and not link_allowed(lane, at):
+            return True
+    return False
+
+def lane_walk(lane, start, keep):
+    """os.walk from start, also through a declared mount's link that leaves the lane, each real folder once"""
+    top, seen, todo = os.path.realpath(lane), set(), [start]
+    mounts = declared_mounts(lane)
+    while todo:
+        t = todo.pop(0)
+        real = os.path.realpath(t)
+        if real in seen:
+            continue
+        seen.add(real)
+        for base, dirs, files in os.walk(t):
+            dirs[:] = sorted(d for d in dirs if keep(d))
+            yield base, dirs, files
+            for d in dirs:
+                p = os.path.join(base, d)
+                rel = os.path.relpath(p, lane).replace(os.sep, '/')
+                if os.path.islink(p) and rel in mounts and link_allowed(lane, rel) and not path_under(os.path.realpath(p), top):
+                    todo.append(p)
+
 def lane_dirs(lane):
     out = []
-    for base, dirs, _ in os.walk(lane):
-        dirs[:] = sorted((d for d in dirs if not d.startswith('.') and d != 'node_modules' and (not ASIDE.search(d))))
+    keep = lambda d: not d.startswith('.') and d != 'node_modules' and not ASIDE.search(d)
+    for base, dirs, _ in lane_walk(lane, lane, keep):
         for d in dirs:
-            out.append(os.path.relpath(os.path.join(base, d), lane).replace(os.sep, '/') + '/')
+            rel = os.path.relpath(os.path.join(base, d), lane).replace(os.sep, '/')
+            if not route_blocked(lane, rel):
+                out.append(rel + '/')
     return out
 
 STATUS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'board', 'said_status.py')
@@ -2028,6 +2081,9 @@ def token_place(lane, root, t):
     tie"""
     top = os.path.realpath(lane)
     dr = docs_root(top)
+    route = os.path.relpath(os.path.normpath(os.path.join(root[0], t)), top).replace(os.sep, '/')
+    if any((route == m or route.startswith(m + '/')) and link_allowed(top, m) for m in declared_mounts(top)):
+        return route + '/', 'lane'  # the declared route decides, wherever the link lands
     full = os.path.realpath(os.path.join(root[0], t))  # a link on the way, the lane's own docs link included
     mine = [(top, ''), (os.path.realpath(os.path.join(top, dr)), dr + '/')]
     cands = [(r, p) for r, p in mine if path_under(full, r)] + [(r, None) for k, r in root[1] if path_under(full, r)]
@@ -2059,7 +2115,7 @@ def named_dirs(lane, handoff_text, hint=None, root=None):
             if where == 'other-lane':
                 out.append((t, '-', 'other-lane', []))
                 continue
-        if os.path.isdir(os.path.join(lane, look)):
+        if os.path.isdir(os.path.join(lane, look)) and not route_blocked(lane, look):
             out.append((t, look, 'audit', []))
             continue
         if every is None:
@@ -2079,7 +2135,7 @@ def parent_dir(lane, t, every):
     parts = t.strip('/').split('/')
     for n in [2] * (len(parts) > 2) + list(range(len(parts) - 1, 2, -1)):
         p = '/'.join(parts[:n]) + '/'
-        if os.path.isdir(os.path.join(lane, p)):
+        if os.path.isdir(os.path.join(lane, p)) and not route_blocked(lane, p):
             return p
         m = [d for d in every if d.endswith('/' + p)]
         if len(m) == 1:
@@ -2088,8 +2144,7 @@ def parent_dir(lane, t, every):
 
 def dir_files(lane, d):
     fs = []
-    for base, dirs, files in os.walk(os.path.join(lane, d)):
-        dirs[:] = sorted((x for x in dirs if not x.startswith('.') and x != 'node_modules'))
+    for base, _, files in lane_walk(lane, os.path.join(lane, d), lambda x: not x.startswith('.') and x != 'node_modules'):
         fs += [os.path.join(base, f) for f in sorted(files)]
     return (len(fs), sum((os.path.getsize(f) for f in fs)))
 
@@ -2134,7 +2189,11 @@ def audit_dirs(lane, run, hint=None, root=None):
             if os.path.isfile(os.path.join(lane, p)) and n.isdigit() and (1 <= int(n) <= len(lines_of(lane, p))):
                 cl.append('  - %s "%s"' % (r, ' '.join(lines_of(lane, p)[int(n) - 1].split())))
         task = ['# Audit task %s' % aid, '', '- dir-path: %s' % path, '- audit-id: %s' % aid, "- target-shape: the handoff's lines that name this directory (%s), verbatim:" % HANDOFF]
-        task += ['  %d: %s' % (i, hl[i - 1]) for i in at]
+        shape = at
+        if not at and hint is not None:  # a hinted directory the handoff never names: the whole handoff is its target
+            shape = [i for i, l in enumerate(hl, 1) if l.strip()]
+            task[-1] = "- target-shape: no line of the handoff (%s) names this directory, so the whole handoff, verbatim:" % HANDOFF
+        task += ['  %d: %s' % (i, hl[i - 1]) for i in shape]
         if state == 'parent':
             task.append('- named: %s, no such directory in the lane; this ancestor is audited in its place' % named)
         task += ['- contract-clauses: %s' % ('the rule lines the checked table holds for the decisions on those lines:' if cl else 'none')] + cl
@@ -3756,7 +3815,8 @@ def _steps(lane, run, cut_rows, readings, single, budget, hint, notes, first):
         A = J(run, AUDIT_DIR)
         if not _os.path.isfile(J(A, 'dirs.tsv')):
             go(k, 'no audit/dirs.tsv')
-        _, files, diff = kept(k, [A, J(run, 'table.tsv')], audit_dirs, lane, run, hint)  # made before the table (step 5)
+        _, files, diff = kept(k, [A, J(run, 'table.tsv')], audit_dirs, lane, run, hint,
+                            None if hint is not None else handoff_root(lane))  # made before the table (step 5)
         if diff:
             go(k, 'audit/ is not what audit-dirs writes: %s' % ', '.join(diff))
         ids = [c[0] for c in tsv(J(A, 'dirs.tsv'), 6) if c[0] != '-']
