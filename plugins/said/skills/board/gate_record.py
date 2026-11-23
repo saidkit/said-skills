@@ -7,27 +7,25 @@
   gate_record.py report   --root <lane-root> --record <record>
 
 Line grammar, one kind per line, read by a line parser:
-  store: git <sha> [dirty <sha256>] [sources <sha256>] | store: content <sha256>   first line; the store identity
+  store: tree <sha256> [dirty <sha256>] [sources <sha256>] | store: content <sha256>   first line; the store identity
   source: <lane-relative path>                                  one per file the feature read was briefed with
   gate-recompute: <unit> exit=<n> <PASS|EXPECTED|FAIL> [ids]   rows of the current store (gate_recompute.sh)
   skill-doctor: <file> open-P1=<n> reviewer=<id> [base=<sha>]  rows of the current store (gate_record_row.py)
   feature-review: <row>                                         rows of the current store
   round: n=<k>, store=<identity>, <key>=<value>, ...            one per round, kept across stores
   matrix@<k>: <task> | covers: <c> | rules-applied: <r> | reviewer: <v>   round k's snapshot, kept across stores
-An old first line `head: <sha>` reads as `git <sha>` and is rewritten as `store:` at the next write; `head: none`
-matches no store. Rows of a moved store are dropped at the next write; round and matrix lines never are.
+An old first line `head: <sha>` reads as `git <sha>`, a form no current store has (the record reads gate owed once),
+and is rewritten as `store:` at the next write; `head: none` matches no store. Rows of a moved store are dropped at the next write; round and matrix lines never are.
 
-identity: `git <HEAD sha>` where the physical lane root is in git, else `content <sha256>` over every file under
+identity: `tree <sha256>` where the physical lane root is in git (see identity()), else `content <sha256>` over every file under
   the lane's `SAID.mounts:` (the lane root when `none` or absent), by relative path and bytes, leaving out the
   `SAID.working:` tree, the record itself, `.git` and `__pycache__`; a mount that is a file counts as that file; a
   symlink counts by its target text and is never followed. A mount that is missing, leaves the lane root or lies
   inside the working tree is a lane error.
-sources: where the lane is in git and its SAID.docs-root resolves outside the lane's work tree (a docs companion in
-  a repo of its own), the feature-review writer adds `sources <sha256>` to the store line, a digest over the path and
-  bytes of each `source:` file. Only the feature-review read compares it: a record without it, or with a digest the
+sources: the feature-review writer adds `sources <sha256>` to the store line, a digest over the path and bytes of each
+  `source:` file (feature specs and task logs without debrief's sections, CLAUDE.md by its lane and rules). Only the feature-review read compares it: a record without it, or with a digest the
   files no longer give, reads that read owed, unless the working dir's debrief.md carries its `## Debrief close`
-  footer. At a write, feature-review rows whose sources moved are dropped; the other rows keep to the lane part. A
-  lane whose docs root is inside its work tree never gets the part.
+  footer. At a write, feature-review rows whose sources moved are dropped; the other rows keep to the lane part.
 check: `current` (exit 0); `gate owed` (exit 1) when the record is absent or its store is not the current one
   (an unreadable record is a read error, never overwritten);
   `Inspect owed: <read>, ...` (exit 1) when a named read has no well-formed rows at the current store. Reads:
@@ -193,7 +191,7 @@ def entry(p, phys):
     return "%s\0%s\n" % (os.path.relpath(p, phys), digest)
 
 
-def git_dirty(phys, mounts, skip, own):
+def git_dirty(phys, mounts, skip, own, leave=lambda rel: False):
     """Sorted entries of the mount paths that differ from HEAD (staged, unstaged, untracked, deleted)."""
     spec = [m.strip("`'\"") or "." for m in mounts]
     try:
@@ -213,6 +211,8 @@ def git_dirty(phys, mounts, skip, own):
         real = os.path.realpath(p)
         if real in own or (skip and inside(real, skip)) or not inside(os.path.abspath(p), phys):
             continue
+        if leave(os.path.relpath(os.path.abspath(p), phys)):
+            continue
         if os.path.islink(p) or (os.path.lexists(p) and not os.path.isdir(p)):
             entries.append(entry(p, phys))
         else:
@@ -227,9 +227,84 @@ def digest(entries):
     return h.hexdigest()
 
 
+def without_debrief(data):
+    """The bytes of a feature file without the sections debrief writes: each `## Lessons`, `## Debrief close` and
+    `## Account (<id>)` section, up to the next `## ` heading outside a code fence."""
+    out, drop, fence = [], False, False
+    for ln in data.split(b"\n"):
+        mark = ln.lstrip()[:3]
+        if mark in (b"```", b"~~~") and (not fence or fence == mark):
+            fence = False if fence else mark
+        elif not fence and ln.startswith(b"## "):
+            drop = bool(re.match(rb"## +(Lessons *(\(|\r?$)|Debrief close\b|Account \()", ln, re.I))
+        if not drop:
+            out.append(ln)
+    return b"\n".join(out).rstrip(b"\r\n")
+
+
+def feature_file(phys):
+    """A test on a lane-relative path: True for a feature spec or task log the lane's keys name."""
+    shapes = []
+    for key in ("feature-spec", "task-log"):
+        value = (lane_key(phys, key) or "").strip().strip("`'\"")
+        if value:
+            shapes.append(re.compile("[^/]+".join(re.escape(p) for p in os.path.normpath(value).split("<id>"))))
+    return lambda rel: any(m.fullmatch(rel) for m in shapes)
+
+
+def claude_sections(phys, names, text=None):
+    """The lines of the `## ` sections of the lane CLAUDE.md (or of text) whose heading starts with one of names."""
+    if text is None:
+        try:
+            with open(os.path.join(phys, "CLAUDE.md"), encoding="utf-8-sig", errors="surrogateescape") as fh:
+                text = fh.read()
+        except OSError:
+            return ""
+    out, on = [], False
+    for ln in text.split("\n"):
+        if ln.startswith("## "):
+            on = ln[3:].strip().startswith(names)
+        if on:
+            out.append(ln.rstrip())
+    return "\n".join(out).rstrip()
+
+
+def mount_repo(phys, m):
+    """The mount's physical folder when it is in a git repo other than the lane's, else None."""
+    joined = os.path.join(phys, m)
+    if m in ("", ".") or not os.path.isdir(joined):
+        return None
+    if os.path.islink(joined.rstrip("/")):  # git pathspecs do not pass through a link
+        return os.path.realpath(joined)
+    other, lane_top = git_top(joined), git_top(phys)
+    return os.path.realpath(joined) if other and other != lane_top else None
+
+
+def tree_entries(phys, mounts, skip, own, leave):
+    """One entry per file at HEAD under the lane's own mounts; the working dir and the files in own never count."""
+    spec = [m.strip("`'\"") or "." for m in mounts]
+    r = subprocess.run(["git", "--literal-pathspecs", "-C", phys, "ls-tree", "-r", "-z", "--full-name", "HEAD", "--"] + spec,
+                       capture_output=True)
+    if r.returncode != 0:
+        raise Error("git ls-tree failed in %s" % phys)
+    top, entries = git_top(phys), []
+    for rec in r.stdout.split(b"\0"):
+        if not rec:
+            continue
+        meta, _, name = rec.partition(b"\t")
+        p = os.path.join(top, os.fsdecode(name))
+        real = os.path.join(os.path.realpath(os.path.dirname(p)), os.path.basename(p))
+        if real in own or (skip and inside(real, skip)) or leave(os.path.relpath(real, phys)):
+            continue
+        entries.append("%s\0%s\n" % (os.fsdecode(name), meta.decode("ascii", "replace")))
+    return entries
+
+
 def identity(root, record=None):
-    """The store identity of the lane at root; the record file itself is never part of it. In git it is the HEAD
-    sha, plus `dirty <sha256>` over the changed mount paths when the tree under the mounts differs from HEAD."""
+    """The store identity of the lane at root. In git it is `tree <sha256>` over the files of each `SAID.mounts:` path
+    at HEAD (a linked mount or one that is its own repo by its HEAD tree), the `## Lane` block and CHANGELOG.md, plus
+    `dirty <sha256>` when any of them differs from HEAD. The record, the working dir, feature specs and task logs (the sources part) and any other commit
+    never count."""
     phys = os.path.realpath(os.path.abspath(root))
     sha = git_sha(phys)
     working = (lane_key(phys, "working") or "").strip().strip("`'\"")
@@ -238,8 +313,24 @@ def identity(root, record=None):
     own = {os.path.realpath(record)} if record else set()
     mounts = mount_list(lane_key(phys, "mounts")) or ["."]
     if sha:
-        dirty = git_dirty(phys, mounts, skip, own)
-        return "git %s dirty %s" % (sha, digest(dirty)) if dirty else "git " + sha
+        counted = own | {os.path.join(phys, "CLAUDE.md")}  # the lane block counts, not the whole file
+        leave = feature_file(phys)
+        repos = {m: mount_repo(phys, m.strip("`'\"")) for m in mounts}
+        mine = [m for m in mounts if not repos[m]]
+        shown = subprocess.run(["git", "-C", phys, "show", "HEAD:./CLAUDE.md"], capture_output=True)
+        at_head = claude_sections(phys, ("Lane",), shown.stdout.decode("utf-8-sig", "surrogateescape") if shown.returncode == 0 else "")
+        now = claude_sections(phys, ("Lane",))
+        tree = ["lane\0%s\n" % at_head]
+        dirty = [] if now == at_head else ["lane\0%s\n" % now]
+        own_paths = mine + ["CHANGELOG.md"]  # skill text outside the mounts
+        tree += tree_entries(phys, own_paths, skip, counted, leave)
+        dirty += git_dirty(phys, own_paths, skip, counted, leave)
+        for m, repo in repos.items():
+            if repo:
+                head = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD:./"], capture_output=True, text=True)
+                tree.append("mount\0%s\0%s\n" % (m, head.stdout.strip() if head.returncode == 0 else "no-head"))
+                dirty += ["%s\0%s" % (m, e) for e in git_dirty(repo, ["."], skip, counted)]
+        return "tree %s dirty %s" % (digest(tree), digest(dirty)) if dirty else "tree " + digest(tree)
     entries = []
     for m in mounts:
         m = m.strip("`'\"")
@@ -277,22 +368,22 @@ def git_top(phys):
     return os.path.realpath(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else None
 
 
-def docs_outside(root):
-    """True when the lane is in git and its SAID.docs-root resolves outside the lane's work tree."""
-    phys = os.path.realpath(os.path.abspath(root))
-    top = git_top(phys) if git_sha(phys) else None
-    docs = (lane_key(phys, "docs-root") or "").strip().strip("`'\"")
-    return bool(top and docs) and not inside(os.path.realpath(os.path.join(phys, docs)), top)
-
-
 def sources_digest(root, files):
-    """sha256 over each source file's lane-relative path and bytes; a file that cannot be read counts as missing."""
+    """sha256 over each source file's lane-relative path and bytes: a feature spec or task log without debrief's
+    sections, the lane CLAUDE.md by its `## Lane` and `## Earned rules` sections; an unreadable file counts as missing."""
     phys = os.path.realpath(os.path.abspath(root))
+    is_feature = feature_file(phys)
     entries = []
     for f in files:
         try:
             with open(os.path.join(phys, f), "rb") as fh:
-                h = hashlib.sha256(fh.read()).hexdigest()
+                data = fh.read()
+            rel = os.path.normpath(f)
+            if rel == "CLAUDE.md":
+                data = claude_sections(phys, ("Lane", "Earned rules")).encode("utf-8", "surrogateescape")
+            elif is_feature(rel):
+                data = without_debrief(data)
+            h = hashlib.sha256(data).hexdigest()
         except OSError:
             h = "missing"
         entries.append("%s\0%s\n" % (f, h))
@@ -324,9 +415,9 @@ def closed(path):
 
 
 def sources_current(root, path):
-    """True when the record's sources part holds for the feature-review read: a lane with no docs companion, a
-    closed feature, or a digest its source files still give."""
-    if not docs_outside(root) or closed(path):
+    """True when the record's sources part holds for the feature-review read: a closed feature, or a digest its
+    source files still give."""
+    if closed(path):
         return True
     src, files = load_sources(path)
     return bool(src) and src == sources_digest(root, files)
@@ -380,7 +471,7 @@ def write(path, store, rows, history, sources=None):
 def update(path, root, mutate, expect=None, sources=None):
     """Rewrite the record at the current store: rows of another store dropped, history kept, mutate(rows, history).
     With `expect` (the identity the caller validated its rows at), a store that differs now is Moved: nothing is written.
-    sources (the feature-review writer's briefed files) sets the sources part on a lane with a docs companion; any
+    sources (the feature-review writer's briefed files) sets the sources part; any
     other write keeps the record's part while its files still give it, and else drops it with the feature-review rows."""
     store = identity(root, path)
     if expect is not None and store != expect:
@@ -398,7 +489,7 @@ def update(path, root, mutate, expect=None, sources=None):
                 rows = [ln for ln in rows if not ln.startswith("feature-review: ")]
     rows, history = mutate(store, rows, history)
     if sources is not None:
-        src = (sources_digest(root, list(sources)), list(sources)) if docs_outside(root) else None
+        src = (sources_digest(root, list(sources)), list(sources))
     elif not any(ln.startswith("feature-review: ") for ln in rows):
         src = None
     write(path, store, rows, history, src)
@@ -459,7 +550,7 @@ def check(root, path, reads, ident=None):
         elif r == "feature-review":
             mine = [ln for ln in rows if ln.startswith("feature-review: ")]
             sound = feature_review_problem(mine, fr_doc_lane(root)) is None  # a hand-edited or inconsistent set is never current
-            fresh = sources_current(root, path)  # a moved docs companion owes the read again
+            fresh = sources_current(root, path)  # a moved spec, log or rule owes the read again
             ok = sound and fresh and mine[0].startswith("feature-review: verdict | PASS | ")  # a FAIL verdict is owed until its rows are fixed
             if sound and fresh and not ok:
                 r = "feature-review FAIL"  # its own owed line: the FAIL rows go to tasks, the reviewer is not rerun

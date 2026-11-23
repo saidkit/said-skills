@@ -23,7 +23,7 @@ first words of any other file (a ledger), fenced lines skipped; a missing one is
 there, cannot be read or holds a malformed ruling line an error. It prints the rows
 it wrote. Exit 0 written, 1 refused (the validator's owed lines are printed, nothing written), 2 missing arguments or
 a record, lane or validator error (`error: <why>`, nothing written). --sources (the lane-relative files the read was
-briefed with, given by review_feature.py) sets the store's sources part on a lane with a docs companion.
+briefed with, given by review_feature.py) sets the store's sources part.
 """
 import argparse, os, re, sys
 

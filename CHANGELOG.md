@@ -2,6 +2,10 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [Unreleased]
+
+- **Upgrade note:** the gate record's store identity is now a hash of the declared mounts at HEAD and the `## Lane` block, so every existing record reads `gate owed` once after the upgrade: each open feature runs one gate recompute and one feature read.
+
 ## [0.28.2] - 2026-11-23
 
 - **Fixed:** `board/cite_check.py` `resolve()` refuses an absolute path or a path with a `..` part on its own, before any file test, so a caller that skips the `inside()` check cannot name a file outside the lane. Before, only its callers held that check.

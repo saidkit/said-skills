@@ -329,7 +329,7 @@ def feature_review_failed(root, workdir, fid):
         rec = gate_record.load(path)
         if rec is None or rec[0] is None or rec[0] != gate_record.identity(root, path):
             return False
-        if not gate_record.sources_current(root, path):  # a moved docs companion owes the read, not the FAIL's tasks
+        if not gate_record.sources_current(root, path):  # a moved source owes the read, not the FAIL's tasks
             return False
         return any(ln.startswith("feature-review: verdict | FAIL |") for ln in rec[1])
     except Exception:  # an unreadable record or an identity error is not a FAIL; the gates report it
@@ -2046,7 +2046,8 @@ def feature_review_output(root, workdir, feature, decisions=()):
     except gate_record.Error as e:
         return 2, ["error: %s" % e]
     toks = ident.split()
-    sha = toks[1] if len(toks) > 1 else ""
+    head_sha = gate_record.git_sha(os.path.realpath(os.path.abspath(root)))
+    sha = head_sha or (toks[1] if len(toks) > 1 else "")  # the verdict names a commit, the store does not
     try:
         real = os.path.realpath(path)
         if not real.startswith(os.path.realpath(workdir) + os.sep):
@@ -2061,7 +2062,7 @@ def feature_review_output(root, workdir, feature, decisions=()):
     except (OSError, UnicodeError):
         return _fr_owed("no readable %s in the working dir" % name)
     wd = os.path.realpath(workdir)
-    dirty = (lambda: len(gate_record.git_dirty(root, ["."], wd, set()))) if toks and toks[0] == "git" else (lambda: 0)
+    dirty = (lambda: len(gate_record.git_dirty(root, ["."], wd, set()))) if head_sha else (lambda: 0)
     try:
         import cite_check  # the one cite check, shared with the scope chain
         dirs = _fr_cite_dirs(root, feature)  # a bare file name resolves in the feature's own folders

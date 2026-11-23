@@ -86,10 +86,10 @@ def owed(root, record, base):
     if rec is None:
         return ["gate owed: no record", "skill-doctor: owed, no record"], 1
     store, rows, _ = rec
-    m = re.fullmatch(r"git ([0-9a-f]{40})( dirty [0-9a-f]{64})?", store or "")
+    m = re.fullmatch(r"(?:git ([0-9a-f]{40})|tree [0-9a-f]{64})( dirty [0-9a-f]{64})?", store or "")
     if not m:
         raise Error("the record's store %r is not a git store" % store)
-    tip, task_base = m.group(1), resolve(root, base)
+    tip, task_base = m.group(1) or resolve(root, "HEAD"), resolve(root, base)  # a tree store names no commit
     files = owed_files(root, task_base, tip)
     have = rows_by_file(rows)
     out = []
