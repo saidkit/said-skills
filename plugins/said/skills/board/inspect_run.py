@@ -2,8 +2,8 @@
 """The feature-level Inspect in one command, outside the driving session: the cold read, the gate recompute, the
 Covers read, the round and the sign-off, every write through the bundled scripts.
 
-  inspect_run.py <feature-id> --root <lane-root> [--base <rev>] [--capture-ref <file|none>] [--ledger <file>]...
-                 [--yes <token>]
+  inspect_run.py <feature-id> --root <lane-root> [--base <rev>] [--mount-base <mount>=<rev>]...
+                 [--capture-ref <file|none>] [--ledger <file>]... [--yes <token>]
 
 Steps, in order, one run per lane at a time (a second run while one holds the lane is refused; the lock is a file in
 the lane's git dir, never in the tree). A --ledger, a SAID path key outside the lane root, a missing ledger, spec or
@@ -72,20 +72,23 @@ def round_verdict(root, working, fid):
 
 def parse(argv):
     if not argv or argv[0].startswith("-"):
-        raise Halt("usage: inspect_run.py <feature-id> --root <lane-root> [--base <rev>] [--capture-ref <file|none>]"
-                   " [--ledger <file>]... [--yes <token>]")
-    fid, opts, ledgers, i = review_feature.feature_id(argv[0]), {}, [], 1
+        raise Halt("usage: inspect_run.py <feature-id> --root <lane-root> [--base <rev>] [--mount-base <mount>=<rev>]..."
+                   " [--capture-ref <file|none>] [--ledger <file>]... [--yes <token>]")
+    fid, opts, ledgers, i = review_feature.feature_id(argv[0]), {"mount-base": []}, [], 1
     while i < len(argv):
         k = argv[i]
-        if i + 1 >= len(argv) or k not in ("--root", "--base", "--capture-ref", "--ledger", "--yes"):
+        if i + 1 >= len(argv) or k not in ("--root", "--base", "--mount-base", "--capture-ref", "--ledger", "--yes"):
             raise Halt("unknown or incomplete option %s" % k)
         if k == "--ledger":
             ledgers.append(argv[i + 1])
+        elif k == "--mount-base":
+            opts["mount-base"].append(argv[i + 1])
         else:
             opts[k[2:]] = argv[i + 1]
         i += 2
     opts["root"] = review_feature.lane_root(opts.get("root"))
     opts["ledgers"] = review_feature.ledgers(opts["root"], ledgers)
+    opts["mount-base"] = review_feature.mount_bases(opts["mount-base"])
     return fid, opts
 
 
@@ -110,12 +113,12 @@ def git(root, *args):
 
 def feature_review(fid, opts, root):
     """Run the read when it is owed and the yes matches; print what was done. Never raises on a reader failure."""
-    p = review_feature.prepare(fid, root, opts.get("base"), opts.get("capture-ref"), opts["ledgers"])
+    p = review_feature.prepare(fid, root, opts.get("base"), opts.get("capture-ref"), opts["ledgers"], opts["mount-base"])
     if p["state"] != "ready":
         print("feature-review: %s" % (p["why"] if p["state"] != "owed" else "owed (%s)" % p["why"]))
         return
     dirty = hashlib.sha256((git(root, "status", "--porcelain", "-z") or "").encode("utf-8")).hexdigest()
-    token = hashlib.sha256(("%s|%s|%s|%s|%d" % (root, p["head"], p["base"], dirty, p["tokens"])).encode("utf-8")).hexdigest()[:10]
+    token = hashlib.sha256(("%s|%s|%s|%s|%d" % (root, p["head"], p["base"] + p["mounts"], dirty, p["tokens"])).encode("utf-8")).hexdigest()[:10]
     print("estimate: at least %d input tokens (%d characters read once, divided by 4); every reader turn re-sends"
           " what it has read, so the spend is several times that" % (p["tokens"], p["chars"]))
     print("yes token: %s" % token)

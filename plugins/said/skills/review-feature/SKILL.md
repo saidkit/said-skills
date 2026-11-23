@@ -22,14 +22,16 @@ description: >
 
 ## When this fires
 
-- `/said:review-feature <feature-id> --base <rev> --capture-ref <file|none> [--ledger <file>]... [--root <lane-root>]`
-  - `--base`: the feature's base commit. `--capture-ref`: a non-empty capture file in the feature's `SAID.working:` dir, named relative to it, never the gate record; on a feature with no capture, the literal `none` (the reader then writes its Captures group as `none`).
+- `/said:review-feature <feature-id> --base <rev> [--mount-base <mount>=<rev>]... --capture-ref <file|none> [--ledger <file>]... [--root <lane-root>]`
+  - `--base`: the feature's base commit.
+  - `--mount-base`: the base of a declared mount that is its own git repo, one per such mount; without it `--base` is used when that commit is in the mount repo, else the read is owed. A `--base` found only in a mount repo reads no lane diff, and the brief says so with a `lane diff: none` line.
+  - `--capture-ref`: a non-empty capture file in the feature's `SAID.working:` dir, named relative to it, never the gate record; on a feature with no capture, the literal `none` (the reader then writes its Captures group as `none`).
   - `--ledger`: one per ledger file the spec cites under `## Context to load`; the script adds the working dir's `rulings.md` and `scope.md` itself when they exist.
   - `--root`: the lane root, the directory whose `CLAUDE.md` holds the lane's `## Lane` block; default the current lane's.
 
 ## Step 1 - Prepare
 
-Run `python3 ${CLAUDE_SKILL_DIR}/review_feature.py prepare <feature-id> --root <lane-root> --base <rev> --capture-ref <file|none> [--ledger <file>]...`. Route on its first line:
+Run `python3 ${CLAUDE_SKILL_DIR}/review_feature.py prepare <feature-id> --root <lane-root> --base <rev> [--mount-base <mount>=<rev>]... --capture-ref <file|none> [--ledger <file>]...`. Route on its first line:
 
 - `review-feature: current` -> end with `review-feature: current`.
 - `review-feature: FAIL recorded (not read again)` -> end with `review-feature: FAIL`.
@@ -61,7 +63,7 @@ The last line of every run is one of:
 
 ## Headless form
 
-`python3 ${CLAUDE_SKILL_DIR}/../board/inspect_run.py <id> --root <lane-root> --base <rev> --capture-ref <file|none> --ledger <file>... [--yes <token>]` runs the same `prepare` and `file` code with the reader headless, then the gate recompute over every unit, the Covers read and the round. It runs the read only with `--yes <token>`, the token of the estimate it prints, passed on the operator's yes to that estimate, never on a grant; it refuses (exit 3) while another run holds the lane.
+`python3 ${CLAUDE_SKILL_DIR}/../board/inspect_run.py <id> --root <lane-root> --base <rev> [--mount-base <mount>=<rev>]... --capture-ref <file|none> --ledger <file>... [--yes <token>]` runs the same `prepare` and `file` code with the reader headless, then the gate recompute over every unit, the Covers read and the round. It runs the read only with `--yes <token>`, the token of the estimate it prints, passed on the operator's yes to that estimate, never on a grant; it refuses (exit 3) while another run holds the lane.
 
 ## Anti-patterns
 
