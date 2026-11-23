@@ -6,8 +6,9 @@ A cite is `<path>:<line>` or `<path>:<line>-<line>`, the path relative to the la
 has a `..` part is outside the lane; the test is on the text of the path, so a link inside the lane is followed.
 The cite holds when the file is there and every line it names exists. A caller may pass dirs, lane-relative
 folders: a bare file name (no /) that is not a file at the lane root then names the one file of that name in them,
-and with none or two such files it is no such file. A quote is the words in double quotes
-directly after the cite; it holds when, whitespace folded, the words stand on the cited line (on one of the lines of
+and with none or two such files it is no such file; one file reached by two spellings or through a link counts
+once. A quote is the words in double quotes directly after the cite; it holds when, whitespace folded, the words stand
+on the cited line (on one of the lines of
 a range), read as written or with each ' read as ", and also when they stand there with the markdown emphasis
 markers dropped from both the line and the words: a pair of ** or * around text, or of backticks, is unwrapped
 to the text inside it. A lone * or backtick is text and stays; nothing else is dropped.

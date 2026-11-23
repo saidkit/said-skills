@@ -6,7 +6,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 - **Fixed:** `board/cite_check.py` `resolve()` refuses an absolute path or a path with a `..` part on its own, before any file test, so a caller that skips the `inside()` check cannot name a file outside the lane. Before, only its callers held that check.
 - **Fixed:** `agents/feature-reviewer.md` points at the example path in its cite paragraph. Before, it pointed at a worked example the file does not have.
-- **Fixed:** `review-qa`'s `covers-read.py` resolves a bare file name in a `**Covers:**` anchor (`PROJ-01.md#<heading>`) through the shared cite check, in the folders the feature review uses: a file at the lane root first, else the one file of that name in `--working`, the `SAID.feature-spec:` dir or a `SAID.mounts:` folder; no match or two matches read `missing`, and a `..` or absolute path is read as before. Before, a bare spec name read `missing`, so one id passed `review-feature` and failed `review-qa`.
+- **Fixed:** `review-qa`'s `covers-read.py` resolves a bare file name in a `**Covers:**` anchor (`PROJ-01.md#<heading>`) through the shared cite check: a file at the lane root first, else, when `--working` is given, the one file of that name in it, the `SAID.feature-spec:` dir or a `SAID.mounts:` folder; none or two read `missing`, one file reached by two spellings or a link counts once (in the feature review too, where it read `no such file`), and a `..` or absolute path is read as before. Before, a bare spec name read `missing`, so one id passed `review-feature` and failed `review-qa`.
 
 ## [0.28.1] - 2026-11-23
 

@@ -16,8 +16,9 @@ before its first `### ` heading; its ids are separated by `, ` (`none` names non
                       fragment. A file at the root shadows a same-named file in --working. A bare file name not at
                       the root names the one file of that name in --working, the `SAID.feature-spec:` folder (direct
                       children) or a `SAID.mounts:` folder (any depth); with none or two it is `missing`.
-                      Without --working no extra folder is searched. The id is `outside` when no file inside the root
-                      is found and a candidate leaves it
+                      Without --working none of these folders is searched, so a bare name that is not a file at the
+                      root is `missing`. The id is `outside` when no file inside the root is found and a candidate
+                      leaves it
 A store whose flag is not given leaves its ids `unchecked`; a given --rulings file that does not exist makes
 every ruling id `missing`. A bare `R-` id, a control character or a space inside an id is `malformed`.
 Output, one line each, every text shown as printable ASCII and capped:
