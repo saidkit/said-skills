@@ -10,7 +10,8 @@ prepare reads the record (`gate_record.py check --reads feature-review`) and pri
   review-feature: current                  the record holds the read's rows at this store; nothing to read
   review-feature: FAIL recorded            the recorded verdict is FAIL; it is not read again
   review-feature: owed (no read: <why>)    the read is owed and cannot run (no --base, no HEAD, no capture file,
-                                           or the capture reference names the gate record)
+                                           the capture reference names the gate record, or a second record-class
+                                           FAIL on this store waits for the operator)
   review-feature: ready                    then `out: <verdict file>`, `estimate: ...` and the brief between the
                                            lines `--- brief` and `--- end`
 Exit 0 ready, 1 any other state, 2 an input error (`error: <why>`). The capture reference is a non-empty file in the
@@ -180,6 +181,10 @@ def prepare(fid, root, base, ref, spec_ledgers, mount_bases=None):
         return {"state": "current", "why": "current"}
     if line == "Inspect owed: feature-review FAIL":
         return {"state": "FAIL", "why": "verdict FAIL, not read again"}
+    held = gate_record.load(record)
+    if held and held[0] == gate_record.identity(root, record) and gate_record.record_fails(held[1]) >= 2 \
+            and gate_record.fr_record_only(held[1]) and gate_record.sources_current(root, record):  # a repair reads again
+        return {"state": "owed", "why": "no read: a record-class FAIL came back on this store: it goes to the operator, no new task"}
     if not base:
         return {"state": "owed", "why": "no read: --base <rev> names the feature's base commit"}
     head = (git(root, "rev-parse", "HEAD") or "").strip()

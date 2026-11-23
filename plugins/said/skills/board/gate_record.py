@@ -12,6 +12,7 @@ Line grammar, one kind per line, read by a line parser:
   gate-recompute: <unit> exit=<n> <PASS|EXPECTED|FAIL> [ids]   rows of the current store (gate_recompute.sh)
   skill-doctor: <file> open-P1=<n> reviewer=<id> [base=<sha>]  rows of the current store (gate_record_row.py)
   feature-review: <row>                                         rows of the current store
+  record-fail: <n>                                              reads with a record-class FAIL row at this store
   round: n=<k>, store=<identity>, <key>=<value>, ...            one per round, kept across stores
   matrix@<k>: <task> | covers: <c> | rules-applied: <r> | reviewer: <v>   round k's snapshot, kept across stores
 An old first line `head: <sha>` reads as `git <sha>`, a form no current store has (the record reads gate owed once),
@@ -51,7 +52,8 @@ import tempfile
 import unicodedata
 
 sys.dont_write_bytecode = True
-ROW_KINDS = ("gate-recompute: ", "skill-doctor: ", "feature-review: ")
+ROW_KINDS = ("gate-recompute: ", "skill-doctor: ", "feature-review: ", "record-fail: ")
+FR_RECORD = "record: "  # the evidence prefix of a FAIL row whose cites sit in the task log only
 ROUND_KEYS = ("decisions", "leaks", "look", "operator-min", "rework-min", "elapsed-min", "tokens")
 READS = ("gate-recompute", "matrix", "feature-review")
 STATUSES = ("PASS", "EXPECTED", "FAIL")
@@ -83,6 +85,31 @@ def fr_doc_lane(root):
     """True when the lane's `SAID.surface:` is doc: its verdict is review-doc-editorial-<id>.md with seven groups."""
     import said_status  # the engine's one lane-block reader; lazy: said_status imports this module
     return (said_status.lane_block_key(root, "surface") or "").strip().strip("`'\"") == "doc"
+
+
+def fr_class_rows(rows):
+    """The ids of the record-class FAIL rows among feature-review rows."""
+    out = []
+    for ln in rows:
+        cells = ln[len("feature-review: "):].split(" | ") if ln.startswith("feature-review: ") else []
+        if len(cells) == 4 and cells[0] != "verdict" and cells[2] == "FAIL" and cells[3].startswith(FR_RECORD):
+            out.append(cells[1])
+    return out
+
+
+def fr_record_only(rows):
+    """True when the feature-review rows hold a FAIL and every FAIL row is of the record class."""
+    fails = [ln for ln in rows if ln.startswith("feature-review: ") and " | FAIL | " in ln
+             and not ln.startswith("feature-review: verdict")]
+    return bool(fails) and len(fr_class_rows(fails)) == len(fails)
+
+
+def record_fails(rows):
+    """The count on the record's `record-fail:` row, 0 without one."""
+    for ln in rows:
+        if ln.startswith("record-fail: ") and ln[len("record-fail: "):].isdigit():
+            return int(ln[len("record-fail: "):])
+    return 0
 
 
 def feature_review_problem(lines, doc=False):
@@ -552,7 +579,7 @@ def check(root, path, reads, ident=None):
             sound = feature_review_problem(mine, fr_doc_lane(root)) is None  # a hand-edited or inconsistent set is never current
             fresh = sources_current(root, path)  # a moved spec, log or rule owes the read again
             ok = sound and fresh and mine[0].startswith("feature-review: verdict | PASS | ")  # a FAIL verdict is owed until its rows are fixed
-            if sound and fresh and not ok:
+            if sound and fresh and not ok and not fr_record_only(mine):
                 r = "feature-review FAIL"  # its own owed line: the FAIL rows go to tasks, the reviewer is not rerun
         else:
             rounds = [round_fields(ln) for ln in history if ln.startswith("round: ")]
@@ -621,7 +648,7 @@ def report(root, path):
     if moved:
         st = stale
     elif "feature-review FAIL" in named:
-        st = "owed: verdict FAIL, each FAIL row goes to a new task"
+        st = "owed: verdict FAIL, each FAIL row without `record:` goes to a new task"
     elif "feature-review" in named:
         st = "owed"
     else:

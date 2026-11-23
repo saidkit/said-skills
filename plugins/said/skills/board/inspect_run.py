@@ -138,6 +138,9 @@ def feature_review(fid, opts, root):
         print("feature-review: the read did not run (%s)" % e.__class__.__name__)
     code, lines = review_feature.file_reply(fid, root, reply, opts["ledgers"])
     print("feature-review: %s" % (lines[1] if len(lines) > 1 else lines[0]))  # the writer's first line, else why not filed
+    for ln in lines:
+        if ln.startswith("record-class: "):
+            print("feature-review: %s" % ln)
     if code and lines[0].startswith("not filed"):  # a refused reply is kept outside the lane, never at the verdict path
         print("feature-review: the refused reply is kept at %s" % review_feature.keep_refused(fid, reply))
 

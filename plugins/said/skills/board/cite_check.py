@@ -143,6 +143,17 @@ def text_faults(lane, text, dirs=()):
     return out
 
 
+def text_paths(lane, text, dirs=()):
+    """The lane-relative file of each cite in the text, in text order; None for a cite that names no file."""
+    out = []
+    for m in IN_TEXT.finditer(text):
+        path = m.group(1)
+        if not re.search(r'[A-Za-z]', path) or ('/' not in path and (len(m.group(2)) >= 4 or not re.search(r'\.[A-Za-z]\w*$', path))):
+            continue
+        out.append(resolve(lane, path, dirs) if inside(path) else None)
+    return out
+
+
 def main(argv):
     lane, files, i = None, [], 0
     while i < len(argv):

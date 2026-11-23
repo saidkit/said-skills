@@ -331,7 +331,8 @@ def feature_review_failed(root, workdir, fid):
             return False
         if not gate_record.sources_current(root, path):  # a moved source owes the read, not the FAIL's tasks
             return False
-        return any(ln.startswith("feature-review: verdict | FAIL |") for ln in rec[1])
+        return any(ln.startswith("feature-review: verdict | FAIL |") for ln in rec[1]) \
+            and not gate_record.fr_record_only(rec[1])  # a record-class FAIL opens no task
     except Exception:  # an unreadable record or an identity error is not a FAIL; the gates report it
         return False
 
@@ -377,7 +378,7 @@ def _fr_doc_lane(root):
 def next_action(fid, phase, workdir, gates, sub, doc=False, fr_owed=False):
     workdir = os.path.normpath(workdir)
     if sub == "feature review FAIL":  # doc: the lane kind, so the action names the verdict that lane writes
-        return "/said:add-task %s (one task per FAIL row of %s-%s.md)" % (fid, "review-doc-editorial" if doc else "review-feature", fid)
+        return "/said:add-task %s (one task per FAIL row of %s-%s.md without `record:` in the gate record)" % (fid, "review-doc-editorial" if doc else "review-feature", fid)
     if phase == "Scope":
         return "/said:scope-refine %s" % workdir if sub == "scope pending" else "/said:scope-grill %s" % fid
     if phase == "Act":
@@ -1968,13 +1969,13 @@ def _fr_owed(why):
 
 
 def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decision_ids=(), dirty=lambda: 0, doc=False,
-                         cites=None, record_path=""):
+                         cites=None, record_path="", record_cite=None):
     """(rc, lines) of a verdict text with no file or git read of its own: parse it against the head sha, then
     `dirty()` (the count of uncommitted files outside the working dir), a row per rule id and a Covers or Uncovered
     decisions row per decision id; rc 0 and the row lines, or rc 1 and the owed lines. cites(cell text) gives the
-    failing cites of a row as [(cite, why)]: such a row is written FAIL with its cites in the evidence cell, never
-    dropped, and the verdict follows the rows. feature_review_output reads the file, the store and the records, then
-    calls this."""
+    failing cites of a row as [(cite, why)]: on a row the reader did not mark FAIL they refuse the reply; on a FAIL row
+    they go in its evidence cell. record_cite(evidence) is True when every cite sits in the task log: the FAIL row is
+    then the record class. feature_review_output reads the file, the store and the records, then calls this."""
     import gate_record
     try:
         verdict, rows = _fr_parse(text, sha, workdir, verdict_path, doc, record_path)
@@ -1992,7 +1993,12 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
     except FeatureReviewRefused as e:
         return _fr_owed(e)
     if cites:
-        rows = [(g, _fr_cite_row(g, c, cites(" | ".join(c[:-1])))) for g, c in rows]
+        checked = [(g, c, cites(" | ".join(c[:-1]))) for g, c in rows]
+        bad = ["%s %s %s" % (_fr_clean(c[0], 40), x, why) for _, c, faults in checked if c[-1] != "FAIL" for x, why in faults]
+        if bad:
+            return _fr_owed("cite fault: " + "; ".join(bad[:6]) + ("; and %d more" % (len(bad) - 6) if len(bad) > 6 else ""))
+        rows = [(g, _fr_class_row(g, _fr_cite_row(g, c, faults),
+                                  bool(record_cite and not faults and record_cite(" | ".join(c[:-1]))))) for g, c, faults in checked]
         verdict = "FAIL" if any(c[-1] == "FAIL" for _, c in rows) else verdict
     out = ["feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ"))]
     for group, _cols in gate_record.fr_groups(doc):
@@ -2019,6 +2025,19 @@ def _fr_cite_row(group, cells, faults):
     tail = lambda c: c if len(c) <= 40 else "..." + c[-37:]  # the row cell is cut at 80: keep the cite's end
     out[_fr_evidence_at(group, cells)] = "cite " + "; ".join("%s %s" % (tail(c), why) for c, why in faults)
     out[-1] = "FAIL"
+    return out
+
+
+def _fr_class_row(group, cells, in_record):
+    """A FAIL row whose cites all hold and sit in the task log carries the record prefix; a typed prefix never counts."""
+    import gate_record
+    if cells[-1] != "FAIL":
+        return cells
+    at, out = _fr_evidence_at(group, cells), list(cells)
+    if _fr_clean(out[at], 80).strip().lower().startswith("record:"):  # as the row will show it
+        out[at] = "evidence " + _fr_clean(out[at], 80).strip()
+    if in_record:
+        out[at] = gate_record.FR_RECORD + out[at]
     return out
 
 
@@ -2066,8 +2085,16 @@ def feature_review_output(root, workdir, feature, decisions=()):
     try:
         import cite_check  # the one cite check, shared with the scope chain
         dirs = _fr_cite_dirs(root, feature)  # a bare file name resolves in the feature's own folders
+        log = (gate_record.lane_key(root, "task-log") or "").strip().strip("`'\"").replace("<id>", feature)
+        log = os.path.realpath(os.path.join(root, log)) if log else None
+
+        def in_log(ev):
+            hits = cite_check.text_paths(root, ev, dirs)
+            return bool(log and hits) and all(h and os.path.realpath(os.path.join(root, h)) == log for h in hits)
+
         return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc,
-                                    lambda cell: cite_check.text_faults(root, cell, dirs), os.path.join(workdir, "gate-%s.md" % feature))
+                                    lambda cell: cite_check.text_faults(root, cell, dirs),
+                                    os.path.join(workdir, "gate-%s.md" % feature), in_log)
     except gate_record.Error as e:
         return 2, ["error: %s" % e]
 

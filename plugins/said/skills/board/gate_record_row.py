@@ -120,11 +120,21 @@ if a.base:  # the review's base, and with --task-base the owed set and the base 
         sys.exit(2)
 
 mine = "skill-doctor: %s " % a.file if not fr else ""
+klass = gate_record.fr_class_rows(new_rows) if fr else []
+seen_class = 0
 
 
 def mutate(store, rows, history):
     if fr:
-        return [l for l in rows if not l.startswith("feature-review: ")] + new_rows, history
+        global seen_class
+        held = [l for l in rows if l.startswith("feature-review: ")]
+        kept = [l for l in rows if not l.startswith(("feature-review: ", "record-fail: "))]
+        if klass:  # the same rows again are a retried write, not a new read
+            seen_class = gate_record.record_fails(rows) + (held != new_rows)
+            kept.append("record-fail: %d" % seen_class)
+        elif not any(l.startswith("feature-review: verdict | PASS") for l in new_rows) and gate_record.record_fails(rows):
+            kept.append("record-fail: %d" % gate_record.record_fails(rows))
+        return kept + new_rows, history
     rows = [l for l in rows if not l.startswith(mine)]
     tail = " base=%s" % a.base if a.base else ""
     return rows + ["skill-doctor: %s open-P1=%s reviewer=%s%s" % (a.file, a.open_p1, a.reviewer, tail)], history
@@ -141,3 +151,5 @@ except (gate_record.Error, OSError) as e:
     sys.exit(2)
 if fr:
     print("\n".join(new_rows))
+    if klass:
+        print("record-class: %d row(s) (%s), FAIL reads on this store: %d" % (len(klass), ", ".join(klass), seen_class))
