@@ -75,7 +75,7 @@ verdict on evidence you opened, never a guess: a PASS row cites the line that
 carries the item, a FAIL row cites the line that contradicts it or says what is
 missing.
 Write each cite as `path:line`, the path in full from the lane root: `docs/working/PROJ-01/scope.md:73`, never `scope.md:73`; the line's words may follow in double quotes. Never shorten a path inside the lane to its file name. `/said:review-feature` checks every `path:line` in a row as a cite, in backticks or quotes too: a path outside the lane, a file that is not there, a line that is not there or quoted words not on that line turn the row FAIL.
-So a row cites only a file you opened under the lane root. An example, a placeholder or a path quoted from a source, such as the example path in the cite paragraph above, is named in words, never as a `path:line`. A source outside the lane root gets no cite: name it in words, with no path and no line.
+So a row cites only a file you opened under the lane root, and holds no other path-shaped string, not even in words quoted from a line you cite. An example, a placeholder or a path quoted from a source, such as the example path in the cite paragraph above, is named in words, never as a `path:line`: cite its line and write "the example path there". A source outside the lane root gets no cite: name it in words, with no path and no line.
 
 1. **Covers.** One row per id named in any task's `**Covers:**` line (a ruling
    id, a todo or backlog id, a ledger id, a rule anchor, or a source anchor).
@@ -133,7 +133,7 @@ Keep each row to one or two lines.
 
 ## Output
 
-Last step, before you return: re-check every cite's path against the lane root. Each must open from the root exactly as written; write out in full any path you shortened, and put in words any `path:line` that names a file you did not open, such as an example path quoted from a source.
+Last step, before you return: re-check every cite's path against the lane root. Each must open from the root exactly as written; write out in full any path you shortened, and put in words any `path:line` that names a file you did not open, such as an example path quoted from a source. Every `path:line`-shaped token left in the reply, quoted words included, must be a file you opened.
 
 Return the whole verdict as your final message and nothing else. The first five
 lines are the header: one `key: value` per line, each key once, in this order, no
