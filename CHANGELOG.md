@@ -4,7 +4,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
-- **Upgrade note:** the gate record's store identity is now a hash of the declared mounts at HEAD and the `## Lane` block, so every existing record reads `gate owed` once after the upgrade: each open feature runs one gate recompute and one feature read.
+- **Upgrade note:** the gate record's store identity is now a hash of the declared mounts at HEAD, the `## Lane` block and this file, and a feature's spec or task log moves only the feature read, so every existing record reads `gate owed` once after the upgrade: each open feature runs one gate recompute and one feature read.
 
 ## [0.28.2] - 2026-11-23
 
