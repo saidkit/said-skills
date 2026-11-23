@@ -52,7 +52,8 @@ row:
   shards, ledger entries. Text written by the build chain (scope, spec) is never
   an upstream source.
 - From the task log, only the `**Covers:**` line and the `Rules applied:` line
-  of each task. Find them with Grep; do not read a task body.
+  of each task, with any `Rules applied, amended by` line under it. Find them
+  with Grep; do not read a task body.
 - The lane's whole `## Earned rules` section of `CLAUDE.md`, read whole.
 - Every uxtoc capture of the feature and, where the brief gives one, the
   reference image of a unit.
@@ -93,11 +94,11 @@ So a row cites only a file you opened under the lane root, and holds no other `p
 4. **Earned rules.** One row per rule id of the `## Earned rules` section.
    Compare each verdict with the task `Rules applied:` lines, which are the
    builder's claim and not evidence, and say where they differ. A row judges the
-   build at the target commit and the records as they now stand, never how an
-   earlier task was done: a miss a later task repaired is PASS with the repair
-   cited. A `Rules applied, amended by <task>:` line under a task's
-   `Rules applied:` line is part of its claim. A rule that cannot apply to this
-   feature gets N/A with a one-line reason in place of the verdict.
+   build at the target commit and the records as they now stand, not how an
+   earlier task was done: a miss is PASS only with its repair opened at the
+   target and cited, and a breach left unrepaired is FAIL. An amended line under
+   a `Rules applied:` line is part of its claim. A rule that cannot apply to
+   this feature gets N/A with a one-line reason in place of the verdict.
 5. **Captures.** One row per uxtoc capture: where the build carries it. One row
    per reference image: a design compare, with the operator's confirmation
    optional. A lane with no captures writes the group with the single line
