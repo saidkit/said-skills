@@ -9,7 +9,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 - **Changed:** a feature-reviewer PASS reply with a failing cite is refused and re-spawned once, never written as a FAIL. A FAIL whose cites all sit in the task log is written as a `record:` row and opens no task; the second on one store goes to the operator.
 - **Changed:** a Checker is oracle-kind by its resolved meta, agent or recipe form; one with no verdict file is recomputed.
 - **Changed:** the feature read and the Covers read share one inside rule, by declared route.
-- **Changed:** the `scope-refine` audit follows a declared mount that is a link, a bare mount token audits the mount, and a handoff with no named hint still yields a target shape.
+- **Changed:** the `scope-refine` audit follows a declared mount that is a link, a bare mount token audits the mount, and a hinted directory no handoff line names takes the whole handoff as its target shape.
 
 ## [0.28.2] - 2026-11-23
 
