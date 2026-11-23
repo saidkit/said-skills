@@ -1943,8 +1943,8 @@ def _fr_workdir_ok(root, workdir, feature):
 
 
 def _fr_cite_dirs(root, feature):
-    """The lane-relative folders a bare file name in a row's cite resolves in: the feature's `SAID.working:` dir and
-    the dir of its `SAID.feature-spec:`, each when declared and inside the lane."""
+    """The lane-relative folders a bare file name in a row's cite resolves in: the feature's `SAID.working:` dir, the
+    dir of its `SAID.feature-spec:` and each `SAID.mounts:` folder, each when declared and inside the lane."""
     import gate_record
     import cite_check
     out = []
@@ -1955,6 +1955,10 @@ def _fr_cite_dirs(root, feature):
         value = (os.path.dirname(value) if key == "feature-spec" else value).strip("/")
         if value and cite_check.inside(value):
             out.append(value)
+    for m in gate_record.mount_list(gate_record.lane_key(root, "mounts")):  # the list read whole; none adds nothing
+        m = m.strip("`'\"").strip("/")
+        if m and cite_check.inside(m):
+            out.append(m)
     return tuple(out)
 
 
