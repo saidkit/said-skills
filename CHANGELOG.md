@@ -4,7 +4,11 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
-- **Upgrade note:** the gate record's store identity is now a hash of the declared mounts at HEAD, the `## Lane` block and this file, and a feature's spec or task log moves only the feature read, so every existing record reads `gate owed` once after the upgrade: each open feature runs one gate recompute and one feature read.
+- **Upgrade note:** the gate record's store identity is now a hash of the declared mounts at HEAD, the `## Lane` block and this file, and a feature's spec or task log moves only the feature read, so every existing record reads `gate owed` once after the upgrade: each open feature runs one gate recompute, one feature read and its skill-doctor rows again.
+- **Added:** `review-feature --mount-base <mount>=<rev>`: the read diffs each declared mount that is its own git repo.
+- **Changed:** a feature-reviewer PASS reply with a failing cite is refused and re-spawned once, never written as a FAIL. A FAIL whose cites all sit in the task log is written as a `record:` row and opens no task; the second on one store goes to the operator.
+- **Changed:** a Checker is oracle-kind by its resolved meta, agent or recipe form; one with no verdict file is recomputed.
+- **Changed:** the feature read and the Covers read share one inside rule, by declared route.
 
 ## [0.28.2] - 2026-11-23
 

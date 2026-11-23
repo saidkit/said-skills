@@ -60,7 +60,7 @@ The last line of every run is one of:
 
 - `review-feature: current` or `review-feature: PASS, not-read=<N>`: the caller goes on to `/said:review-qa <id>` and reports `not-read=<N>`.
 - `review-feature: FAIL` or `review-feature: FAIL, not-read=<N>`: Inspect does not start; the caller sends each build FAIL row of the gate record to `/said:add-task <id>`.
-- `review-feature: owed: <why>` or `review-feature: error: <why>`: the caller stops. On `owed: record-class:` it reports the rows and opens no task: the read runs again after the record is repaired, and at `FAIL reads on this store: 2` the rows go to the operator.
+- `review-feature: owed: <why>` or `review-feature: error: <why>`: the caller stops. On `owed: record-class:` or `owed: no read: a record-class FAIL` it reports the rows and opens no task: the read runs again after the record is repaired, and at `FAIL reads on this store: 2` the rows go to the operator.
 
 ## Headless form
 
@@ -70,5 +70,5 @@ The last line of every run is one of:
 
 - Typing a row, or editing the verdict file or the gate record.
 - Briefing the reader with anything beyond the printed brief and its refusal line, or forking it with this session's context.
-- Reading again over a `current` record or a recorded FAIL.
+- Reading again over a `current` record or a recorded build FAIL.
 - Spawning from `said` or `flow` directly: they invoke this skill.
