@@ -165,9 +165,15 @@ def _inside(root, path):
     return path == root or path.startswith(root + os.sep)
 
 
+def _spelled_inside(rel):
+    """A path that names a place inside the lane by its spelling: relative, with no `..` part."""
+    return not os.path.isabs(rel) and ".." not in rel.replace(os.sep, "/").split("/")
+
+
 class Stores(object):
     def __init__(self, args):
         self.root = os.path.realpath(os.path.abspath(args["root"]))
+        self.tops = (self.root,) + self._docs_root()  # the lane, and its declared docs root where a link leads
         self.working = os.path.realpath(os.path.abspath(args["working"])) if args["working"] else None
         self.rulings = self._rulings(args["rulings"])
         self.line_ids = self._line_ids(args["todo"], args["backlog"])
@@ -217,15 +223,27 @@ class Stores(object):
                 words.update(first_word(ln) for ln in read_lines(p))
         return words
 
+    def _docs_root(self):
+        """The physical folder of the lane's declared `SAID.docs-root:`, when it is spelled inside the lane."""
+        board = os.path.normpath(os.path.join(HERE, "..", "board"))
+        if board not in sys.path:
+            sys.path.insert(0, board)
+        import gate_record
+        value = (gate_record.lane_key(self.root, "docs-root") or "").strip().strip("`'\"")
+        if not value or not _spelled_inside(value):
+            return ()
+        return (os.path.realpath(os.path.join(self.root, value)),)
+
     def anchor_file(self, rel):
         cands = []
         if "/" not in rel and self.working:
             cands.append(os.path.join(self.working, rel))
         cands.append(os.path.join(self.root, rel))
+        tops = self.tops if _spelled_inside(rel) else (self.root,)  # a `..` or absolute spelling never reaches the docs root
         left = False
         for c in cands:
             real = os.path.realpath(c)
-            if not _inside(self.root, real):
+            if not any(_inside(t, real) for t in tops):
                 left = left or os.path.exists(real) or os.path.islink(c)
                 continue
             if os.path.isfile(real):
