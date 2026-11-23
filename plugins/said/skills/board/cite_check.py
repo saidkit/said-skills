@@ -60,12 +60,12 @@ def _under(top, real):
 
 def admitted(lane, path, routes):
     """True when a lane-relative path is inside by declared route. Its target must stay in the lane or in the target of
-    the declared route the path is spelled under (whatever that route links to, `/` included). A `..` or absolute
-    spelling is never inside."""
+    the declared route the path is spelled under (whatever that route links to, `/` included); the lane's `CLAUDE.md`
+    is inside wherever it links. A `..` or absolute spelling is never inside."""
     if not inside(path):
         return False
     real, spelled, home = os.path.realpath(os.path.join(lane, path)), posixpath.normpath(path), os.path.realpath(lane)
-    if _under(home, real):
+    if _under(home, real) or spelled == 'CLAUDE.md':  # the lane's own file, wherever it links
         return True
     for route in routes:
         route = posixpath.normpath(route).strip('/')
