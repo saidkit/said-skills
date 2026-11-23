@@ -2,6 +2,13 @@
 
 All notable changes to the SAID plugin are documented here. Format follows [Keep a Changelog](https://keepachangelog.com); the project uses semantic versioning.
 
+## [0.28.1] - 2026-11-23
+
+- **Fixed:** the scope-refine rule chain accepts a cite of the declared `--handoff` when that file lies outside the lane (a `..` path from the lane root): `audit-check` and `question-check` read the cited line from it, and every other path outside the lane still fails. Before, every correct cite of such a handoff failed as no such line and the chain stopped.
+- **Fixed:** `audit-dirs` resolves the directory names of a handoff outside the lane from the handoff's root: the nearest directory above it whose `CLAUDE.md` declares `SAID.lanes:` (printed with its row count on a `handoff root:` line), else the handoff's own directory. A name under this lane is audited at its lane-relative path; a name under another lane of the registry is listed with the state `other-lane`, not audited, and named in the draft's audit section; a handoff inside the lane resolves as before. Before, the lane's own code was never audited.
+- **Fixed:** `review-qa`'s `earned-rules.py` reads a task's close date from a Status line whose `Done (YYYY-MM-DD)`, or only its `Done`, is in backticks, bold or bare (``**Status:** `Done (2026-11-01)` ``); before, such a task read as closed undated.
+- **Fixed:** the shared cite check (`board/cite_check.py`) resolves a feature-review cite that names a file by its bare name (`scope.md:73`) to the one file of that name in the feature's `SAID.working:` dir or the dir of `SAID.feature-spec:`; no match or two matches stay `no such file`, and the line and quoted-words checks run as before. The scope chain passes no folders and is unchanged. `agents/feature-reviewer.md` asks for the full path from the lane root and re-checks every cite before answering. Before, a round whose reader cited bare names was filed FAIL.
+
 ## [0.28.0] - 2026-11-22
 
 - **Added:** `agents/feature-reviewer.md`, a read-only agent that reads a feature's sources (the rulings, the upstream texts, the spec, each task's `Covers` ids and the lane's Earned rules) against the diff from its base commit to HEAD and returns one verdict, a row per source item with a PASS, FAIL or NOT-READ cell. It is a step of every round and is never named in `SAID.reviewers:`; on a doc lane it is also that lane's `doc-editorial` Checker (below).
