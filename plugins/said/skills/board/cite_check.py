@@ -58,6 +58,8 @@ def resolve(lane, path, dirs=(), isfile=None):
     """The lane-relative path a cite names: the path itself when that file is under the lane root; else, for a bare
     name (no /), the one file of that name under dirs (lane-relative folders: a direct child of each, or at any depth
     under a folder written `<folder>/**`); None when none or more than one."""
+    if not inside(path):  # holds the callers' precondition on its own
+        return None
     isfile = isfile or os.path.isfile
     if isfile(os.path.join(lane, path)):
         return path
