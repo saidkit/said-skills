@@ -43,7 +43,8 @@ RULE_LINE = re.compile(r"^- ")
 ID_TOKEN = re.compile(r"(?<![A-Za-z])R-[A-Z]+-[A-Z0-9-]+")  # a whole token: `ADR-...` never yields an id
 APPLIED_LINE = re.compile(r"^Rules applied:\s*(?P<ids>.*?)\s*\(block:\s*(?P<n>\d+)\)\s*\.?\s*$")
 LINE_PREFIX = re.compile(r"^\s*(?:[-*]\s+)?`?\s*")  # a bullet marker and/or a backtick before the line is tolerated
-DONE_DATE = re.compile(r"\*\*Status:\*\*\s*Done\s*\((\d{4}-\d{2}-\d{2})\)|^Status:\s*Done\s*\((\d{4}-\d{2}-\d{2})\)", re.M)
+# the close date of a Status line, bold or bare; `Done (date)` and `Done` (date) in backticks read the same
+DONE_DATE = re.compile(r"(?:\*\*Status:\*\*|^Status:)\s*(?:Done\s*\((\d{4}-\d{2}-\d{2})\)|`Done\s*\((\d{4}-\d{2}-\d{2})\)`|`Done`\s*\((\d{4}-\d{2}-\d{2})\))", re.M)
 # A rule line's linked record (the earned-rules contract): the record is the line's FINAL
 # `->` / Unicode-right-arrow segment = exactly ONE path token, bare or backticked, lane-root-relative, an
 # optional `#anchor` allowed and stripped, with NOTHING after it. This is a strict grammar, not a
@@ -179,7 +180,7 @@ def cmd_check(args):
         return 2
     entry, fix = fix_block(raw, args.task_id)
     dm = DONE_DATE.search(entry)
-    done = (dm.group(1) or dm.group(2)) if dm else None
+    done = next((g for g in dm.groups() if g), None) if dm else None
     if sec is None:
         # A lane that has not been rolled: the HALT belongs to impl (it will not close there); the
         # sweep only points at the roll — never a FAIL it cannot act on.
