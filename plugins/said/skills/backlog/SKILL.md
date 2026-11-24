@@ -45,7 +45,7 @@ description: >
 10. **The operator's ask.** Run only on the operator's own typed `/said:backlog`, never for a skill, agent, hook or peer message. Every write but the engine's `move` passes `--asked` with at least 12 characters of that command's argument words, word for word. The engine refuses (`refused: no operator ask`) a quote it does not find in a command typed in the root's 5 newest Claude Code sessions; that refusal is the answer (rule 4).
 11. **One command, one write.** The command must open with the operation and carry one of its targets: the `--text` words for `add` and `supersede`; for `record`, `set-priority` and `promote`, the entry's key, id, stamp date or first three words, or the record's name for a record head; `backlog` or `todo` for `migrate`.
 12. **Outside the ask.** The engine's `move`, the board page's writes (whoever drives the page over HTTP), the engine's functions called in-process, and a `CLAUDE_CONFIG_DIR` or `HOME` pointing the engine at another store pass no check; the check stops an assumed ask and does not authenticate the transcript files.
-13. **The author.** The engine writes the author word `~@name` before the id of each entry or todo line it writes: the operator's name on a write that passed rule 10, `~@agent` on every other write (rule 12). Never type one (`--text` refuses a `~@` word). The name is the root's git `user.name`, lowercased, each run of characters other than a-z and 0-9 one `-`; it starts with a letter, holds at most 40 characters and is not `agent`. On `refused: no operator name`, ask the operator for the name and to set it with `git config user.name`; never set or guess it, nor write the line another way.
+13. **The author.** The engine writes the author word `~@name` before the id of each entry or todo line it writes: the operator's name on a write that passed rule 10, `~@agent` on every other write (rule 12). Never type one (`--text` refuses a `~@` word). The name is the root's git `user.name`, lowercased, each run of characters outside a-z and 0-9 one `-` (none at the ends); a letter first, at most 40 characters, not `agent`. On `refused: no operator name`, ask the operator for the name and to set it with `git config user.name`; never set or guess it, nor write the line another way.
 
 ## Operations
 
@@ -134,7 +134,7 @@ pass `--lane`.
      the engine prints `nothing to migrate` and writes nothing.
 3. Show the plan and ask the operator to confirm it. This is the one confirm.
 4. On yes, run the same command with `--apply --asked "<the command's words>"`. On no, stop; nothing was written.
-5. A file of the other kind, and any form the engine cannot map are refused with the
+5. A former-grammar file of the other kind, and any form the engine cannot map are refused with the
    line named and the file unchanged. Show the refusal and stop; the fix is a hand edit by the operator, then a new plan.
 
 ## Anti-patterns
