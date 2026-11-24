@@ -32,7 +32,8 @@ sweep: for each open todo line whose text names `target <path>`: `close: <line> 
   3) prints `stale: <line> <id> <k> features debriefed since <date>`. Ends `sweep: <a> close, <b> keep, <c> stale`.
 table: the spec's `## Feature Tasks` rows against the log's task statuses: `stale: <id> table <s>, log <s>`,
   `extra: <id> (no task in the log)`, `missing: <id> (<s> in the log, no table row)`; then the log's own `## Summary
-  Table` against the same statuses, each line ending `(the log's summary table)`; a log with none adds nothing; exit 1 on any.
+  Table` against the same statuses, each line ending `(the log's summary table)`, read with or without the spec's table;
+  a log with none adds nothing; exit 1 on any; a table with no Status column is refused (`error:`, exit 2).
 Exit 0 unless stated; 2 with `error: <why>` on a usage error or an unreadable input.
 """
 import importlib.util
@@ -458,7 +459,7 @@ def spec_rows(spec, title="Feature Tasks"):
         return None
     head = [c.lower() for c in rows[0]]
     if "status" not in head:
-        raise Fail("the %s table has no Status column" % title)
+        raise Fail("the %s has no Status column" % (title if title.endswith("Table") else title + " table"))
     at = head.index("status")
     out = {}
     for r in rows[1:]:
