@@ -62,7 +62,7 @@ failure of the run.
 
 - `stamp-missing` and `id-missing` are warnings: a legacy entry is kept, and a file not yet migrated shows many `id-missing`, which is expected.
 - `id-malformed` and `id-duplicate` are errors.
-- `author-missing` (a line with no author) and `author-agent` (a line no typed command last wrote) are warnings; `migrate` writes the missing authors. `author-malformed` and `author-duplicate` are errors.
+- `author-missing` (a line with no author) and `author-agent` (a line whose author is `~@agent`, last written by the engine's `move` or an in-process call) are warnings; `migrate` writes the missing authors. `author-malformed` and `author-duplicate` are errors.
 - Offer no fix the operator did not ask for; each fix is one of the operations below or a hand edit the operator makes.
 
 ### add (a new entry)

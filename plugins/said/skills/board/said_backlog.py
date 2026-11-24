@@ -708,7 +708,7 @@ def _split_cr(line):
 
 AGENT = todo_md.AGENT
 AUTHOR_CAP = 40
-OWN_CODES = ("author-agent",)  # warnings the engine writes itself: a page write's `~@agent` never refuses that write
+OWN_CODES = ("author-agent",)  # warnings the engine writes itself: `~@agent` from move or an in-process call never refuses that write
 
 
 def operator_name(root):
