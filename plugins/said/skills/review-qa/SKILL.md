@@ -21,6 +21,16 @@ description: >
 
 # Feature Review-QA — Implementation Hygiene Verification Gate
 
+## Contract
+
+1. **Read-only.** Never edits code, specs, or tasks. Surfaces verdicts (PASS / FAIL / WARN); the operator decides remediation.
+2. **Hygiene only.** Verifies quality gates clean, `### Fix` claims honest and cited `Refs:` rules satisfied where mechanically assertable; the behavioral contract is the sibling `/said:accept`.
+3. **Project-agnostic commands.** Never hardcodes a language-specific command; quality-gate commands resolve at runtime via the same chain as `/said:impl` Step 0 #8.
+
+A gate record's **build FAIL rows** are its `feature-review:` FAIL rows, the `verdict` row aside, whose evidence does not start `record:`.
+
+## What this skill is
+
 This skill verifies implementation hygiene at task or feature close: quality gates clean, `### Fix` claims honest, cited `Refs:` rules satisfied where mechanically assertable. Sits between Act's close and Debrief's entry as a parallel sibling to `/said:accept` (behavioral contract side).
 
 **Read-only contract.** Never edits code, specs, or tasks. Surfaces verdicts (PASS / FAIL / WARN); operator decides remediation.

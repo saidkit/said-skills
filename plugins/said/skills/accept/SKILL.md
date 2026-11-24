@@ -18,6 +18,16 @@ description: >
 
 # Feature Accept — Behavioral Contract Verification Gate
 
+## Contract
+
+1. **Read-only.** Never edits code, specs, or tasks. Surfaces verdicts; the operator decides the remediation path (re-open via `/said:impl`, or follow-up via `/said:add-task`).
+2. **Behavioral contract only.** Verifies the AC promises a feature or task made, bullet conditions or Gherkin scenarios; implementation hygiene is the sibling `/said:review-qa`.
+3. **Single pass.** Multiple `/said:accept` runs on the same task with shifting outcomes = drift. Phase A -> operator-review -> Phase B lands one PASS or one operator-decided fix-and-re-run.
+
+A gate record's **build FAIL rows** are its `feature-review:` FAIL rows, the `verdict` row aside, whose evidence does not start `record:`.
+
+## What this skill is
+
 This skill verifies that AC promises a feature/task made — bullet conditions OR Gherkin scenarios — actually pass post-implementation. Sits between Act's close and Debrief's entry as a parallel sibling to `/said:review-qa` (hygiene side).
 
 **Read-only contract.** Never edits code, specs, or tasks. Surfaces verdicts; operator decides remediation path (re-open via `/said:impl`, or follow-up via `/said:add-task`).
