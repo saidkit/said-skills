@@ -27,8 +27,10 @@ import re
 import sys
 
 CITE = re.compile(r'^([\w./-]+):(\d+)$')
-# a cite inside free text: a path or a name, then :line, :line-line; a quote may follow (after a closing ` or :)
-IN_TEXT = re.compile(r'(?<![\w./:@-])([\w./-]*[/.A-Za-z][\w./-]*):(\d+)(?:-(\d+))?(?!\w)(?!:\d)(?:[`:]{0,2}[ \t]*"([^"\n]+)")?')
+# a cite inside free text: a path with a / or a .ext, then :line, :line-line; a quote may follow (after a closing ` or :)
+IN_TEXT = re.compile(r'(?<![\w./:@-])([\w./-]*[/.][\w./-]*):(\d+)(?:-(\d+))?(?!\w)(?!:\d)(?:[`:]{0,2}[ \t]*"([^"\n]+)")?')
+# the strict reading: a bare name with a letter is a path too
+IN_TEXT_STRICT = re.compile(IN_TEXT.pattern.replace('[/.]', '[/.A-Za-z]', 1))
 
 
 def fold(s):
@@ -139,7 +141,7 @@ def quote_at(line, words):
     return False
 
 
-VERSION = re.compile(r'v?\d+(\.\d+)*')
+VERSION = re.compile(r'v?\d+(\.\d+)*|\d{4}-\d\d-\d\dT\d\d')  # a version, or a timestamp's date and hour
 
 
 def not_a_cite(path, line, strict=False):
@@ -154,11 +156,11 @@ def text_faults(lane, text, dirs=(), routes=None, strict=False):
     resolve in (see resolve); none by default. routes: the lane's declared routes; given, a file must be admitted.
     strict: a bare name with a long line or no extension is a cite too."""
     out = []
-    for m in IN_TEXT.finditer(text):
+    for m in (IN_TEXT_STRICT if strict else IN_TEXT).finditer(text):
         path, a, b, words = m.group(1), int(m.group(2)), m.group(3), m.group(4)
         cite = '%s:%s%s' % (path, m.group(2), '-' + b if b else '')
         if not_a_cite(path, m.group(2), strict):
-            continue  # a number (1.5:2), a version (v1.2:3) or a host and port (example.com:8080), not a path
+            continue  # a number, a version or a timestamp; by default also a host and port (example.com:8080)
         if not inside(path):
             out.append((cite, 'outside the lane'))
             continue
@@ -187,7 +189,7 @@ def text_faults(lane, text, dirs=(), routes=None, strict=False):
 def text_paths(lane, text, dirs=(), strict=False):
     """The lane-relative file of each cite in the text, in text order; None for a cite that names no file."""
     out = []
-    for m in IN_TEXT.finditer(text):
+    for m in (IN_TEXT_STRICT if strict else IN_TEXT).finditer(text):
         path = m.group(1)
         if not_a_cite(path, m.group(2), strict):
             continue
