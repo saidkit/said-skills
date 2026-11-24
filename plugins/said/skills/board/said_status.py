@@ -2033,7 +2033,7 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
         if faults:
             bad = ["%s %s %s" % (_fr_clean(c[0], 40), _fr_clean(x, 200), why) for c, x, why in faults]
             hint = "; name the path in full, or where the missing file is the finding, drop the line number" if any(w == "no such file" for _, _, w in faults) else ""
-            return _fr_owed("cite fault: " + "; ".join(bad[:6]) + ("; and %d more" % (len(bad) - 6) if len(bad) > 6 else "") + hint)
+            return _fr_owed("cite fault: " + "; ".join(bad) + hint)  # every refused cite named
         rows = [(g, _fr_class_row(g, c, bool(c[-1] == "FAIL" and record_cite and record_cite(" | ".join(c[:-1]))))) for g, c in rows]
         verdict = "FAIL" if any(c[-1] == "FAIL" for _, c in rows) else verdict
     out = ["feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ"))]

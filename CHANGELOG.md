@@ -7,6 +7,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 - **Added:** `/said:backlog done <key or id>` ticks an entry done: its box becomes `[X]` and its author the operator's, every other byte of the line kept; gated by the typed ask like the other writes; an entry already done, or promoted, is refused.
 - **Changed:** the `no operator ask` refusal names the expected typed form of the refused operation (for `supersede`, `supersede <key or id> ; <new words>`), never a part of the quote; the skill states the supersede form with a worked example.
 - **Fixed:** the todo reader reads a lowercase `[x]` as done with one `state-lowercase` error, as the backlog reader does; the backlog's message names the `done` operation.
+- **Fixed:** the feature-review cite refusal names every refused cite (no cap at six), and where a cite's quoted words stand on other lines of the same file it names those lines, so the one re-spawn, in session or headless, can correct its cite; the writer never rewrites a cite.
 - **Fixed:** `supersede` keeps the entry's id (it mints one only for a line that had none), so a task's `Covers` cite of the id still resolves after the words change.
 
 ## [0.29.0] - 2026-11-24

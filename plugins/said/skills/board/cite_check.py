@@ -179,11 +179,19 @@ def text_faults(lane, text, dirs=(), routes=None, strict=False):
         span = range(a, int(b) + 1) if b else range(a, a + 1)
         bad = next((n for n in (a, int(b) if b else a) if not 1 <= n <= len(ls)), None)
         if bad is not None or not span:
-            out.append((cite, 'no line %d' % (bad if bad is not None else a)))
+            out.append((cite, 'no line %d' % (bad if bad is not None else a) + stand_on(ls, words, ', the quoted words')))
             continue
         if words is not None and (not fold(words) or not any(quote_at(ls[n - 1], words) for n in span)):
-            out.append((cite, 'the quoted words are not on the line'))
+            out.append((cite, 'the quoted words are not on the line' + stand_on(ls, words, ', they')))
     return out
+
+
+def stand_on(ls, words, lead):
+    """', <lead> stand on line(s) N' for the lines the quoted words stand on; '' when none or no words."""
+    at = [str(n) for n, l in enumerate(ls, 1) if words is not None and fold(words) and quote_at(l, words)]
+    if not at:
+        return ''
+    return '%s stand on line%s %s' % (lead, 's' if len(at) > 1 else '', ', '.join(at))
 
 
 def text_paths(lane, text, dirs=(), strict=False):
