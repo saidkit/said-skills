@@ -114,8 +114,8 @@ def git(root, *args):
     return r.stdout if r.returncode == 0 else None
 
 
-# a refusal the reply did not cause: a dirty tree, a verdict file that cannot be read
-STORE_SIDE = re.compile(r"feature review owed: (\d+ uncommitted file|no readable |the verdict file )")
+# a refusal the reply did not cause: a dirty tree, a verdict file that cannot be read; an oversized reply is read again
+STORE_SIDE = re.compile(r"feature review owed: (\d+ uncommitted file|no readable |the verdict file resolves outside )")
 
 
 def feature_review(fid, opts, root):
