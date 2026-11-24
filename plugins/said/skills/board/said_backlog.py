@@ -2010,15 +2010,12 @@ def _fold(text):
 
 
 def _ask_binding(root, a):
-    """What the typed command's words after its operation word must hold for this one write (folded, parts split at `;`):
-    the whole `--text` as a part (or the whole remainder) and every `--note` as a part; the entry's key or 13-digit id
-    as a word; a record head's name or slug as a word; the migrate target as a word."""
-    def words(rest):
-        return {w.strip(".,;:()[]\"'") for w in rest.split()}
-
-    def text_ok(rest, text):
-        x = _fold(text)
-        return bool(x) and (x == rest or x in [p.strip() for p in rest.split(";")])
+    """What the typed command's words after its operation word must hold for this one write (folded, parts split at `;`,
+    each part in its place): for `add` the `--text` as the first part (or the whole remainder) and the notes as the parts
+    after it, in order; for an entry write its key or 13-digit id as a word of the first part, and for `supersede` the
+    text as the second part (or the whole remainder after the first `;`); a record head's name or slug; the migrate target."""
+    def words(part):
+        return {w.strip(".,;:()[]\"'") for w in part.split()}
 
     entry = []
     if a.cmd in ("supersede", "record", "promote") or a.cmd == "set-priority" and not getattr(a, "record", None):
@@ -2031,17 +2028,22 @@ def _ask_binding(root, a):
             entry += [_fold(e["id"]), _fold(e["id"]).lstrip("@")]
 
     def binds(rest):
-        w = words(rest)
-        if a.cmd in ("add", "supersede") and not text_ok(rest, a.text):
+        parts = [p.strip() for p in rest.split(";")]
+        if a.cmd == "add":
+            x, notes = _fold(a.text), [_fold(n) for n in (a.note or [])]
+            if x and x == rest.strip() and not notes:
+                return True
+            return bool(x) and parts[0] == x and parts[1:1 + len(notes)] == notes
+        if entry and not any(k and k in words(parts[0]) for k in entry):
             return False
-        if a.cmd == "add" and not all(text_ok(rest, n) for n in (a.note or [])):
-            return False
-        if entry and not any(x and x in w for x in entry):
-            return False
+        if a.cmd == "supersede":
+            x = _fold(a.text)
+            return bool(x) and len(parts) > 1 and (parts[1] == x or rest.split(";", 1)[1].strip() == x)
         if a.cmd == "set-priority" and getattr(a, "record", None):
+            w = words(rest)
             return _fold(a.record) in w or _fold(a.record.split("-", 2)[-1]) in w
         if a.cmd == "migrate":
-            return a.target in w
+            return a.target in words(rest)
         return True
     return binds
 

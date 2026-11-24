@@ -44,7 +44,7 @@ description: >
    operations and stop; run nothing.
 9. **`--today`** (on `add` and `supersede`) is today's date in the operator's local time (`date +%Y-%m-%d`).
 10. **The operator's ask.** Run only on the operator's own typed `/said:backlog`, never for a skill, agent, hook or peer message. Every write but the engine's `move` passes `--asked` with at least 12 characters of that command's argument words, word for word. The engine refuses (`refused: no operator ask`) a quote it does not find in a command typed in the 5 newest session files of the transcript stores of the root and its folders up to its git toplevel; that refusal is the answer (rule 4).
-11. **One command, one write.** The command opens with the operation (`move` or `record` for `record`); the words after it, split into parts at `;`, name the one write: the `--text` as a whole part (a text holding `;` only as the whole remainder) for `add` and `supersede`, and each `--note` as a part for `add`; the entry's key or 13-digit id as a word, for `supersede`, `record`, `promote` and `set-priority` on an entry; the record's name or slug for `set-priority --record`; `backlog` or `todo` for `migrate`.
+11. **One command, one write.** The command opens with the operation (`move` or `record` for `record`); the words after it, split at `;`, are parts in places: for `add` the text first, then each note in order; for an entry write the key or 13-digit id in the first part, then for `supersede` the new text; the record's name or slug for `set-priority --record`; `backlog` or `todo` for `migrate`. A key inside a text names nothing, and a part is the text of one write only. The refusal does not say which part failed.
 12. **Outside the ask.** The engine's `move`, the board page's writes (whoever drives the page over HTTP), the engine's functions called in-process, and a `CLAUDE_CONFIG_DIR` or `HOME` pointing the engine at another store pass no check; the check stops an assumed ask and does not authenticate the transcript files.
 
 ## Operations
@@ -66,6 +66,7 @@ failure of the run.
 ### add (a new entry)
 
 `python3 $ENGINE --root ROOT add --section "<section>" [--topic "<topic>" [--subtopic "<subtopic>"]] --text "<words>" --today YYYY-MM-DD [--note "<note>"]... --asked "<the command's words>"`.
+The operator's text and notes are relayed as typed, each a bare part of the command (`add <text>; <note>`); a command quoting them as `--text "..."` is refused.
 The engine appends one open entry, stamped today, at the end of the named section, topic or subtopic (a
 section that holds topics needs `--topic`, a topic that holds subtopics needs `--subtopic`), with at most two
 notes as its sub-bullets. It creates no section, topic or subtopic. `<section>`, `<topic>` and `<subtopic>`
