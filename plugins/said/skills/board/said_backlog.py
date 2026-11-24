@@ -1924,6 +1924,7 @@ def _makedirs_tracked(path, made):
 
 ASK_MIN = 12  # a quote shorter than this names no ask
 ASK_NOT_TYPED = ("<cross-session-message", "<agent-message", "<task-notification", "<system-reminder")
+ASK_OUTPUT = ("<bash-stdout>", "<bash-stderr>", "<local-command-stdout>", "<local-command-stderr>", "<local-command-caveat>")
 
 
 def _typed_words(rec):
@@ -1932,20 +1933,26 @@ def _typed_words(rec):
     if (not isinstance(rec, dict) or rec.get("type") != "user" or rec.get("isMeta") or rec.get("isSidechain")
             or rec.get("isCompactSummary") or rec.get("toolUseResult") is not None):
         return None
+    if "sdk" in (str(rec.get("promptSource")), str(rec.get("turnOrigin"))) or str(rec.get("entrypoint", "")).startswith("sdk"):
+        return None  # a scripted prompt
+    if rec.get("promptSource") == "suggestion_accepted":
+        return None  # model words the operator accepted, not typed
     origin = rec.get("origin")
     if origin is not None and (not isinstance(origin, dict) or origin.get("kind") != "human"):
         return None
     c = (rec.get("message") or {}).get("content")
     if isinstance(c, list):
-        if not c or any(not isinstance(b, dict) or b.get("type") != "text" for b in c):
+        if not c or any(not isinstance(b, dict) or b.get("type") == "tool_result" for b in c):
             return None
-        c = "\n".join(str(b.get("text", "")) for b in c)
+        c = "\n".join(str(b.get("text", "")) for b in c if b.get("type") == "text")  # an attached image is no words
     if not isinstance(c, str):
         return None
     while "<system-reminder>" in c and "</system-reminder>" in c.split("<system-reminder>", 1)[1]:  # a hook's note is not typed
         head, rest = c.split("<system-reminder>", 1)
         c = head + " " + rest.split("</system-reminder>", 1)[1]
-    return None if any(m in c for m in ASK_NOT_TYPED) else " ".join(c.split())
+    if any(m in c for m in ASK_NOT_TYPED) or c.lstrip().startswith(ASK_OUTPUT):
+        return None
+    return " ".join(c.split())
 
 
 def _slug(path):
@@ -1954,33 +1961,47 @@ def _slug(path):
 
 def operator_asked(root, quote):
     """True when `quote` (whitespace folded, at least ASK_MIN characters) sits in a message the operator typed in this
-    project's Claude Code transcript store: <config>/projects/<slug>/*.jsonl, the slug of the root or of the cwd."""
+    project's Claude Code transcript store: <config>/projects/<slug>/*.jsonl, the slug of the root, the cwd or a folder
+    above either short of the home folder (a session started there); the message must name the backlog."""
     q = " ".join((quote or "").split())
     if len(q) < ASK_MIN:
         return False
     base = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
     words = "".join(ch if ch.isascii() and ch.isalnum() else " " for ch in q).split()
     probe = max(words, key=len) if words else ""
+    home = os.path.realpath(os.path.expanduser("~"))
     slugs = []
     for d in (root, os.getcwd()):
-        s = _slug(d)
-        if s not in slugs:
-            slugs.append(s)
-    for s in slugs:
-        for p in sorted(glob.glob(os.path.join(glob.escape(os.path.join(base, "projects", s)), "*.jsonl"))):
-            try:
-                with open(p, encoding="utf-8", errors="replace") as h:
-                    for line in h:
-                        if probe not in line:
-                            continue
-                        try:
-                            t = _typed_words(json.loads(line))
-                        except ValueError:
-                            continue
-                        if t and q in t:
-                            return True
-            except OSError:
-                continue
+        d = os.path.realpath(os.path.abspath(d))
+        while d != home and d not in slugs:
+            slugs.append(d)
+            up = os.path.dirname(d)
+            if up == d:
+                break
+            d = up
+    files = []
+    for d in slugs:
+        files += glob.glob(os.path.join(glob.escape(os.path.join(base, "projects", _slug(d))), "*.jsonl"))
+    def age(x):
+        try:
+            return -os.path.getmtime(x)
+        except OSError:
+            return 0
+
+    for p in sorted(set(files), key=age):  # newest first: an ask is usually recent
+        try:
+            with open(p, encoding="utf-8", errors="replace") as h:
+                for line in h:
+                    if probe not in line:
+                        continue
+                    try:
+                        t = _typed_words(json.loads(line))
+                    except ValueError:
+                        continue
+                    if t and q in t and "backlog" in t.lower():
+                        return True
+        except OSError:
+            continue
     return False
 
 
