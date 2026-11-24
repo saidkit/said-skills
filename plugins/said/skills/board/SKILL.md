@@ -18,6 +18,7 @@ Run `flow`'s Step-1 reconstruction over **every** feature and **report**: phase,
 ## Contract — holds every run
 
 - **Observe, with page writes.** No code, task or other spec edits, no test runs, no downstream skill invoked. The page's writes, by board: backlog, a row's priority and order, quick add of an entry, and edits to an entry's text, notes and tags (with Undo); todo, a line's priority and order, its state, and edits to its text and sub-items (with Undo); features, a feature's `**Priority:**` line on its spec head; plus, with `--connect`, the app URL. Every write touches one entry (an order write moves the entry with its sub-bullets) or one spec head line, behind the same Host, Origin and CSRF checks.
+- **A page write is the launcher's.** A backlog or todo line the page writes (an Undo too) takes the author of whoever launched the board: the root's git `user.name`, read once at start as `/said:backlog` reads it. With no name the page still shows, and each line write is refused with `refused: no operator name`; set `git config user.name` and launch again.
 - **Derive, never store.** Reconstruct from artifacts each run; write no status file or `_resume.md`. The web page caches a derive only until the next explicit refresh (a full page load or the header button).
 - **Script numbers are canonical.** `said_status.py` owns the features board's counts and `said_backlog.py` the backlog and todo boards'; never override them in prose. A wrong number is a bug to fix in the script, not a value to hand-edit.
 - **Loopback only.** The web server binds `127.0.0.1`, holds no credential, makes no network call of its own and proxies nothing.
@@ -28,7 +29,7 @@ Run `flow`'s Step-1 reconstruction over **every** feature and **report**: phase,
 | Board | Web page | `--cli` / `--json` |
 |---|---|---|
 | features (default) | `/said:board` | `said_status.py` (Step 1) |
-| backlog | `/said:board backlog`: the entries in four views (Outline, By section, By stage, By priority), with each entry's record trail | `said_backlog.py --root <repo-root> --board backlog [--json]` |
+| backlog | `/said:board backlog`: the entries in four views (Outline, By section, By stage, By priority), with each entry's record trail and author | `said_backlog.py --root <repo-root> --board backlog [--json]` |
 | todo | `/said:board todo`: one tab per registry lane that has a `todo.md`, state and priority filters | `said_backlog.py --root <repo-root> --board todo [--json]` |
 | sessions | reserved, not built: say so and run nothing | none |
 

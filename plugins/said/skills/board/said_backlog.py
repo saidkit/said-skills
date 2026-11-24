@@ -30,6 +30,7 @@ import datetime
 import glob
 import json
 import os
+import subprocess
 import sys
 import time
 import unicodedata
@@ -378,7 +379,7 @@ def board_row(e):
     return {"key": e["key"], "line": e["line"], "state": e["state"], "stamp": e["stamp"], "date": e["date"],
             "position": 0 if e.get("parent") else e.get("position") or 0,
             "priority": e["priority"], "section": e["section"], "group": e["group"], "subgroup": e["subgroup"], "text": e["text"], "tags": e["tags"],
-            "stage": e["stage"], "feature": e.get("feature") or "", "record": e.get("record") or "",
+            "author": e.get("author") or "", "stage": e["stage"], "feature": e.get("feature") or "", "record": e.get("record") or "",
             "trail": [{"kind": t["kind"], "path": t["path"], "exists": t["exists"], "date": t.get("date") or ""} for t in e["trail"]],
             "raw": e.get("raw", ""),
             "notes": [{"text": b["text"], "depth": b["depth"], "line": b["line"], "raw": b.get("raw", "")} for b in e["sub_bullets"]]}
@@ -418,8 +419,8 @@ def render_board_text(view):
 def board_line(r):
     mark = {"open": "[ ]", "wip": "[+]", "done": "[X]"}.get(r["state"], "[?]")
     prio = ("[#%s] " % r["priority"]) if r["priority"] else ""
-    return "%s %s%s%s%s" % (mark, ("[%s] " % r["date"]) if r["stamp"] else "", prio, r["text"][:80],
-                            (" -> " + r["feature"]) if r["feature"] else "")
+    return "%s %s%s%s%s%s" % (mark, ("[%s] " % r["date"]) if r["stamp"] else "", prio, r["text"][:80],
+                              (" -> " + r["feature"]) if r["feature"] else "", (" ~@" + r["author"]) if r.get("author") else "")
 
 
 # ---------------------------------------------------------------- the todo board's view model
@@ -705,7 +706,56 @@ def _split_cr(line):
     return body, line[len(body):]
 
 
-def set_priority(root, letter, key=None, line=None, lane=None, record=None):
+AGENT = todo_md.AGENT
+AUTHOR_CAP = 40
+OWN_CODES = ("author-agent",)  # warnings the engine writes itself: `~@agent` from move or an in-process call never refuses that write
+
+
+def operator_name(root):
+    """The operator's author name: the root's git `user.name`, lowercased, each run of other than a-z and 0-9 one `-`."""
+    try:
+        r = subprocess.run(["git", "config", "--get", "user.name"], cwd=root, capture_output=True, text=True, timeout=10)
+        raw = r.stdout.strip() if r.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError, UnicodeDecodeError):
+        raw = ""
+    if not raw:
+        raise Refused("no operator name: git config user.name is unset")
+    name = "".join(c if ("a" <= c <= "z" or "0" <= c <= "9") else " " for c in raw.lower())
+    name = "-".join(name.split())
+    if not todo_md.is_author(todo_md.AUTHOR_LEAD + name) or len(name) > AUTHOR_CAP or name == AGENT:
+        raise Refused("no operator name: git config user.name `%s` gives no author (a letter first, at most %d characters, not `%s`)"
+                      % (clean(raw, 40), AUTHOR_CAP, AGENT))
+    return name
+
+
+def _author_word(author):
+    if not todo_md.is_author(todo_md.AUTHOR_LEAD + str(author)):
+        raise Refused("`%s` is no author name" % clean(str(author), 40))
+    return todo_md.AUTHOR_LEAD + author
+
+
+def _authored(line, author):
+    """The box line with its author written or replaced right before the trailing id; every other byte kept."""
+    word = _author_word(author)
+    body, cr = _split_cr(line)
+    core = body.rstrip()
+    trail = body[len(core):]
+    ident = todo_md.trailing_id(core)
+    if ident:
+        core = core[:len(core) - len(ident)].rstrip()
+    old = todo_md.trailing_author(core)
+    if old:
+        core = core[:len(core) - len(old)].rstrip()
+    return core + " " + word + (" " + ident if ident else "") + trail + cr
+
+
+def _new_codes(before, after):
+    """The finding codes `after` adds over `before`, the engine's own author warnings left out."""
+    added = Counter(f["code"] for f in after) - Counter(f["code"] for f in before)
+    return {c: n for c, n in added.items() if c not in OWN_CODES}
+
+
+def set_priority(root, letter, key=None, line=None, lane=None, record=None, author=AGENT):
     """Write, replace or remove (`none`) the priority token of one entry line (`key` + `line`, with
     `lane` for a todo line) or of one record head (`record`, the folder name). (ok, message)."""
     try:
@@ -721,7 +771,7 @@ def set_priority(root, letter, key=None, line=None, lane=None, record=None):
         new = _token_line(lines[at["line"] - 1], letter)
         if new == lines[at["line"] - 1]:
             return True, "same %s:%d already %s" % (rel(path, root), at["line"], letter or "none")
-        lines[at["line"] - 1] = new
+        lines[at["line"] - 1] = _authored(new, author)
         _write_raw(path, bom, lines)
         return True, "wrote %s:%d priority %s -> %s" % (rel(path, root), at["line"], at["priority"] or "none", letter or "none")
     except Refused as e:
@@ -828,7 +878,7 @@ def set_feature_priority(spec, lane_root, letter):
         return False, "refused: %s" % clean("%s: %s" % (type(e).__name__, e), 200)
 
 
-def move_entry(root, key, line, lane=None, to=None, before=None):
+def move_entry(root, key, line, lane=None, to=None, before=None, author=AGENT):
     """Move the entry `key` at `line` (with `lane` for a todo entry) to position `to` (1-based) among
     the top-level entries of its own section, topic or subtopic, or ahead of the entry `before` (a key in the
     same container); the entry's sub-bullets and nested boxes travel with it. (ok, message)."""
@@ -866,6 +916,7 @@ def move_entry(root, key, line, lane=None, to=None, before=None):
         last = {e["line"]: _block_last(entries, top, e, lines) for e in top}
         s = at["line"]
         moving = lines[s - 1:last[s]]
+        moving[0] = _authored(moving[0], author)
         del lines[s - 1:last[s]]
 
         def adj(n):
@@ -962,6 +1013,8 @@ def _words(text, what):
         raise Refused("%s carry a stamp or a priority token; the operation writes those" % what)
     if any(todo_md.id_start(w) for w in words.split()):
         raise Refused("%s carry an id; the writer mints it" % what)
+    if any(todo_md.author_start(w) for w in words.split()):
+        raise Refused("%s carry an author; the writer writes it" % what)
     return words
 
 
@@ -980,9 +1033,10 @@ def mint_id(taken):
     return "@%d" % ms
 
 
-def _room(words):
-    if len(words) > ID_ROOM:
-        raise Refused("the words run over %d characters; the line's id counts in the 300" % ID_ROOM)
+def _room(words, author):
+    room = ID_ROOM - len(_author_word(author)) - 1
+    if len(words) > room:
+        raise Refused("the words run over %d characters; the line's author and id count in the 300" % room)
 
 
 def _line_room(text):
@@ -994,9 +1048,8 @@ def _line_room(text):
 def _guard(root, path, old, new, span):
     """Refuse a rewrite that adds a finding the file did not have, or leaves an error on a line it wrote (`span`: line numbers)."""
     rp = rel(path, root)
-    base = Counter(f["code"] for f in _findings_of(root, rp, old))
     items = _findings_of(root, rp, new)
-    if Counter(f["code"] for f in items) - base or any(f["severity"] == "error" and f["file"] == rp and f["line"] in span for f in items):
+    if _new_codes(_findings_of(root, rp, old), items) or any(f["severity"] == "error" and f["file"] == rp and f["line"] in span for f in items):
         raise Refused("the write would leave a line that breaks the backlog grammar")
 
 
@@ -1048,7 +1101,7 @@ def _fill_template(tpl, kind, entry, notes, section, rel_backlog):
     return out
 
 
-def record(root, key, line, kind, slug):
+def record(root, key, line, kind, slug, author=AGENT):
     """Move an entry's notes into a new record folder `backlog/<stamp>-<kind>-<slug>/idea.md` built from
     `backlog/template-idea.md`; the entry keeps its first line and one link sub-bullet. (ok, message)."""
     made = None
@@ -1086,6 +1139,7 @@ def record(root, key, line, kind, slug):
         first = at["line"]
         last = max([first] + [sb["line"] for sb in at["sub_bullets"]])
         was = list(lines)
+        lines[first - 1] = _authored(lines[first - 1], author)
         lines[first:last] = [link]
         _inside(bdir, _docs_home(root))
         os.mkdir(folder)
@@ -1149,7 +1203,7 @@ def _entry_line(today, words, tokens=()):
     return " ".join(["- [ ] [%s]" % today, words] + list(tokens))
 
 
-def add(root, section, topic, subtopic, text, today, notes=None):
+def add(root, section, topic, subtopic, text, today, notes=None, author=AGENT):
     """Append one open, stamped entry, with at most two note sub-bullets, at the end of a section, a topic
     or a subtopic that exists. (ok, message, written): the message names the new entry's key and line, `written` is {key, line} (None on a refusal)."""
     try:
@@ -1160,7 +1214,7 @@ def add(root, section, topic, subtopic, text, today, notes=None):
         if subtopic is not None and topic is None:
             raise Refused("a subtopic is named with its topic: add --topic")
         words = _words(text, "the words")
-        _room(words)
+        _room(words, author)
         notes = [_words(nt, "the note") for nt in (notes or [])]
         if len(notes) > 2:
             raise Refused("%d notes; an entry carries at most two sub-bullets" % len(notes))
@@ -1206,7 +1260,7 @@ def add(root, section, topic, subtopic, text, today, notes=None):
             if after < len(lines) - 1 and not lines[after].strip():
                 after += 1
         cr, terminated = _eol(lines)
-        new = [_entry_line(today, words, [ident])] + ["  - %s" % nt for nt in notes]
+        new = [_entry_line(today, words, [_author_word(author), ident])] + ["  - %s" % nt for nt in notes]
         old = list(lines)
         lines[after:after] = new
         _guard(root, path, old, lines, range(after + 1, after + len(new) + 1))
@@ -1232,9 +1286,12 @@ def _still_reads(line, expected):
 
 
 def _entry_parts(text):
-    """(lead words: the stamp and the priority token, the other words, the trailing id token) of an entry's text."""
+    """(lead words: the stamp and the priority token, the other words, the trailing id token) of an entry's text; the
+    author word is left out, every writer writes its own."""
     words = todo_md.words_of(text)
     ident = words.pop() if len(words) > 1 and todo_md.is_id(words[-1]) else ""
+    if len(words) > 1 and todo_md.is_author(words[-1]):
+        words.pop()
     n = len(todo_md.lead_spans(" ".join(words)))
     return words[:n], words[n:], ident
 
@@ -1251,11 +1308,12 @@ def _compose(pre, words):
     return line
 
 
-def _edit_entry(op, body, text):
-    """The entry line after a text or tag operation: its box, stamp, token and trailing id kept."""
+def _edit_entry(op, body, text, author):
+    """The entry line after a text or tag operation: its box, stamp, token and trailing id kept, the author written."""
     bx = todo_md.box_of(body)
     pre = body[:bx[4]]
     lead, rest, ident = _entry_parts(bx[2])
+    ident = _author_word(author) + (" " + ident if ident else "")
     if op == "text":
         words = _words(text, "the words").split()
         if any(todo_md.id_start(w) for w in words):
@@ -1276,7 +1334,7 @@ def _edit_entry(op, body, text):
     return _compose(pre, lead + [w for w in rest if w != "#" + tag] + [ident])
 
 
-def edit(root, op, line, expected, text=None, depth=None):
+def edit(root, op, line, expected, text=None, depth=None, author=AGENT):
     """Replace line `line` of the backlog if it still reads `expected`, by one operation: `text` (the entry's words),
     `note` (a note's words), `note-add` (a note of `depth` after the entry's or a note's last line), `note-del`,
     `tag-add`, `tag-del`, and the two Undo forms `restore` (an entry line as it was) and `restore-note` (a removed note,
@@ -1310,8 +1368,9 @@ def edit(root, op, line, expected, text=None, depth=None):
                 a, b = todo_md.box_of(new), todo_md.box_of(was)
                 if new != text or not a or not b or a[0] != b[0]:
                     raise Refused("the line to restore is not an entry line")
+                new = _authored(new, author)
             else:
-                new = _edit_entry(op, was, text)
+                new = _edit_entry(op, was, text, author)
             out = [new]
         elif op in ("note", "note-del"):
             if sub is None:
@@ -1347,9 +1406,9 @@ def edit(root, op, line, expected, text=None, depth=None):
                 raise Refused("an entry carries at most two sub-bullets")
             out = [was, new]
             at = line + 1
-        before = Counter(f["code"] for f in _findings_of(root, bl["path"], lines))
+        before = _findings_of(root, bl["path"], lines)
         lines[line - 1:line] = [x + cr for x in out]
-        if Counter(f["code"] for f in _findings_of(root, bl["path"], lines)) - before:
+        if _new_codes(before, _findings_of(root, bl["path"], lines)):
             raise Refused("the edit would break the backlog grammar")
         cr_all, terminated = _eol(lines)
         _write_raw(path, bom, _apply_eol(lines, cr_all, terminated))
@@ -1392,13 +1451,13 @@ def _todo_findings(root, t, lines):
 
 def _todo_commit(path, bom, lines, root=None, t=None, old=None):
     """Write `lines`; with `old` (the lines before the edit) a rewrite that adds a finding the file did not have is refused first."""
-    if old is not None and Counter(f["code"] for f in _todo_findings(root, t, lines)) - Counter(f["code"] for f in _todo_findings(root, t, old)):
+    if old is not None and _new_codes(_todo_findings(root, t, old), _todo_findings(root, t, lines)):
         raise Refused("the edit would break the todo grammar")
     cr_all, terminated = _eol(lines)
     _write_raw(path, bom, _apply_eol(lines, cr_all, terminated))
 
 
-def todo_state(root, lane, line, expected, state):
+def todo_state(root, lane, line, expected, state, author=AGENT):
     """Set the state of lane `lane`'s todo line `line` (`open`, `wip`, `done`: the box ` `, `+`, `X`) if it still reads
     `expected`; every other byte of the line stays. (ok, message, {line, raw} written, None on a refusal)."""
     try:
@@ -1412,7 +1471,7 @@ def todo_state(root, lane, line, expected, state):
             raise Refused("the line is already %s" % state)
         body, cr = _split_cr(lines[line - 1])
         bx = todo_md.box_of(body)
-        lines[line - 1] = body[:bx[3]] + STATE_MARK[state] + body[bx[3] + 1:] + cr
+        lines[line - 1] = _authored(body[:bx[3]] + STATE_MARK[state] + body[bx[3] + 1:], author) + cr
         _todo_commit(path, bom, lines)
         return True, "wrote %s:%d: state %s" % (rel(path, root), line, state), {"line": line, "raw": lines[line - 1].rstrip("\r")}
     except Refused as e:
@@ -1428,7 +1487,7 @@ def _sub_words(text):
     return words
 
 
-def todo_edit(root, lane, op, line, expected, text=None):
+def todo_edit(root, lane, op, line, expected, text=None, author=AGENT):
     """Replace line `line` of lane `lane`'s todo file if it still reads `expected`, by one operation: `text` (the line's
     words; its box, stamp, priority token and trailing id token stay), `sub` (a sub-item's words), `sub-add` (a sub-item
     after the line's last), `sub-del`, and the Undo form `restore-sub` (a removed sub-item, after its anchor line).
@@ -1450,7 +1509,7 @@ def todo_edit(root, lane, op, line, expected, text=None):
             words = _words(text, "the words").split()
             if any(todo_md.id_start(w) for w in words):
                 raise Refused("the words carry an id token; the board writes those")
-            lines[line - 1] = _compose(was[:bx[4]], lead + words + [ident]) + cr
+            lines[line - 1] = _compose(was[:bx[4]], lead + words + [_author_word(author), ident]) + cr
         elif op in ("sub", "sub-del"):
             if sub is None or sub[1]["kind"] not in ("in", "adr", "ref"):
                 raise Refused("line %d is not an `in`, `adr:` or `ref:` sub-item" % line)
@@ -1487,13 +1546,13 @@ def _findings_of(root, rp, lines):
     return f.items
 
 
-def supersede(root, key, line, text, today):
+def supersede(root, key, line, text, today, author=AGENT):
     """Replace the entry's line in place: open, stamped `today`, the new words, then
     ` - supersedes [<old stamp>]` (or the old text quoted when it has no stamp). (ok, message)."""
     try:
         root = os.path.realpath(os.path.abspath(_text(root, "the root", 1000)))
         words = _words(text, "the words")
-        _room(words)
+        _room(words, author)
         stamp = _stamp_of(today)
         path, bom, lines, at, entries = _backlog_entry(root, key, line)
         if at["state"] == "done":
@@ -1504,7 +1563,7 @@ def supersede(root, key, line, text, today):
         body, cr = _split_cr(lines[at["line"] - 1])
         token = (" [#%s]" % at["priority"]) if at["priority"] else ""
         ident = mint_id({e["id"] for e in entries})
-        tail = "%s - supersedes %s %s" % (words, old, ident)
+        tail = "%s - supersedes %s %s %s" % (words, old, _author_word(author), ident)
         _line_room(tail)
         was = list(lines)
         lines[at["line"] - 1] = "%s- [ ] [%s]%s %s%s" % (" " * at["indent"], today, token, tail, cr)
@@ -1548,7 +1607,7 @@ def _lane_paths(root, token, feature):
     return within, out[0].rstrip("/"), out[1]
 
 
-def promote(root, key, line, target_lane, feature, apply=False):
+def promote(root, key, line, target_lane, feature, apply=False, author=AGENT):
     """Promote an entry's record to a feature of a registry lane: the record folder moves whole into the
     lane's working dir for the feature, the entry goes `[+]` and its link becomes the feature link.
     Without `apply` it prints the plan and writes nothing. (ok, message)."""
@@ -1590,7 +1649,7 @@ def promote(root, key, line, target_lane, feature, apply=False):
         cr, terminated = _eol(lines)
         body, c = _split_cr(lines[at["line"] - 1])
         bx = todo_md.box_of(body)
-        lines[at["line"] - 1] = body[:bx[3]] + "+" + body[bx[3] + 1:] + c
+        lines[at["line"] - 1] = _authored(body[:bx[3]] + "+" + body[bx[3] + 1:], author) + c
         sbody, sc = _split_cr(lines[sb["line"] - 1])
         ind = sbody[:len(sbody) - len(sbody.lstrip(" "))]
         lines[sb["line"] - 1] = "%s- [%s](%s)%s" % (ind, feature, href, sc)
@@ -1727,6 +1786,26 @@ def _assign_ids(lines):
     return out
 
 
+def _assign_authors(lines, author):
+    """`lines` with `author` written before the id of every entry line outside a fence that has no author word;
+    a line with one, well-formed or not, stays as it is."""
+    out, fence = list(lines), False
+    for i, ln in enumerate(lines):
+        if ln.startswith("```"):
+            fence = not fence
+            continue
+        bx = None if fence else todo_md.box_of(ln)
+        if bx and bx[1] in STATES and not any(todo_md.author_start(w) for w in todo_md.words_of(bx[2])):
+            out[i] = _authored(ln, author)
+    return out
+
+
+def _at_current(bodies):
+    """True when the file's frontmatter already names the current format."""
+    end = _front_end(bodies) if bodies and bodies[0].strip() == "---" else None
+    return end is not None and any(ln.partition(":")[0].strip() == "format" and ln.partition(":")[2].strip() == FORMAT for ln in bodies[1:end])
+
+
 def _front_end(lines):
     """The index of the closing `---` of the frontmatter; the opening one is line 1."""
     for i in range(1, len(lines)):
@@ -1837,8 +1916,9 @@ def _migrate_todo_lines(bodies):
     return out, origin
 
 
-def migrate(root, target, lane=None, file=None, apply=False, full=False):
-    """Rewrite a former-grammar backlog (target `backlog`) to grammar v2, or a todo file's stamps (target `todo`).
+def migrate(root, target, lane=None, file=None, apply=False, full=False, author=AGENT):
+    """Rewrite a former-grammar backlog (target `backlog`) to grammar v2, or a todo file's stamps (target `todo`),
+    writing `author` on every entry line that has none; a file already at the current format gets the authors only.
     Without `apply` it prints the plan and writes nothing. (ok, message)."""
     try:
         root = os.path.realpath(os.path.abspath(_text(root, "the root", 1000)))
@@ -1862,8 +1942,15 @@ def migrate(root, target, lane=None, file=None, apply=False, full=False):
         path = _inside(path, root)
         bom, lines = _read_raw(path)
         bodies = [_split_cr(ln)[0] for ln in lines]
-        new, origin = (_migrate_backlog_lines if target == "backlog" else _migrate_todo_lines)(bodies)
-        new = _assign_ids(new)
+        current = _at_current(bodies)
+        if current:  # the format is already current: only the unauthored lines change
+            new, origin = list(bodies), list(range(1, len(bodies) + 1))
+        else:
+            new, origin = (_migrate_backlog_lines if target == "backlog" else _migrate_todo_lines)(bodies)
+            new = _assign_ids(new)
+        new = _assign_authors(new, author)
+        if current and new == bodies:
+            return True, "same: %s is at %s and every entry line has an author; nothing to migrate" % (rel(path, root), FORMAT)
         if target == "todo":
             ctx = lambda: _Ctx(Findings(), rel(path, root), (), os.path.dirname(path), root, "x")
             if len(todo_md.read_lane(bodies, ctx())[3]) != len(todo_md.read_lane(new, ctx())[3]):
@@ -1880,7 +1967,10 @@ def migrate(root, target, lane=None, file=None, apply=False, full=False):
                    for j in range(len(new)) if origin[j] and bodies[origin[j] - 1] != new[j]]
         kept = set(origin)
         removed = ["line %d: %s -> (removed)" % (n, clean(bodies[n - 1], 100)) for n in range(1, len(bodies) + 1) if n not in kept]
-        plan = ["plan: migrate %s (%s)" % (rp, "grammar %s, `format` key added, `structure` block dropped, ids" % FORMAT if target == "backlog" else "`format` key added, todo format comment dropped, stamps, ids")]
+        what = ("already %s: the author %s on every entry line that has none" % (FORMAT, _author_word(author)) if current
+                else "grammar %s, `format` key added, `structure` block dropped, ids, authors %s" % (FORMAT, _author_word(author)) if target == "backlog"
+                else "`format` key added, todo format comment dropped, stamps, ids, authors %s" % _author_word(author))
+        plan = ["plan: migrate %s (%s)" % (rp, what)]
         shown = removed + changes  # every deletion is listed first, so a cap never hides one before a change
         plan += ["plan: %s" % c for c in (shown if full else shown[:PREVIEW_CAP])]
         if not full and len(shown) > PREVIEW_CAP:
@@ -2149,7 +2239,7 @@ def _main(argv=None):
     pr.add_argument("--feature", required=True, help="the feature id, <PREFIX>-<NN>")
     pr.add_argument("--apply", action="store_true", help="write; without it the plan is printed and nothing is written")
     pr.add_argument("--asked", help=ASKED)
-    mg = sub.add_parser("migrate", help="rewrite a former-grammar backlog to grammar v2 (target backlog), or a todo file's stamps (target todo); plan without --apply")
+    mg = sub.add_parser("migrate", help="rewrite a former-grammar backlog to grammar v2 (target backlog), or a todo file's stamps (target todo), and write the operator's author on every unauthored entry line (a file at v2 gets the authors only); plan without --apply")
     mg.add_argument("target", choices=["backlog", "todo"], help="the file's kind; a file of the other kind is refused")
     mg.add_argument("--lane", help="the registry lane token whose todo file the todo target rewrites")
     mg.add_argument("--file", help="an absolute, physical path under the root, instead of the default file")
@@ -2165,8 +2255,15 @@ def _main(argv=None):
     if gated and not operator_asked(a.root, a.asked, ASK_VERBS[a.cmd], _ask_binding(a.root, a)):  # one typed command, one write
         print("refused: no operator ask; --asked quotes a /said:backlog command the operator typed that names this subcommand and its target")
         return 2
+    author = AGENT
+    if a.cmd == "migrate" or gated and not (a.cmd == "set-priority" and a.record is not None):  # a typed write, and migrate's plan of it, write the operator's author
+        try:
+            author = operator_name(os.path.realpath(os.path.abspath(a.root)))
+        except Refused as e:
+            print("refused: %s" % e)
+            return 2
     if a.cmd == "set-priority":
-        ok, msg = set_priority(a.root, a.letter, key=a.key, line=a.line, lane=a.lane, record=a.record)
+        ok, msg = set_priority(a.root, a.letter, key=a.key, line=a.line, lane=a.lane, record=a.record, author=author)
         print(msg)
         return 0 if ok else 2
     if a.cmd == "move":
@@ -2178,18 +2275,18 @@ def _main(argv=None):
         print(json.dumps(data, indent=1, ensure_ascii=True) if (a.json or a.lint_json) else render_lint(data))
         return code
     if a.cmd == "migrate":
-        ok, msg = migrate(a.root, a.target, lane=a.lane, file=a.file, apply=a.apply, full=a.full)
+        ok, msg = migrate(a.root, a.target, lane=a.lane, file=a.file, apply=a.apply, full=a.full, author=author)
         print(msg)
         return 0 if ok else 2
     if a.cmd in ("add", "record", "supersede", "promote"):
         if a.cmd == "add":
-            ok, msg, _ = add(a.root, a.section, a.topic, a.subtopic, a.text, a.today, a.note)
+            ok, msg, _ = add(a.root, a.section, a.topic, a.subtopic, a.text, a.today, a.note, author=author)
         elif a.cmd == "record":
-            ok, msg = record(a.root, a.key, a.line, a.kind, a.slug)
+            ok, msg = record(a.root, a.key, a.line, a.kind, a.slug, author=author)
         elif a.cmd == "supersede":
-            ok, msg = supersede(a.root, a.key, a.line, a.text, a.today)
+            ok, msg = supersede(a.root, a.key, a.line, a.text, a.today, author=author)
         else:
-            ok, msg = promote(a.root, a.key, a.line, a.target_lane, a.feature, apply=a.apply)
+            ok, msg = promote(a.root, a.key, a.line, a.target_lane, a.feature, apply=a.apply, author=author)
         print(msg)
         return 0 if ok else 2
     data = read_all(a.root)
