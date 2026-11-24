@@ -188,10 +188,13 @@ def text_faults(lane, text, dirs=(), routes=None, strict=False):
 
 def stand_on(ls, words, lead):
     """', <lead> stand on line(s) N' for the lines the quoted words stand on; '' when none or no words."""
-    at = [str(n) for n, l in enumerate(ls, 1) if words is not None and fold(words) and quote_at(l, words)]
+    if words is None or not fold(words):
+        return ''
+    at = [str(n) for n, l in enumerate(ls, 1) if quote_at(l, words)]
     if not at:
         return ''
-    return '%s stand on line%s %s' % (lead, 's' if len(at) > 1 else '', ', '.join(at))
+    more = ', and %d more' % (len(at) - 5) if len(at) > 5 else ''  # the refusal line stays short
+    return '%s stand on line%s %s%s' % (lead, 's' if len(at) > 1 else '', ', '.join(at[:5]), more)
 
 
 def text_paths(lane, text, dirs=(), strict=False):
