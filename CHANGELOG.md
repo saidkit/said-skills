@@ -4,6 +4,8 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
+## [0.29.1] - 2026-11-24
+
 - **Added:** `/said:backlog done <key or id>` ticks an entry done: its box becomes `[X]` and its author the operator's, every other byte of the line kept; gated by the typed ask like the other writes; an entry already done, or promoted, is refused.
 - **Changed:** the `no operator ask` refusal names the expected typed form of the refused operation (for `supersede`, `supersede <key or id> ; <new words>`), never a part of the quote; the skill states the supersede form with a worked example.
 - **Fixed:** the todo reader reads a lowercase `[x]` as done with one `state-lowercase` error, as the backlog reader does; the backlog's message names the `done` operation.
