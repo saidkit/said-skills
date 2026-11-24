@@ -1582,7 +1582,7 @@ def done(root, key, line, author=AGENT):
     try:
         root = os.path.realpath(os.path.abspath(_text(root, "the root", 1000)))
         path, bom, lines, at, entries = _backlog_entry(root, key, line)
-        if at["state"] == "done":
+        if at["state_char"] == "X":  # a lowercase [x] reads as done and is ticked to [X]
             raise Refused("the entry at line %d is already done" % at["line"])
         if at["feature"]:
             raise Refused("the entry at line %d is promoted (%s); its feature owns it" % (at["line"], at["feature"]))
