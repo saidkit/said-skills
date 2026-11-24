@@ -2001,11 +2001,39 @@ def _store_folders(root):
     return out
 
 
-def operator_asked(root, quote):
+ASK_VERBS = {"add": ("add",), "record": ("move", "record"), "supersede": ("supersede",), "set-priority": ("set-priority",),
+             "promote": ("promote",), "migrate": ("migrate",)}  # the operation word the typed command opens with
+
+
+def _fold(text):
+    return " ".join(str(text or "").split()).lower()
+
+
+def _ask_targets(root, a):
+    """The words that name this write's target, any one of which the typed command must carry: the new text for add and
+    supersede, the entry's key, id, stamp date or first three words (or the record's name or slug), the migrate target."""
+    if a.cmd in ("add", "supersede"):
+        return [a.text]
+    if a.cmd == "migrate":
+        return [a.target]
+    if getattr(a, "record", None):
+        return [a.record, a.record.split("-", 2)[-1]]
+    out = [a.key]
+    try:
+        e = next((e for e in read_all(root)["backlog"]["entries"] if e["key"] == a.key), None)
+    except Exception:
+        e = None
+    if e:
+        out += [e.get("id"), (e.get("id") or "").lstrip("@"), e.get("date"), " ".join(str(e.get("text", "")).split()[:3])]
+    return [t for t in out if t]
+
+
+def operator_asked(root, quote, verbs=None, targets=None):
     """True when `quote` (whitespace folded, at least ASK_MIN characters) sits in the argument words of a
     `/said:backlog` command the operator typed, in one of the ASK_SESSIONS newest session files of the root's
     Claude Code transcript store: <config>/projects/<slug>/*.jsonl, the slug of the root or of a folder above it up to
-    its git toplevel; the cwd never counts."""
+    its git toplevel; the cwd never counts. With `verbs` the command opens with one of them, and with `targets` it
+    carries one of them, so one typed command authorizes the one write it names."""
     q = " ".join((quote or "").split())
     if len(q) < ASK_MIN:
         return False
@@ -2030,8 +2058,13 @@ def operator_asked(root, quote):
                         w = _command_words(json.loads(line))
                     except ValueError:
                         continue
-                    if w and q in w:
-                        return True
+                    if not (w and q in w):
+                        continue
+                    if verbs and w.split()[0].lower() not in verbs:
+                        continue
+                    if targets is not None and not any(_fold(t) and _fold(t) in w.lower() for t in targets):
+                        continue
+                    return True
         except OSError:
             continue
     return False
@@ -2108,8 +2141,8 @@ def _main(argv=None):
     except Exception:
         pass
     gated = a.cmd in ("add", "record", "supersede", "set-priority") or a.cmd in ("promote", "migrate") and a.apply
-    if gated and not operator_asked(a.root, a.asked):
-        print("refused: no operator ask; --asked quotes the words of a /said:backlog command the operator typed")
+    if gated and not operator_asked(a.root, a.asked, ASK_VERBS[a.cmd], _ask_targets(a.root, a)):  # one typed command, one write
+        print("refused: no operator ask; --asked quotes a /said:backlog command the operator typed that names this subcommand and its target")
         return 2
     if a.cmd == "set-priority":
         ok, msg = set_priority(a.root, a.letter, key=a.key, line=a.line, lane=a.lane, record=a.record)
