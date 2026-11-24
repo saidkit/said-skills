@@ -12,6 +12,10 @@ words in double quotes directly after the cite; it holds when, whitespace folded
 markdown emphasis markers dropped from both the line and the words: a pair of ** or * around text, or of backticks, is
 unwrapped to the text inside it. A lone * or backtick is text and stays; nothing else is dropped.
 
+A token with no letter or of a version shape (1.5:2, v1.2:3) is never a cite. A bare name with a line of four digits
+or more, or with no extension, is a host and port to the default reading; a caller that passes strict reads it as a
+cite too.
+
   cite_check.py --lane <lane> <file>    check every cite in the text of <file>
 
 Prints one `<cite>: <why>` line per failing cite, in text order. Exit 0 every cite holds, 1 a cite fails, 2 an input
@@ -23,8 +27,8 @@ import re
 import sys
 
 CITE = re.compile(r'^([\w./-]+):(\d+)$')
-# a cite inside free text: a path with a / or a .ext, then :line, :line-line; a quote may follow (after a closing ` or :)
-IN_TEXT = re.compile(r'(?<![\w./:@-])([\w./-]*[/.][\w./-]*):(\d+)(?:-(\d+))?(?!\w)(?!:\d)(?:[`:]{0,2}[ \t]*"([^"\n]+)")?')
+# a cite inside free text: a path or a name, then :line, :line-line; a quote may follow (after a closing ` or :)
+IN_TEXT = re.compile(r'(?<![\w./:@-])([\w./-]*[/.A-Za-z][\w./-]*):(\d+)(?:-(\d+))?(?!\w)(?!:\d)(?:[`:]{0,2}[ \t]*"([^"\n]+)")?')
 
 
 def fold(s):
@@ -135,14 +139,25 @@ def quote_at(line, words):
     return False
 
 
-def text_faults(lane, text, dirs=(), routes=None):
+VERSION = re.compile(r'v?\d+(\.\d+)*')
+
+
+def not_a_cite(path, line, strict=False):
+    """True for a token that is no cite: no letter, a version, or (unless strict) a bare host and port."""
+    if not re.search(r'[A-Za-z]', path) or VERSION.fullmatch(path):
+        return True
+    return not strict and '/' not in path and (len(line) >= 4 or not re.search(r'\.[A-Za-z]\w*$', path))
+
+
+def text_faults(lane, text, dirs=(), routes=None, strict=False):
     """[(cite, why)] for every cite in the text that fails, in text order. dirs: the folders a bare file name may
-    resolve in (see resolve); none by default. routes: the lane's declared routes; given, a file must be admitted."""
+    resolve in (see resolve); none by default. routes: the lane's declared routes; given, a file must be admitted.
+    strict: a bare name with a long line or no extension is a cite too."""
     out = []
     for m in IN_TEXT.finditer(text):
         path, a, b, words = m.group(1), int(m.group(2)), m.group(3), m.group(4)
         cite = '%s:%s%s' % (path, m.group(2), '-' + b if b else '')
-        if not re.search(r'[A-Za-z]', path) or ('/' not in path and (len(m.group(2)) >= 4 or not re.search(r'\.[A-Za-z]\w*$', path))):
+        if not_a_cite(path, m.group(2), strict):
             continue  # a number (1.5:2), a version (v1.2:3) or a host and port (example.com:8080), not a path
         if not inside(path):
             out.append((cite, 'outside the lane'))
@@ -169,12 +184,12 @@ def text_faults(lane, text, dirs=(), routes=None):
     return out
 
 
-def text_paths(lane, text, dirs=()):
+def text_paths(lane, text, dirs=(), strict=False):
     """The lane-relative file of each cite in the text, in text order; None for a cite that names no file."""
     out = []
     for m in IN_TEXT.finditer(text):
         path = m.group(1)
-        if not re.search(r'[A-Za-z]', path) or ('/' not in path and (len(m.group(2)) >= 4 or not re.search(r'\.[A-Za-z]\w*$', path))):
+        if not_a_cite(path, m.group(2), strict):
             continue
         out.append(resolve(lane, path, dirs) if inside(path) else None)
     return out

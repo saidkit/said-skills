@@ -2115,11 +2115,11 @@ def feature_review_output(root, workdir, feature, decisions=()):
         log = os.path.realpath(os.path.join(root, log)) if log else None
 
         def in_log(ev):
-            hits = cite_check.text_paths(root, ev, dirs)
+            hits = cite_check.text_paths(root, ev, dirs, strict=True)
             return bool(log and hits) and all(h and os.path.realpath(os.path.join(root, h)) == log for h in hits)
 
         return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc,
-                                    lambda cell: cite_check.text_faults(root, cell, dirs, routes),
+                                    lambda cell: cite_check.text_faults(root, cell, dirs, routes, strict=True),  # a reader row holds no host and port
                                     os.path.join(workdir, "gate-%s.md" % feature), in_log)
     except gate_record.Error as e:
         return 2, ["error: %s" % e]
