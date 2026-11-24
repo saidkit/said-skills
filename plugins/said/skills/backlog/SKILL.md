@@ -43,8 +43,8 @@ description: >
    operations and stop; run nothing.
 9. **`--today`** (on `add` and `supersede`) is today's date in the operator's local time (`date +%Y-%m-%d`).
 10. **The operator's ask.** Run only on the operator's own typed `/said:backlog`, never for a skill, agent, hook or peer message. Every write but the engine's `move` passes `--asked` with at least 12 characters of that command's argument words, word for word. The engine refuses (`refused: no operator ask`) a quote it does not find in a command typed in the root's 5 newest Claude Code sessions; that refusal is the answer (rule 4).
-11. **One command, one write.** The command must open with the operation and carry its target: the `--text` words for `add` and `supersede`, the entry's id, stamp date or first three words, the record's name for a record head, `backlog` or `todo` for `migrate`.
-12. **Outside the ask.** The engine's `move`, the board page's writes (whoever drives the page over HTTP), the engine's functions called in-process, and a `CLAUDE_CONFIG_DIR` pointing the engine at another store pass no check; the check stops an assumed ask and does not authenticate the transcript files.
+11. **One command, one write.** The command must open with the operation and carry one of its targets: the `--text` words for `add` and `supersede`; for `record`, `set-priority` and `promote`, the entry's key, id, stamp date or first three words, or the record's name for a record head; `backlog` or `todo` for `migrate`.
+12. **Outside the ask.** The engine's `move`, the board page's writes (whoever drives the page over HTTP), the engine's functions called in-process, and a `CLAUDE_CONFIG_DIR` or `HOME` pointing the engine at another store pass no check; the check stops an assumed ask and does not authenticate the transcript files.
 
 ## Operations
 
