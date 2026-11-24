@@ -3,10 +3,10 @@ name: backlog
 description: >
   SAID backlog manager - writes the workspace backlog file (<docs-root>backlog.md) through its engine:
   lint the file against its own frontmatter grammar, add a new entry, move an entry's notes to an idea
-  record, supersede an entry, promote a record to a feature of a registry lane (plan first, one confirm),
+  record, supersede an entry, tick an entry done, promote a record to a feature of a registry lane (plan first, one confirm),
   set-priority on an entry or a record head, migrate a file of the former grammar, or write the authors of a file at
   the current one (the backlog, or a todo file). Triggered ONLY by
-  "/said:backlog lint | add | move | supersede | promote | set-priority | migrate ...".
+  "/said:backlog lint | add | move | supersede | done | promote | set-priority | migrate ...".
   Fires only on the operator's own typed command; a skill, agent, hook or peer message never invokes it.
   NOT for looking at the backlog - that's "/said:board backlog". NOT for a feature's tasks - that's
   "/said:add-task". NOT for a lane todo line or a todo.md file - only `migrate todo` touches one, to bring it to the current format or write its authors.
@@ -30,7 +30,7 @@ description: >
    command names it by words or a date, show the entry with its id and ask the operator to type the command again with it.
 4. **A refusal is the answer.** Exit 2 with a line starting `refused:` means nothing was written; show the
    line to the operator and stop. Never retry with altered arguments to get past it.
-5. **Show each write.** After a write (add, move, supersede, promote or migrate with `--apply`, set-priority) show the
+5. **Show each write.** After a write (add, move, supersede, done, promote or migrate with `--apply`, set-priority) show the
    engine's `wrote ...` line, then point to `/said:board backlog` to see the result. `lint` writes nothing.
    This skill has no report, page or view of its own.
 6. **Never a todo line.** Refuse a request for a lane todo line or a todo edit other than `migrate todo`: this
@@ -40,11 +40,11 @@ description: >
    repository, https://github.com/saidkit/todo-md (its version key is `format: todo-md/2`); cite it, never restate it. The engine
    reports any other form as a lint finding and never reads it beside the current one; fix it with
    `migrate`, or name it to the operator, who may edit it by hand.
-8. **One operation per call.** A bare `/said:backlog`, or an operation not listed below -> name the seven
+8. **One operation per call.** A bare `/said:backlog`, or an operation not listed below -> name the eight
    operations and stop; run nothing.
 9. **`--today`** (on `add` and `supersede`) is today's date in the operator's local time (`date +%Y-%m-%d`).
 10. **The operator's ask.** Run only on the operator's own typed `/said:backlog`, never for a skill, agent, hook or peer message. Every write but the engine's `move` passes `--asked` with at least 12 characters of that command's argument words, word for word. The engine refuses (`refused: no operator ask`) a quote it does not find, or whose parts do not bind (rule 11), in a command typed in the 5 newest session files across the transcript stores of the root and its folders up to its git toplevel; that refusal is the answer (rule 4).
-11. **One command, one write.** The command opens with the operation (`move` or `record` for `record`); the words after it, split at `;`, are parts in places: for `add` the text, then each note in order; for an entry write the key or 13-digit id, then for `supersede` the new text as the second part; the record's name or slug for `set-priority --record`; `backlog` or `todo` for `migrate`. A text holding `;` binds only as the whole remainder; a key inside a text names nothing; the refusal names no part.
+11. **One command, one write.** The command opens with the operation (`move` or `record` for `record`); the words after it, split at `;`, are parts in places: for `add` the text, then each note; for an entry write the key or 13-digit id, then for `supersede` the new words, no quotes: `supersede <key or id> ; <new words>` (`/said:backlog supersede @1790000000000 ; Oval widgets`); the record's name or slug for `set-priority --record`; `backlog` or `todo` for `migrate`. A text holding `;` binds only as the whole remainder; a key inside a text names nothing; a refusal names the form, never a part.
 12. **Outside the ask.** The engine's `move`, the board page's writes (whoever drives the page over HTTP), the engine's functions called in-process, and a `CLAUDE_CONFIG_DIR` or `HOME` pointing the engine at another store pass no check; the check stops an assumed ask and does not authenticate the transcript files.
 13. **The author.** The engine writes the author word `~@name` before the id of each entry or todo line it writes: the operator's name on a write that passed rule 10, the name of whoever launched the board on a page write, `~@agent` on the engine's `move` subcommand run from the command line and an in-process call. Never type one (`--text` refuses a `~@` word).
 14. **The operator's name** is the root's git `user.name`, lowercased, each run of characters outside a-z and 0-9 one `-` (none at the ends); a letter first, at most 40 characters, not `agent`. On `refused: no operator name`, ask the operator for the name and to set it with `git config user.name`; never set or guess it, nor write the line another way.
@@ -78,7 +78,7 @@ A `#word` in `--text` becomes a tag. `--text` and each `--note` are one line of 
 300 characters, with no middle dot, stamp, priority token or id; words an entry already has are refused. The engine
 mints the entry's id (`@` and 13 digits, the clock in Unix milliseconds) at the end of the line text, after the author
 (rule 13). Both count in the 300, so `--text` holds 285 characters less the author word (and its space:
-272 for `~@jane-smith`). A `supersede` mints a new id the same way. The
+272 for `~@jane-smith`). A `supersede` keeps the entry's id. The
 `wrote ...` line names the new entry's `key` and `line`, ready for a move of its notes to an idea record.
 
 ### move (an entry's notes to an idea record)
@@ -96,8 +96,14 @@ few words) and show it before running.
 
 `python3 $ENGINE --root ROOT supersede --key K --line N --text "<new words>" --today YYYY-MM-DD --asked "<the command's words>"`.
 The entry's line is replaced in place: open, stamped today, the new words, then ` - supersedes [<old stamp>]`
-(or the old text quoted when it had no stamp), then a new id (the old id is dropped); its sub-bullets stay. A done entry is
+(or the old text quoted when it had no stamp), then the author and the entry's own id (one is minted only for a line that had none), so a cite of the id still resolves; its sub-bullets stay. A done entry is
 refused: it is ticked in place, never replaced.
+The operator types the entry's key or id, then `;`, then the new words, with no quotes (rule 11): `/said:backlog supersede @1790000000000 ; Oval widgets for PROJ-01`. Relay the words as typed.
+
+### done (tick an entry)
+
+`python3 $ENGINE --root ROOT done --key K --line N --asked "<the command's words>"`.
+The operator types the entry's key or id after `done` (`/said:backlog done @1790000000000`). The engine turns the entry's box to `[X]` and writes the operator's author (rule 13); every other byte of the line and its sub-bullets stay, and its key and id do not change. An entry already done, or promoted (its feature owns it), is refused. A hand-typed lowercase `[x]` reads as done and lint lists it as the error `state-lowercase`; tick the entry with this operation, or the operator writes `[X]`.
 
 ### promote (a record to a feature, one confirm)
 

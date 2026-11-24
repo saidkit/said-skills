@@ -1548,7 +1548,8 @@ def _findings_of(root, rp, lines):
 
 def supersede(root, key, line, text, today, author=AGENT):
     """Replace the entry's line in place: open, stamped `today`, the new words, then
-    ` - supersedes [<old stamp>]` (or the old text quoted when it has no stamp). (ok, message)."""
+    ` - supersedes [<old stamp>]` (or the old text quoted when it has no stamp), the author and the entry's own id
+    (one minted only for a line that has none). (ok, message)."""
     try:
         root = os.path.realpath(os.path.abspath(_text(root, "the root", 1000)))
         words = _words(text, "the words")
@@ -1562,7 +1563,7 @@ def supersede(root, key, line, text, today, author=AGENT):
         old = ("[%s]" % at["date"]) if at["stamp"] else ('"%s"' % _raw_text(lines, at))
         body, cr = _split_cr(lines[at["line"] - 1])
         token = (" [#%s]" % at["priority"]) if at["priority"] else ""
-        ident = mint_id({e["id"] for e in entries})
+        ident = at["id"] or mint_id({e["id"] for e in entries})  # the entry keeps its id: a cite of it still resolves
         tail = "%s - supersedes %s %s %s" % (words, old, _author_word(author), ident)
         _line_room(tail)
         was = list(lines)
@@ -1570,6 +1571,28 @@ def supersede(root, key, line, text, today, author=AGENT):
         _guard(root, path, was, lines, (at["line"],))
         _write_raw(path, bom, lines)
         return True, "wrote %s:%d: the entry superseded, it names %s" % (rel(path, root), at["line"], old)
+    except Refused as e:
+        return False, "refused: %s" % e
+    except (OSError, ValueError, TypeError, KeyError, IndexError) as e:
+        return False, "refused: %s" % clean("%s: %s" % (type(e).__name__, e), 200)
+
+
+def done(root, key, line, author=AGENT):
+    """Tick the entry done in place: its box becomes `[X]` and its author the write's, every other byte kept. (ok, message)."""
+    try:
+        root = os.path.realpath(os.path.abspath(_text(root, "the root", 1000)))
+        path, bom, lines, at, entries = _backlog_entry(root, key, line)
+        if at["state"] == "done":
+            raise Refused("the entry at line %d is already done" % at["line"])
+        if at["feature"]:
+            raise Refused("the entry at line %d is promoted (%s); its feature owns it" % (at["line"], at["feature"]))
+        body, cr = _split_cr(lines[at["line"] - 1])
+        bx = todo_md.box_of(body)
+        was = list(lines)
+        lines[at["line"] - 1] = _authored(body[:bx[3]] + "X" + body[bx[3] + 1:], author) + cr
+        _guard(root, path, was, lines, (at["line"],))
+        _write_raw(path, bom, lines)
+        return True, "wrote %s:%d: the entry is done [X]" % (rel(path, root), at["line"])
     except Refused as e:
         return False, "refused: %s" % e
     except (OSError, ValueError, TypeError, KeyError, IndexError) as e:
@@ -2092,7 +2115,10 @@ def _store_folders(root):
 
 
 ASK_VERBS = {"add": ("add",), "record": ("move", "record"), "supersede": ("supersede",), "set-priority": ("set-priority",),
-             "promote": ("promote",), "migrate": ("migrate",)}  # the operation word the typed command opens with
+             "promote": ("promote",), "migrate": ("migrate",), "done": ("done",)}  # the operation word the typed command opens with
+ASK_FORMS = {"add": "add <text>[; <note>]", "record": "move <key or id>", "supersede": "supersede <key or id> ; <new words>",
+             "set-priority": "set-priority <key or id>, or set-priority <record name or slug>", "promote": "promote <key or id>",
+             "migrate": "migrate backlog, or migrate todo", "done": "done <key or id>"}  # the typed form a refusal names: shapes only, never the quote
 
 
 def _fold(text):
@@ -2108,7 +2134,7 @@ def _ask_binding(root, a):
         return {w.strip(".,;:()[]\"'") for w in part.split()}
 
     entry = []
-    if a.cmd in ("supersede", "record", "promote") or a.cmd == "set-priority" and not getattr(a, "record", None):
+    if a.cmd in ("supersede", "record", "promote", "done") or a.cmd == "set-priority" and not getattr(a, "record", None):
         entry = [_fold(a.key)]
         try:
             e = next((e for e in read_all(root)["backlog"]["entries"] if e["key"] == a.key), None)
@@ -2191,7 +2217,7 @@ def main(argv=None):
 
 def _main(argv=None):
     ap = argparse.ArgumentParser(description="read the backlog file and the registry lanes' todo files by their grammars; "
-                                 "`lint` checks the backlog; `set-priority`, `move`, `add`, `record`, `supersede` and `promote` write")
+                                 "`lint` checks the backlog; `set-priority`, `move`, `add`, `record`, `supersede`, `done` and `promote` write")
     ap.add_argument("--root", default=".", help="the root whose <docs-root>backlog.md is read (default: the current directory)")
     ap.add_argument("--json", action="store_true", help="print the data as JSON")
     ap.add_argument("--board", choices=["backlog", "todo"], help="print a board's view model (the page's numbers): `backlog`, by stage and by priority; `todo`, one tab per lane with a todo file")
@@ -2232,6 +2258,10 @@ def _main(argv=None):
     ss.add_argument("--text", required=True, help="the new words, one line")
     ss.add_argument("--today", required=True, help="the day, YYYY-MM-DD (the new stamp)")
     ss.add_argument("--asked", help=ASKED)
+    dn = sub.add_parser("done", help="tick an entry done: its box becomes [X], every other byte of the line kept")
+    dn.add_argument("--key", required=True, help="the entry's stable key (from --json)")
+    dn.add_argument("--line", required=True, help="the entry's line position (from --json)")
+    dn.add_argument("--asked", help=ASKED)
     pr = sub.add_parser("promote", help="move an entry's record into a registry lane's working dir for a feature; plan without --apply")
     pr.add_argument("--key", required=True, help="the entry's stable key (from --json)")
     pr.add_argument("--line", required=True, help="the entry's line position (from --json)")
@@ -2251,9 +2281,9 @@ def _main(argv=None):
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
-    gated = a.cmd in ("add", "record", "supersede", "set-priority") or a.cmd in ("promote", "migrate") and a.apply
+    gated = a.cmd in ("add", "record", "supersede", "set-priority", "done") or a.cmd in ("promote", "migrate") and a.apply
     if gated and not operator_asked(a.root, a.asked, ASK_VERBS[a.cmd], _ask_binding(a.root, a)):  # one typed command, one write
-        print("refused: no operator ask; --asked quotes a /said:backlog command the operator typed that names this subcommand and its target")
+        print("refused: no operator ask; --asked quotes a /said:backlog command the operator typed that names this subcommand and its target; expected: /said:backlog %s" % ASK_FORMS[a.cmd])
         return 2
     author = AGENT
     if a.cmd == "migrate" or gated and not (a.cmd == "set-priority" and a.record is not None):  # a typed write, and migrate's plan of it, write the operator's author
@@ -2276,6 +2306,10 @@ def _main(argv=None):
         return code
     if a.cmd == "migrate":
         ok, msg = migrate(a.root, a.target, lane=a.lane, file=a.file, apply=a.apply, full=a.full, author=author)
+        print(msg)
+        return 0 if ok else 2
+    if a.cmd == "done":
+        ok, msg = done(a.root, a.key, a.line, author=author)
         print(msg)
         return 0 if ok else 2
     if a.cmd in ("add", "record", "supersede", "promote"):

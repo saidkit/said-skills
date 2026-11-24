@@ -940,7 +940,7 @@ def _make_entry(out, line, indent, mark, text, secs, position):
     if mark not in STATES:
         out.add(line, "state-unknown", "the state `[%s]` is not ` `, `+` (in progress) or `X`" % mark)
     elif mark == "x":
-        out.add(line, "state-lowercase", "the done state is `[X]`; lowercase `[x]` read as done")
+        out.add(line, "state-lowercase", "the done state is `[X]`; lowercase `[x]` read as done (write `[X]`, or tick it with `/said:backlog done`)")
     stamp, letter, pos, body, tags = split_entry_text(text)
     if find_former_stamp(text):
         out.add(line, "stamp-former", "the stamp `[@YYMMDD]` is the former form; write `[YYYY-MM-DD]`")
@@ -1047,6 +1047,8 @@ def _todo_item(rd, it, cur, entries, other_line):
         indent, mark, text = bx[0], bx[1], bx[2]
         if mark not in STATES:
             out.add(n, "state-unknown", "the state `[%s]` is not ` `, `+` or `X`" % mark)
+        elif mark == "x":  # todo-md R5: read as done, one finding
+            out.add(n, "state-lowercase", "the done state is `[X]`; lowercase `[x]` read as done (write `[X]`)")
         stamp, letter, pos, body, _ = split_entry_text(text, with_tags=False)
         if letter and letter not in PRIORITY_LETTERS:
             out.add(n, "priority-letter", "the priority `%s` is outside A, B, C (High, Medium, Low)" % clean(letter, 20))
