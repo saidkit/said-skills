@@ -16,7 +16,8 @@ task log is an error before any estimate:
      the token is the one the current estimate prints (it covers HEAD, the base and the uncommitted changes). --base (the feature's base commit) and --capture-ref (a
      non-empty capture file in the working dir, never the gate record, or `none` on a feature with no capture) are needed
      for the read. A reply with no verdict line is not filed;
-     a reply the writer refuses is not filed either, and is kept in a temp file outside the lane whose path is printed.
+     a reply the writer refuses is not filed either, and is kept in a temp file outside the lane whose path is printed;
+     the reader then runs once more under the same yes, its brief ending with the writer's refusal line.
   2. gate_recompute.sh over every unit (SAID_GATE_UNITS is never passed), writing the record.
   3. covers-read.py over the task log, its output in <working>/covers-<id>.txt (--ledger names the decision ledgers).
   4. gate_record.py round from that output, then check over every read; the report of the record is printed.
@@ -120,7 +121,7 @@ def feature_review(fid, opts, root):
     dirty = hashlib.sha256((git(root, "status", "--porcelain", "-z") or "").encode("utf-8")).hexdigest()
     token = hashlib.sha256(("%s|%s|%s|%s|%d" % (root, p["head"], p["base"] + p["mounts"], dirty, p["tokens"])).encode("utf-8")).hexdigest()[:10]
     print("estimate: at least %d input tokens (%d characters read once, divided by 4); every reader turn re-sends"
-          " what it has read, so the spend is several times that" % (p["tokens"], p["chars"]))
+          " what it has read, so the spend is several times that; a refused reply is read once more" % (p["tokens"], p["chars"]))
     print("yes token: %s" % token)
     if "yes" not in opts:
         print("feature-review: owed (no read without a yes: rerun with --yes %s to spend)" % token)
@@ -130,19 +131,26 @@ def feature_review(fid, opts, root):
         return
     cmd = [os.environ.get("SAID_CLAUDE_BIN") or "claude", "-p", "--agent", review_feature.AGENT, "--allowedTools", reader_tools(),
            "--output-format", "text"]
-    try:
-        r = subprocess.run(cmd, input=p["brief"], capture_output=True, text=True, cwd=root, timeout=3600)
-        reply = r.stdout if r.returncode == 0 else ""
-    except (OSError, subprocess.TimeoutExpired) as e:
-        reply = ""
-        print("feature-review: the read did not run (%s)" % e.__class__.__name__)
-    code, lines = review_feature.file_reply(fid, root, reply, opts["ledgers"])
-    print("feature-review: %s" % (lines[1] if len(lines) > 1 else lines[0]))  # the writer's first line, else why not filed
-    for ln in lines:
-        if ln.startswith("record-class: "):
-            print("feature-review: %s" % ln)
-    if code and lines[0].startswith("not filed"):  # a refused reply is kept outside the lane, never at the verdict path
-        print("feature-review: the refused reply is kept at %s" % review_feature.keep_refused(fid, reply))
+    brief = p["brief"]
+    for attempt in (1, 2):  # a refused reply is read once more, as the session skill does
+        try:
+            r = subprocess.run(cmd, input=brief, capture_output=True, text=True, cwd=root, timeout=3600)
+            reply = r.stdout if r.returncode == 0 else ""
+        except (OSError, subprocess.TimeoutExpired) as e:
+            reply = ""
+            print("feature-review: the read did not run (%s)" % e.__class__.__name__)
+        code, lines = review_feature.file_reply(fid, root, reply, opts["ledgers"])
+        print("feature-review: %s" % (lines[1] if len(lines) > 1 else lines[0]))  # the writer's first line, else why not filed
+        for ln in lines:
+            if ln.startswith("record-class: "):
+                print("feature-review: %s" % ln)
+        if not (code and lines[0].startswith("not filed")):
+            return
+        print("feature-review: the refused reply is kept at %s" % review_feature.keep_refused(fid, reply))  # never in the lane
+        owed = next((ln for ln in lines if ln.startswith("feature review owed: ")), "")
+        if attempt == 2 or not lines[0].startswith("not filed (the writer refused") or not owed:
+            return
+        brief = p["brief"].rstrip("\n") + "\nYour last reply was refused by the row writer: %s. Keep the Output rules exactly.\n" % owed
 
 
 def main(argv):
