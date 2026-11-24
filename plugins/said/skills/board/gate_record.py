@@ -60,7 +60,7 @@ import unicodedata
 
 sys.dont_write_bytecode = True
 ROW_KINDS = ("gate-recompute: ", "skill-doctor: ", "feature-review: ", "record-fail: ", "debrief-window: ")
-FR_RECORD = "record: "  # the evidence prefix of a FAIL row whose cites sit in the task log only
+FR_RECORD = "record: "  # the evidence prefix of a FAIL row whose cites sit in the feature's records only
 ROUND_KEYS = ("decisions", "leaks", "look", "operator-min", "rework-min", "elapsed-min", "tokens")
 READS = ("gate-recompute", "matrix", "feature-review")
 STATUSES = ("PASS", "EXPECTED", "FAIL")

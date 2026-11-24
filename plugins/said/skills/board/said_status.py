@@ -2010,8 +2010,8 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
     `dirty()` (the count of uncommitted files outside the working dir), a row per rule id and a Covers or Uncovered
     decisions row per decision id; rc 0 and the row lines, or rc 1 and the owed lines. cites(cell text) gives the
     failing cites of a row as [(cite, why)]: any of them, on a row of any status, refuses the reply.
-    record_cite(evidence) is True when every cite sits in the task log: the FAIL row is
-    then the record class. feature_review_output reads the file, the store and the records, then calls this."""
+    record_cite(evidence) is True when every cite sits in a record (the task log, the spec, a file of the working
+    dir): the FAIL row is then the record class. feature_review_output reads the file, the store and the records, then calls this."""
     import gate_record
     try:
         verdict, rows = _fr_parse(text, sha, workdir, verdict_path, doc, record_path)
@@ -2054,7 +2054,7 @@ def _fr_evidence_at(group, cells):
 
 
 def _fr_class_row(group, cells, in_record):
-    """A FAIL row whose cites all hold and sit in the task log carries the record prefix; a typed prefix never counts."""
+    """A FAIL row whose cites all hold and sit in records carries the record prefix; a typed prefix never counts."""
     import gate_record
     if cells[-1] != "FAIL":
         return cells
@@ -2111,12 +2111,18 @@ def feature_review_output(root, workdir, feature, decisions=()):
         import cite_check  # the one cite check, shared with the scope chain
         dirs = _fr_cite_dirs(root, feature)  # a bare file name resolves in the feature's own folders
         routes = _fr_routes(root, feature)
-        log = (gate_record.lane_key(root, "task-log") or "").strip().strip("`'\"").replace("<id>", feature)
-        log = os.path.realpath(os.path.join(root, log)) if log else None
+        records = []  # the feature's task log and spec, files by name; its working dir, any file under it
+        for key in ("task-log", "feature-spec"):
+            rec = (gate_record.lane_key(root, key) or "").strip().strip("`'\"").replace("<id>", feature)
+            if rec:
+                records.append(os.path.realpath(os.path.join(root, rec)))
+
+        def a_record(real):
+            return real in records or real.startswith(wd + os.sep)
 
         def in_log(ev):
             hits = cite_check.text_paths(root, ev, dirs, strict=True)
-            return bool(log and hits) and all(h and os.path.realpath(os.path.join(root, h)) == log for h in hits)
+            return bool(hits) and all(h and a_record(os.path.realpath(os.path.join(root, h))) for h in hits)
 
         return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc,
                                     lambda cell: cite_check.text_faults(root, cell, dirs, routes, strict=True),  # a reader row holds no host and port
