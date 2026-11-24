@@ -4,6 +4,8 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-24
+
 - **Upgrade note:** the gate record's store identity is now a hash of the declared mounts at HEAD, the `## Lane` block and this file, and a feature's spec or task log moves only the feature read, so every existing record reads `gate owed` once after the upgrade: each open feature runs one gate recompute, one feature read and its skill-doctor rows again.
 - **Upgrade note:** a typed `rejected` or `superseded` ruling mark made during a debrief now halts `debrief-seal` with the feature read owed: run `/said:review-feature` again, then re-run `/said:debrief`, which skips Phase A and resumes at the seal.
 - **Upgrade note:** the backlog is the operator's: `debrief` proposes a backlog entry and never writes it, `/said:backlog` fires only on the operator's typed command, and every engine write but `move` refuses unless `--asked` quotes a `/said:backlog` command typed in the 5 newest session files of the root's transcript stores that opens with the operation and names its one write (the entry by key or id, never a date or first words; the whole text; every note); a script calling them must pass one.
