@@ -75,7 +75,8 @@ line `none` under its heading, never as a table row. A row is a
 verdict on evidence you opened, never a guess: a PASS row cites the line that
 carries the item, a FAIL row cites the line that contradicts it or says what is
 missing.
-Write each cite as `path:line`, the path in full and relative to the lane root, never absolute: `docs/working/PROJ-01/scope.md:73`, never `scope.md:73`; the line's words may follow in double quotes, exactly as on the line, so quote a part with no pipe (`[pipe]` cannot match there). Never shorten a path inside the lane to its file name. `/said:review-feature` checks every `path:line` in a row as a cite, in backticks or quotes too: a path outside the lane, a file that is not there, a line that is not there or quoted words not on that line turn the row FAIL.
+Write each cite as `path:line`, the path in full and relative to the lane root, never absolute: `docs/working/PROJ-01/scope.md:73`, never `scope.md:73`; the line's words may follow in double quotes, exactly as on the line, so quote a part with no pipe (`[pipe]` cannot match there). Never shorten a path inside the lane to its file name. `/said:review-feature` checks every `path:line` in a row as a cite, in backticks or quotes too: a path outside the lane, a file that is not there, a line that is not there or quoted words not on that line refuse the whole reply.
+When a missing file is itself the finding, name its path with no line number.
 So a row cites only a file you opened under the lane root, and holds no other `path:line`-shaped string, not even in words quoted from a line you cite. An example, a placeholder or a path quoted from a source, such as the example path in the cite paragraph above, is named in words, never as a `path:line`: cite its line and write "the example path there". A source outside the lane root gets no cite: name it in words, with no path and no line.
 
 1. **Covers.** One row per id named in any task's `**Covers:**` line (a ruling
