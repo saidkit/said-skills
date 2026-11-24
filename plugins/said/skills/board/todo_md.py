@@ -312,9 +312,60 @@ def read_id(add, line, text, seen):
     return ident
 
 
+AUTHOR_LEAD = "~@"
+AGENT = "agent"
+
+
+def author_start(w):
+    """True for a word that is an author by its first characters: `~@`."""
+    return w.startswith(AUTHOR_LEAD)
+
+
+def is_author(w):
+    """True for a whole-word author: `~@`, an ASCII letter, then ASCII letters, digits, `-` or `_`."""
+    name = w[len(AUTHOR_LEAD):]
+    return (author_start(w) and bool(name) and name[0].isascii() and name[0].isalpha()
+            and all(c.isascii() and (c.isalnum() or c in "-_") for c in name))
+
+
+def trailing_author(text):
+    """The author word right before the id that ends a line's text (or its last word with no id), else ''."""
+    words = words_of(without_id(text))
+    return words[-1] if words and is_author(words[-1]) else ""
+
+
+def without_tail(text):
+    """`text` without the id and the author that end it."""
+    core = without_id(text)
+    au = trailing_author(text)
+    return core[:core.rstrip().rfind(au)].rstrip() if au else core
+
+
+def read_author(add, line, text):
+    """The author name of an entry line's text, '' when it has none; a missing author and `~@agent` are warnings, a
+    `~@` word that is no author right before the id is `author-malformed`, two authors on one line `author-duplicate`."""
+    words = words_of(text)
+    slot = len(words) - (2 if trailing_id(text) else 1)
+    starts = [(i, w) for i, w in enumerate(words) if author_start(w)]
+    good = [w for _, w in starts if is_author(w)]
+    if len(good) > 1:
+        add(line, "author-duplicate", "the line carries %d authors; a line has one, right before its id" % len(good))
+    bad = 0
+    for i, w in starts:
+        if not is_author(w) or (len(good) == 1 and i != slot):
+            bad += 1
+            add(line, "author-malformed", "`%s` is no author: an author is `~@` and a letter-led name, right before the id" % clean(w, 30))
+    au = trailing_author(text) if len(good) == 1 and not bad else ""
+    if not starts:
+        add(line, "author-missing", "the line carries no `~@name` author", "warn")
+    elif au.lower() == AUTHOR_LEAD + AGENT:
+        add(line, "author-agent", "the line's last write was asked by no person (`~@agent`)", "warn")
+    return au[len(AUTHOR_LEAD):]
+
+
 def stable_key(prefix, text):
-    """A line's handle for the writers: its words, without the stamp, the priority cookie, the tags and the id."""
-    core = take_tags(strip_lead(without_id(text)).replace("**", ""))[1].lower()
+    """A line's handle for the writers: its words, without the stamp, the priority cookie, the tags, the author and the id."""
+    core = take_tags(strip_lead(without_tail(text)).replace("**", ""))[1].lower()
     return "%s:%s" % (prefix, hashlib.sha1(core.encode("utf-8")).hexdigest()[:10])
 
 
@@ -561,7 +612,7 @@ def with_priority(line, letter):
 def raw_text(ln):
     """An entry's text from the file's own line: after the box, without the lead (stamp and cookie)."""
     text = box_of(ln.rstrip("\r"))[2]
-    return without_id(strip_lead(text))
+    return without_tail(strip_lead(text))
 
 
 # ---------------------------------------------------------------- front matter
@@ -901,6 +952,7 @@ def _make_entry(out, line, indent, mark, text, secs, position):
         out.add(line, "token-before-stamp", "the priority token precedes the stamp; it follows it")
     token_findings(out.add, line, text)
     ident = read_id(out.add, line, text, out.ids)
+    author = read_author(out.add, line, text)
     section, topic, sub = secs.section, secs.topic, secs.sub
     return {
         "key": stable_key("backlog", text), "line": line, "indent": indent, "position": position,
@@ -908,7 +960,7 @@ def _make_entry(out, line, indent, mark, text, secs, position):
         "subgroup": sub["title"] if sub else "",
         "state": STATES.get(mark, "unknown"), "state_char": mark, "stamp": stamp, "date": stamp_date(stamp),
         "priority": letter if letter in PRIORITY_LETTERS else "", "priority_pos": pos,
-        "text": clean(without_id(body) if ident else body), "id": ident, "tags": [clean(t, 60) for t in tags], "sub_bullets": [], "links": [], "record": None, "feature": None, "feature_path": "",
+        "text": clean(without_tail(body)), "id": ident, "author": author, "tags": [clean(t, 60) for t in tags], "sub_bullets": [], "links": [], "record": None, "feature": None, "feature_path": "",
         "parent": None, "stage": "", "trail": [],
     }
 
@@ -1004,6 +1056,7 @@ def _todo_item(rd, it, cur, entries, other_line):
         elif not stamp:
             out.add(n, "stamp-missing", "no `[YYYY-MM-DD]` stamp", "warn")
         ident = read_id(out.add, n, text, out.ids)
+        author = read_author(out.add, n, text)
         while stack and stack[-1][0] >= indent:
             stack.pop()
         parent = stack[-1][1] if stack else None
@@ -1012,8 +1065,8 @@ def _todo_item(rd, it, cur, entries, other_line):
         entry = {"key": stable_key("todo-" + ctx.token, text), "line": n, "indent": indent,
                  "section": section["title"] if section else "", "subsection": subsection["title"] if subsection else "",
                  "state": STATES.get(mark, "unknown"), "state_char": mark, "stamp": stamp, "date": stamp_date(stamp),
-                 "priority": letter if letter in PRIORITY_LETTERS else "", "priority_pos": pos, "text": clean(without_id(body) if ident else body),
-                 "id": ident, "sub_bullets": [], "links": [], "parent": parent["key"] if parent else None, "raw": ln, "serves": "",
+                 "priority": letter if letter in PRIORITY_LETTERS else "", "priority_pos": pos, "text": clean(without_tail(body)),
+                 "id": ident, "author": author, "sub_bullets": [], "links": [], "parent": parent["key"] if parent else None, "raw": ln, "serves": "",
                  "position": len((subsection or section or {"entries": []})["entries"]) + 1 if parent is None else 0}
         entries.append(entry)
         if parent is None and (subsection or section):
