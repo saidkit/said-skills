@@ -491,13 +491,14 @@ def cmd_table(spec, log):
     table = spec_rows(spec)
     if table is None:
         print("warn: no Feature Tasks table in %s" % shown(spec, 200))
-        return 0
     tasks = log_statuses(log)
-    drift = diff_rows(table, tasks, "")
+    drift = diff_rows(table, tasks, "") if table is not None else 0
     own = spec_rows(log, "Summary Table")  # the log's own summary table, when it has one
     if own is not None:
         drift += diff_rows(own, tasks, " (the log's summary table)")
-    print("table: %d rows, %d tasks, %d drift" % (len(table), len(tasks), drift))
+    if table is None and own is None:
+        return 0
+    print("table: %d rows, %d tasks, %d drift" % (len(table if table is not None else own), len(tasks), drift))
     return 1 if drift else 0
 
 
