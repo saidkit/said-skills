@@ -78,7 +78,7 @@ gate-recompute: evaluation/<unit> exit=1 FAIL <id>          (undeclared -> verdi
 Because the judge is a deterministic exit code, no verdict file is trusted. The oracle is the recompute
 `review-qa` runs once per feature: the script writes its rows to `<SAID.working:>/gate-<feature-id>.md`
 and this agent's L1 verdict file (`review-cli-gate-<task>.md`) copies its rows from that record. `accept` and
-`debrief` read the record at a matching HEAD and rerun nothing; a stale or absent record stops them with
+`debrief` read the record when its `store:` line matches the lane and rerun nothing; a stale or absent record stops them with
 `gate owed: run /said:review-qa <id>`. The engine's `said_status.py --reviewer-gate`, called by a gate for a
 Checker that is not oracle-kind or by an operator, still recomputes the gate (`said-recompute`) from the lane
 root. A fabricated `verdict: PASS` whose gate actually fails is caught at recompute. This is the

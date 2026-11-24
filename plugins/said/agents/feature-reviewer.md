@@ -41,7 +41,7 @@ reference to copy into your header. Read every one in full before you write a
 row:
 
 - The diff from the base commit to the target commit, and every file it
-  touches as it stands at the target.
+  touches as it stands at the target; each mount diff the brief carries, read the same way; on a `lane diff: none` line, no lane diff.
 - The feature spec.
 - The decision records your brief names, each in full: `rulings.md` of the
   feature working dir, each decision-ledger file the spec cites under
