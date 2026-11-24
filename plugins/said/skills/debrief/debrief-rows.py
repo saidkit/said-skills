@@ -104,6 +104,8 @@ def lane_place(top, spelled):
     the lane root, then at the lane's docs root; it is inside when cite_check admits it (the lane's own files, its
     declared routes: the docs root and the mounts, the lane CLAUDE.md wherever it links). `..` or absolute: outside."""
     cc, gr = _board("cite_check"), _board("gate_record")
+    if "\0" in spelled:  # isfile() would read it as absent
+        raise Fail("not a path: %s" % shown(spelled, 80))
     if not cc.inside(spelled):
         return None, "outside the lane root"
     docs = (gr.lane_key(top, "docs-root") or "").strip().strip("`'\"").strip("/")
@@ -112,11 +114,8 @@ def lane_place(top, spelled):
     found = False
     for rel in [spelled] + ([docs + "/" + spelled] if docs else []):
         full = os.path.join(top, rel)
-        try:
-            if not os.path.isfile(full):
-                continue
-        except ValueError as e:  # a NUL byte in a path read from a file
-            raise Fail("not a path: %s (%s)" % (shown(spelled, 80), e))
+        if not os.path.isfile(full):
+            continue
         found = True
         if cc.admitted(top, rel, routes):
             return physical(full), None
