@@ -29,7 +29,7 @@ Run `flow`'s Step-1 reconstruction over **every** feature and **report**: phase,
 | Board | Web page | `--cli` / `--json` |
 |---|---|---|
 | features (default) | `/said:board` | `said_status.py` (Step 1) |
-| backlog | `/said:board backlog`: the entries in four views (Outline, By section, By stage, By priority), with each entry's record trail | `said_backlog.py --root <repo-root> --board backlog [--json]` |
+| backlog | `/said:board backlog`: the entries in four views (Outline, By section, By stage, By priority), with each entry's record trail and author | `said_backlog.py --root <repo-root> --board backlog [--json]` |
 | todo | `/said:board todo`: one tab per registry lane that has a `todo.md`, state and priority filters | `said_backlog.py --root <repo-root> --board todo [--json]` |
 | sessions | reserved, not built: say so and run nothing | none |
 
