@@ -31,7 +31,8 @@ sweep: for each open todo line whose text names `target <path>`: `close: <line> 
   whose date is older than <n> debriefed features (task logs with a `## Debrief close` footer dated after it, default
   3) prints `stale: <line> <id> <k> features debriefed since <date>`. Ends `sweep: <a> close, <b> keep, <c> stale`.
 table: the spec's `## Feature Tasks` rows against the log's task statuses: `stale: <id> table <s>, log <s>`,
-  `extra: <id> (no task in the log)`, `missing: <id> (<s> in the log, no table row)`; exit 1 on any.
+  `extra: <id> (no task in the log)`, `missing: <id> (<s> in the log, no table row)`; then the log's own `## Summary
+  Table` against the same statuses, each line ending `(the log's summary table)`; a log with none adds nothing; exit 1 on any.
 Exit 0 unless stated; 2 with `error: <why>` on a usage error or an unreadable input.
 """
 import importlib.util
@@ -440,7 +441,7 @@ def cmd_sweep(todo, root, logs, stale):
 
 
 # --- table -----------------------------------------------------------------------------------------------------------
-def spec_rows(spec):
+def spec_rows(spec, title="Feature Tasks"):
     md = _board("md_blocks")
     rows, level, on = [], 0, False
     for b in md.walk(md.parse(read_text(spec).splitlines())):
@@ -448,7 +449,7 @@ def spec_rows(spec):
             text = b.text if b.kind == "heading" else " ".join(t for _n, t in b.lines)
             if on and b.level <= level:
                 on = False
-            if not on and text.strip().startswith("Feature Tasks"):
+            if not on and text.strip().startswith(title):
                 on, level = True, b.level
             continue
         if on and b.kind == "para":
@@ -457,7 +458,7 @@ def spec_rows(spec):
         return None
     head = [c.lower() for c in rows[0]]
     if "status" not in head:
-        raise Fail("the Feature Tasks table has no Status column")
+        raise Fail("the %s table has no Status column" % title)
     at = head.index("status")
     out = {}
     for r in rows[1:]:
@@ -492,20 +493,28 @@ def cmd_table(spec, log):
         print("warn: no Feature Tasks table in %s" % shown(spec, 200))
         return 0
     tasks = log_statuses(log)
+    drift = diff_rows(table, tasks, "")
+    own = spec_rows(log, "Summary Table")  # the log's own summary table, when it has one
+    if own is not None:
+        drift += diff_rows(own, tasks, " (the log's summary table)")
+    print("table: %d rows, %d tasks, %d drift" % (len(table), len(tasks), drift))
+    return 1 if drift else 0
+
+
+def diff_rows(table, tasks, where):
     drift = 0
     for tid, st in table.items():
         if tid not in tasks:
             drift += 1
-            print("extra: %s (no task in the log)" % shown(tid))
+            print("extra: %s (no task in the log)%s" % (shown(tid), where))
         elif tasks[tid] != st:
             drift += 1
-            print("stale: %s table %s, log %s" % (shown(tid), shown(st, 20), shown(tasks[tid], 20)))
+            print("stale: %s table %s, log %s%s" % (shown(tid), shown(st, 20), shown(tasks[tid], 20), where))
     for tid, st in tasks.items():
         if tid not in table:
             drift += 1
-            print("missing: %s (%s in the log, no table row)" % (shown(tid), shown(st, 20)))
-    print("table: %d rows, %d tasks, %d drift" % (len(table), len(tasks), drift))
-    return 1 if drift else 0
+            print("missing: %s (%s in the log, no table row)%s" % (shown(tid), shown(st, 20), where))
+    return drift
 
 
 # --- arguments -------------------------------------------------------------------------------------------------------
