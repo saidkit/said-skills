@@ -5,7 +5,7 @@ description: >
   round, at the Act->Inspect boundary and before `review-qa`. Checks that the gate record reads the read owed, builds
   the brief, spawns the `said:feature-reviewer` agent cold, files its verdict and writes its rows into the feature's
   gate record through the bundled scripts. Triggered ONLY by the explicit command
-  "/said:review-feature <feature-id> --base <rev> --capture-ref <file|none> [--ledger <file>]... [--root <lane-root>]",
+  "/said:review-feature <feature-id> --base <rev> [--mount-base <mount>=<rev>]... --capture-ref <file|none> [--ledger <file>]... [--root <lane-root>]",
   issued by `said` and `flow` at Inspect or by the operator. NOT for a task close (that is `/said:review-qa`), NOT
   for reading a gate record (`review-qa` and `accept` read it), NOT for a run outside the session (that is
   `board/inspect_run.py`, this skill's headless form).

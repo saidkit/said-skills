@@ -5,11 +5,13 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 ## [Unreleased]
 
 - **Upgrade note:** the gate record's store identity is now a hash of the declared mounts at HEAD, the `## Lane` block and this file, and a feature's spec or task log moves only the feature read, so every existing record reads `gate owed` once after the upgrade: each open feature runs one gate recompute, one feature read and its skill-doctor rows again.
+- **Upgrade note:** a typed `rejected` or `superseded` ruling mark made during a debrief now halts `debrief-seal` with the feature read owed: run `/said:review-feature` again, then re-run `/said:debrief`, which skips Phase A and resumes at the seal.
 - **Added:** `review-feature --mount-base <mount>=<rev>`: the read diffs each declared mount that is its own git repo.
 - **Changed:** a feature-reviewer PASS reply with a failing cite is refused and re-spawned once, never written as a FAIL. A FAIL whose cites all sit in the task log is written as a `record:` row and opens no task; the second on one store goes to the operator.
 - **Changed:** a Checker is oracle-kind by its resolved meta, agent or recipe form; one with no verdict file is recomputed.
 - **Changed:** the feature read and the Covers read share one inside rule, by declared route.
 - **Changed:** the `scope-refine` audit follows a declared mount that is a link, a bare mount token audits the mount, and a hinted directory no handoff line names takes the whole handoff as its target shape.
+- **Fixed:** `debrief` no longer owes a new feature read for its own spec and task log edits and a pending ruling marked landed: `gate_record.py debrief-open` and `debrief-seal` bracket them, and any other source change still refuses. A closed feature is now read from the task log's last `## Debrief close` footer, so a task below that footer still owes its read.
 
 ## [0.28.2] - 2026-11-23
 

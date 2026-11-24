@@ -5,6 +5,9 @@
   gate_record.py check    --root <lane-root> --record <record> --reads <read>[,<read>...]
   gate_record.py round    --root <lane-root> --record <record> --matrix-from <file> [--set <key>=<value>]...
   gate_record.py report   --root <lane-root> --record <record>
+  gate_record.py debrief-open --root <lane-root> --record <record>
+  gate_record.py debrief-seal --root <lane-root> --record <record>
+  gate_record.py debrief-window --root <lane-root> --record <record>
 
 Line grammar, one kind per line, read by a line parser:
   store: tree <sha256> [dirty <sha256>] [sources <sha256>] | store: content <sha256>   first line; the store identity
@@ -25,8 +28,8 @@ identity: `tree <sha256>` where the physical lane root is in git (see identity()
   inside the working tree is a lane error.
 sources: the feature-review writer adds `sources <sha256>` to the store line, a digest over the path and bytes of each
   `source:` file (feature specs and task logs without debrief's sections, CLAUDE.md by its lane and rules). Only the feature-review read compares it: a record without it, or with a digest the
-  files no longer give, reads that read owed, unless the working dir's debrief.md carries its `## Debrief close`
-  footer. At a write, feature-review rows whose sources moved are dropped; the other rows keep to the lane part.
+  files no longer give, reads that read owed, unless the task log's last `## Debrief close` footer has no task below
+  it. At a write, feature-review rows whose sources moved are dropped; the other rows keep to the lane part.
 check: `current` (exit 0); `gate owed` (exit 1) when the record is absent or its store is not the current one
   (an unreadable record is a read error, never overwritten);
   `Inspect owed: <read>, ...` (exit 1) when a named read has no well-formed rows at the current store. Reads:
@@ -40,6 +43,10 @@ report: the Inspect report, derived from the record and the lane's store, never 
   over every read, each owed line, then each read and the skill-doctor rows with a status and their rows. A read the
   check names, a run that left a unit out, a FAIL row, an open P1 or a moved store reads owed, never current. Exit 0
   nothing owed, 1 something owed.
+debrief-open: before debrief's first edit, on a current feature-review read, opens a window row. debrief-seal: after its
+  last edit, moves the sources part to the spec and task log as they now stand and closes the window; a change to any
+  other source refuses (exit 1, nothing written), except a pending ruling marked landed with its home.
+  debrief-window: prints whether the record holds an open window (a read; a refused seal leaves one).
 A refused round value prints `refused: <why>` and writes nothing (exit 1); exit 2 = a usage, read or lane error
 (`error: <why>`).
 """
@@ -52,7 +59,7 @@ import tempfile
 import unicodedata
 
 sys.dont_write_bytecode = True
-ROW_KINDS = ("gate-recompute: ", "skill-doctor: ", "feature-review: ", "record-fail: ")
+ROW_KINDS = ("gate-recompute: ", "skill-doctor: ", "feature-review: ", "record-fail: ", "debrief-window: ")
 FR_RECORD = "record: "  # the evidence prefix of a FAIL row whose cites sit in the task log only
 ROUND_KEYS = ("decisions", "leaks", "look", "operator-min", "rework-min", "elapsed-min", "tokens")
 READS = ("gate-recompute", "matrix", "feature-review")
@@ -434,22 +441,204 @@ def load_sources(path):
         [ln[len("source: "):] for ln in lines[1:] if ln.startswith("source: ")]
 
 
-def closed(path):
-    """True when the record's working dir holds a debrief.md with its `## Debrief close` footer."""
+def closed(root, path):
+    """True when the feature's task log has a `## Debrief close` footer and no task heading below the last one."""
+    phys = os.path.realpath(os.path.abspath(root))
+    name = re.fullmatch(r"gate-(.+)\.md", os.path.basename(path))
+    shape = (lane_key(phys, "task-log") or "").strip().strip("`'\"")
+    if not name or not shape:
+        return False
+    import said_status  # the board's one task-heading grammar; lazy: said_status imports this module
+    footer, below, fence = False, False, False
     try:
-        with open(os.path.join(os.path.dirname(os.path.abspath(path)), "debrief.md"), encoding="utf-8") as fh:
-            return any(re.match(r"##\s+Debrief close\b", ln, re.I) for ln in fh)
+        with open(os.path.join(phys, shape.replace("<id>", name.group(1))), encoding="utf-8") as fh:
+            for ln in fh:
+                mark = ln.lstrip()[:3]
+                if mark in ("```", "~~~") and (not fence or fence == mark):
+                    fence = False if fence else mark
+                elif not fence and re.match(r"##\s+Debrief close\b", ln, re.I):
+                    footer, below = True, False
+                elif not fence and said_status.HEADER_RE.match(ln.rstrip("\r\n")):
+                    below = True
     except (OSError, UnicodeDecodeError):
         return False
+    return footer and not below
+
+
+WINDOW = "debrief-window: "
+
+
+def _ruling_parser():
+    """The shipped ruling-line parser."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("said_hold_gate", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "review-qa", "hold-gate.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.parse_ruling_line
+
+
+def _ruling_lines(text):
+    """Each line of a rulings list: its parsed entry, or the line itself when it is not a well-formed entry."""
+    parse = _ruling_parser()
+    return [(lambda e: e if isinstance(e, dict) else ln)(parse(ln)) for ln in text.split("\n")]
+
+
+def _ruling_hash(items):
+    return hashlib.sha256(repr(items).encode("utf-8", "surrogateescape")).hexdigest()
+
+
+def _ruling_parts(lines, pending):
+    """(hash without each status and home, hash of the status and home of every entry on a line not in pending)."""
+    body = [ln if isinstance(ln, str) else (ln["id"], ln["who"], ln["text"], tuple(ln["links"])) for ln in lines]
+    held = [(k, e["id"], e["status"], e["arrow"]) for k, e in enumerate(lines)
+            if isinstance(e, dict) and k not in pending]
+    return _ruling_hash(body), _ruling_hash(held)
+
+
+def rulings_shape(text):
+    """What a later rulings_marks_only compares: {rulings, held, pending}, pending being line indexes."""
+    lines = _ruling_lines(text)
+    pending = [k for k, e in enumerate(lines) if isinstance(e, dict) and e["status"] == "pending"]
+    body, held = _ruling_parts(lines, set(pending))
+    return {"rulings": body, "held": held, "pending": pending}
+
+
+def rulings_marks_only(shape, text):
+    """True when text differs from the shaped list only by pending rulings marked landed with a home."""
+    lines = _ruling_lines(text)
+    pending = set(shape["pending"])
+    if _ruling_parts(lines, pending) != (shape["rulings"], shape["held"]):
+        return False
+    return all(isinstance(lines[k], dict) and (lines[k]["status"] == "pending" and not lines[k]["arrow"]
+                                               or lines[k]["status"] == "landed" and bool(lines[k]["arrow"]))
+               for k in pending)
+
+
+def _window_parts(root, path, files):
+    """(digest of every source but this feature's spec, task log and rulings list, that rulings list's text)."""
+    phys = os.path.realpath(os.path.abspath(root))
+    name = re.fullmatch(r"gate-(.+)\.md", os.path.basename(path))
+    own = set()
+    for key in ("feature-spec", "task-log"):
+        shape = (lane_key(phys, key) or "").strip().strip("`'\"")
+        if name and shape:
+            own.add(os.path.normpath(shape.replace("<id>", name.group(1))))
+    mine = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(path)), "rulings.md"))
+    rulings = [f for f in files if os.path.realpath(os.path.join(phys, f)) == mine]
+    rest = [f for f in files if f not in rulings and os.path.normpath(f) not in own]
+    text = ""
+    for f in rulings:
+        try:
+            with open(os.path.join(phys, f), encoding="utf-8-sig", errors="surrogateescape") as fh:
+                text += fh.read()
+        except OSError:
+            text += "\0missing %s\n" % f
+    return sources_digest(root, rest), text
+
+
+def _task_ids(root, path):
+    """A hash of the task-heading ids of this feature's task log."""
+    import said_status  # the board's one task-heading grammar
+    phys = os.path.realpath(os.path.abspath(root))
+    name = re.fullmatch(r"gate-(.+)\.md", os.path.basename(path))
+    shape = (lane_key(phys, "task-log") or "").strip().strip("`'\"")
+    ids, fence = [], False
+    try:
+        with open(os.path.join(phys, shape.replace("<id>", name.group(1) if name else "")), encoding="utf-8") as fh:
+            for ln in fh:
+                mark = ln.lstrip()[:3]
+                if mark in ("```", "~~~") and (not fence or fence == mark):
+                    fence = False if fence else mark
+                elif not fence:
+                    m = said_status.HEADER_RE.match(ln.rstrip("\r\n"))
+                    if m:
+                        ids.append(m.group(1))
+    except (OSError, UnicodeDecodeError):
+        ids = ["unreadable"]
+    return _ruling_hash(sorted(ids))
+
+
+def _window_fields(row):
+    """{sources, tasks, others, rulings, held, pending} of a window row, or None for a row not of that form."""
+    try:
+        f = dict(p.split("=", 1) for p in row[len(WINDOW):].split())
+        f["pending"] = [] if f["pending"] == "-" else [int(k) for k in f["pending"].split(",")]
+        return f if all(f.get(k) for k in ("sources", "tasks", "others", "rulings", "held")) else None
+    except (ValueError, KeyError):
+        return None
+
+
+def _window_holds(root, path, f):
+    """True when a window's stamp is the record's sources part, no task was added and its other sources stand."""
+    src, files = load_sources(path)
+    if not src or f["sources"] != src or f["tasks"] != _task_ids(root, path):
+        return False
+    others, rulings = _window_parts(root, path, files)
+    return others == f["others"] and rulings_marks_only(f, rulings)
+
+
+def _open_window(path):
+    rec = load(path)
+    win = [ln for ln in rec[1] if ln.startswith(WINDOW)] if rec else []
+    return _window_fields(win[0]) if win else None
+
+
+def debrief_open(root, path):
+    rec = load(path)
+    f = _open_window(path)
+    if f and rec[0] == identity(root, path) and _window_holds(root, path, f):
+        return 0, "debrief-open: open"  # a resumed run keeps its window
+    code, text = check(root, path, ["feature-review"])
+    if code:
+        return 1, text
+    src, files = load_sources(path)
+    others, rulings = _window_parts(root, path, files)
+    s = rulings_shape(rulings)
+    row = "%ssources=%s tasks=%s others=%s rulings=%s held=%s pending=%s" % (
+        WINDOW, src, _task_ids(root, path), others, s["rulings"], s["held"],
+        ",".join(str(k) for k in s["pending"]) or "-")
+    update(path, root, lambda _store, rows, history: (
+        [ln for ln in rows if not ln.startswith(WINDOW)] + [row], history))
+    return 0, "debrief-open: open"
+
+
+def debrief_window(path):
+    rec = load(path)
+    return 0, "debrief-window: " + ("open" if rec and any(ln.startswith(WINDOW) for ln in rec[1]) else "none")
+
+
+def debrief_seal(root, path):
+    rec = load(path)
+    if rec is None or rec[0] is None or rec[0] != identity(root, path):
+        return 1, "gate owed"
+    store, rows, history = rec
+    win = [ln for ln in rows if ln.startswith(WINDOW)]
+    if not win:
+        code, text = check(root, path, ["feature-review"])
+        return code, "debrief-seal: current" if code == 0 else text
+    f = _window_fields(win[0])
+    if f is None:
+        raise Error("the record's debrief window row is malformed (left as it is)")
+    if not any(ln.startswith("feature-review: verdict | PASS") for ln in rows):
+        return 1, "Inspect owed: feature-review (no PASS read on the record)"
+    if not _window_holds(root, path, f):
+        return 1, "Inspect owed: feature-review (a source other than the spec and task log moved)"
+    files = load_sources(path)[1]
+    write(path, store, [ln for ln in rows if not ln.startswith(WINDOW)], history, (sources_digest(root, files), files))
+    return 0, "debrief-seal: sealed"
 
 
 def sources_current(root, path):
-    """True when the record's sources part holds for the feature-review read: a closed feature, or a digest its
-    source files still give."""
-    if closed(path):
+    """True when the record's sources part holds for the feature-review read: a closed feature, a digest its source
+    files still give, or an open debrief window whose other sources stand."""
+    if closed(root, path):
         return True
     src, files = load_sources(path)
-    return bool(src) and src == sources_digest(root, files)
+    if bool(src) and src == sources_digest(root, files):
+        return True
+    f = _open_window(path)
+    return bool(f) and _window_holds(root, path, f)
 
 
 def load(path):
@@ -512,7 +701,7 @@ def update(path, root, mutate, expect=None, sources=None):
         history = prior[2]
         old, files = load_sources(path)
         if old and rows:
-            if old == sources_digest(root, files) or closed(path):  # a closed feature keeps its part as recorded
+            if sources_current(root, path):  # a closed feature or open debrief window keeps its part as recorded
                 src = (old, files)
             else:
                 rows = [ln for ln in rows if not ln.startswith("feature-review: ")]
@@ -728,7 +917,8 @@ def do_round(root, path, src, sets):
 
 
 def parse(argv):
-    if not argv or argv[0] not in ("identity", "check", "round", "report"):
+    if not argv or argv[0] not in ("identity", "check", "round", "report",
+                                   "debrief-open", "debrief-seal", "debrief-window"):
         raise Error("usage: " + __doc__.strip().splitlines()[2].strip() + " | check ... | round ...")
     cmd, opts, sets, i = argv[0], {}, [], 1
     while i < len(argv):
@@ -741,7 +931,8 @@ def parse(argv):
             opts[k[2:]] = argv[i + 1]
         i += 2
     need = {"identity": ("root",), "check": ("root", "record", "reads"), "round": ("root", "record", "matrix-from"),
-            "report": ("root", "record")}[cmd]
+            "report": ("root", "record"), "debrief-open": ("root", "record"), "debrief-seal": ("root", "record"),
+            "debrief-window": ("root", "record")}[cmd]
     for k in need:
         if k not in opts:
             raise Error("usage: %s needs --%s" % (cmd, k))
@@ -767,6 +958,14 @@ def main(argv):
             rep = report(o["root"], o["record"])
             print("\n".join(report_text(rep, o["root"])))
             return 1 if rep["owed"] else 0
+        if cmd == "debrief-window":
+            code, text = debrief_window(o["record"])
+            print(text)
+            return code
+        if cmd in ("debrief-open", "debrief-seal"):
+            code, text = (debrief_open if cmd == "debrief-open" else debrief_seal)(o["root"], o["record"])
+            print(text)
+            return code
         do_round(o["root"], o["record"], o["matrix-from"], sets)
         return 0
     except Refused as e:
