@@ -637,24 +637,36 @@ class Handler(BaseHTTPRequestHandler):
     def _apply_write(self, board, kind, payload, lane):
         if board == "features":
             return self._feature_priority(payload.get("id"), lane, payload.get("letter")) + (None,)
+        au = CFG.get("author")
+        if not au:  # a line write is the launcher's; with no name there is no author to write
+            return False, CFG.get("author_refused") or "refused: no operator name", None
         if kind == "state":
-            return said_backlog.todo_state(CFG["root"], lane, payload.get("line"), payload.get("expected"), payload.get("state"))
+            return said_backlog.todo_state(CFG["root"], lane, payload.get("line"), payload.get("expected"), payload.get("state"), author=au)
         if kind == "edit" and board == "todo":
-            return said_backlog.todo_edit(CFG["root"], lane, payload.get("op"), payload.get("line"), payload.get("expected"), text=payload.get("text"))
+            return said_backlog.todo_edit(CFG["root"], lane, payload.get("op"), payload.get("line"), payload.get("expected"),
+                                          text=payload.get("text"), author=au)
         if kind == "edit":
             return said_backlog.edit(CFG["root"], payload.get("op"), payload.get("line"), payload.get("expected"),
-                                     text=payload.get("text"), depth=payload.get("depth"))
+                                     text=payload.get("text"), depth=payload.get("depth"), author=au)
         if kind == "add":
             return said_backlog.add(CFG["root"], payload.get("section"), payload.get("topic"), payload.get("subtopic"),
-                                    payload.get("text"), CFG.get("today") or date.today().isoformat())
+                                    payload.get("text"), CFG.get("today") or date.today().isoformat(), author=au)
         if kind == "priority":
             return said_backlog.set_priority(CFG["root"], payload.get("letter"), key=payload.get("key"),
-                                             line=payload.get("line"), lane=lane) + (None,)
+                                             line=payload.get("line"), lane=lane, author=au) + (None,)
         return said_backlog.move_entry(CFG["root"], payload.get("key"), payload.get("line"), lane=lane,
-                                       to=payload.get("to"), before=payload.get("before")) + (None,)
+                                       to=payload.get("to"), before=payload.get("before"), author=au) + (None,)
 
     def log_message(self, fmt, *args):
         sys.stderr.write("  %s %s\n" % (datetime.now().strftime("%H:%M:%S"), (fmt % args)))
+
+
+def resolve_author(root):
+    """Read once at start: the launcher's author for every page line write, or the engine's refusal."""
+    try:
+        CFG["author"], CFG["author_refused"] = said_backlog.operator_name(root), None
+    except said_backlog.Refused as exc:
+        CFG["author"], CFG["author_refused"] = None, "refused: %s" % exc
 
 
 def _bind(host, port, tries=25):
@@ -765,6 +777,7 @@ def main():
     CFG["today"] = a.today
     CFG["lanes"] = [said_status.parse_lane_arg(x, defaults) for x in a.lane] if a.lane else [defaults]
     CFG["root"] = a.root
+    resolve_author(a.root)
 
     # --- opt-in integration: the flag first, then a config left by an earlier connect ---
     stored = read_config(a.root)
