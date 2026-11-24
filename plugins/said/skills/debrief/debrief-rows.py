@@ -24,10 +24,10 @@ account: one markdown table, a row per round row of the record and a sum row, th
 traces: every leak of the record (none without --record) and every A.4 row not skipped needs an A.7 row whose first cell is its id (the
   leak's `<round>.<i>`, the lesson row's first cell) and whose kind cell is rule, check or observable. Prints
   `trace: <id> <kind>`, `untraced: <id> (<why>)`, `traces: <k> of <n>`; exit 1 when one is untraced.
-arrows: for each A.5 row applied whose ruling the list shows landed, its home (the arrow, without `#...` or `:<line>`)
-  must hold `ruling: <id>`. Prints `arrow: <id> -> <home>` or `missing: <id> <home> (<why>)`; exit 1 when one misses.
+arrows: for each A.5 row applied whose ruling the list shows landed, its home (the arrow, without `#...` or `:<line>`,
+  placed as lane_place says) must hold `ruling: <id>`. Prints `arrow: <id> -> <home>` or `missing: <id> <home> (<why>)`; exit 1 when one misses.
 sweep: for each open todo line whose text names `target <path>`: `close: <line> <id> target <path>` when the target
-  exists inside the lane root and holds the line's id, else `keep: <line> <id> (<why>)`; any open line not closing
+  exists inside the lane (see lane_place) and holds the line's id, else `keep: <line> <id> (<why>)`; any open line not closing
   whose date is older than <n> debriefed features (task logs with a `## Debrief close` footer dated after it, default
   3) prints `stale: <line> <id> <k> features debriefed since <date>`. Ends `sweep: <a> close, <b> keep, <c> stale`.
 table: the spec's `## Feature Tasks` rows against the log's task statuses: `stale: <id> table <s>, log <s>`,
@@ -99,8 +99,28 @@ def physical(path):
         raise Fail("not a path: %s (%s)" % (shown(path, 80), e))
 
 
-def inside(path, top):
-    return path == top or path.startswith(top.rstrip(os.sep) + os.sep)
+def lane_place(top, spelled):
+    """(physical path, None) for the file a lane-relative spelling names, else (None, why). The spelling is tried at
+    the lane root, then at the lane's docs root; it is inside when cite_check admits it (the lane's own files, its
+    declared routes: the docs root and the mounts, the lane CLAUDE.md wherever it links). `..` or absolute: outside."""
+    cc, gr = _board("cite_check"), _board("gate_record")
+    if not cc.inside(spelled):
+        return None, "outside the lane root"
+    docs = (gr.lane_key(top, "docs-root") or "").strip().strip("`'\"").strip("/")
+    docs = docs if docs and cc.inside(docs) else ""
+    routes = gr.mount_list(gr.lane_key(top, "mounts")) + ([docs] if docs else [])
+    found = False
+    for rel in [spelled] + ([docs + "/" + spelled] if docs else []):
+        full = os.path.join(top, rel)
+        try:
+            if not os.path.isfile(full):
+                continue
+        except ValueError as e:  # a NUL byte in a path read from a file
+            raise Fail("not a path: %s (%s)" % (shown(spelled, 80), e))
+        found = True
+        if cc.admitted(top, rel, routes):
+            return physical(full), None
+    return None, ("outside the lane root" if found else "no such file")
 
 
 def cites(text, token):
@@ -319,13 +339,8 @@ def cmd_arrows(path, lists, root):
             continue
         seen.add(rid)
         home = home_path(landed[rid]["arrow"])
-        target = physical(os.path.join(top, home))
-        why = None
-        if not inside(target, top):
-            why = "outside the lane root"
-        elif not os.path.isfile(target):
-            why = "no such file"
-        elif not cites(read_text(target), "ruling: " + rid):
+        target, why = lane_place(top, home)
+        if why is None and not cites(read_text(target), "ruling: " + rid):
             why = "no 'ruling: %s'" % rid
         if why:
             missed += 1
@@ -396,18 +411,16 @@ def cmd_sweep(todo, root, logs, stale):
         closing = False
         if target:
             try:
-                path = physical(os.path.join(top, target))
+                path, where = lane_place(top, target)
             except Fail:
-                path = None
+                path, where = None, "target is not a path"
             why = None
-            if path is None:
-                why = "target is not a path"
+            if where == "target is not a path":
+                why = where
             elif not ident:
                 why = "no line id"
-            elif not inside(path, top):
-                why = "target outside the lane root"
-            elif not os.path.isfile(path):
-                why = "no target file"
+            elif where is not None:
+                why = "target outside the lane root" if where.startswith("outside") else "no target file"
             elif not cites(read_text(path), ident):
                 why = "target does not cite %s" % ident
             if why:
