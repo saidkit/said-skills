@@ -1786,6 +1786,26 @@ def _assign_ids(lines):
     return out
 
 
+def _assign_authors(lines, author):
+    """`lines` with `author` written before the id of every entry line outside a fence that has no author word;
+    a line with one, well-formed or not, stays as it is."""
+    out, fence = list(lines), False
+    for i, ln in enumerate(lines):
+        if ln.startswith("```"):
+            fence = not fence
+            continue
+        bx = None if fence else todo_md.box_of(ln)
+        if bx and bx[1] in STATES and not any(todo_md.author_start(w) for w in todo_md.words_of(bx[2])):
+            out[i] = _authored(ln, author)
+    return out
+
+
+def _at_current(bodies):
+    """True when the file's frontmatter already names the current format."""
+    end = _front_end(bodies) if bodies and bodies[0].strip() == "---" else None
+    return end is not None and any(ln.partition(":")[0].strip() == "format" and ln.partition(":")[2].strip() == FORMAT for ln in bodies[1:end])
+
+
 def _front_end(lines):
     """The index of the closing `---` of the frontmatter; the opening one is line 1."""
     for i in range(1, len(lines)):
@@ -1896,8 +1916,9 @@ def _migrate_todo_lines(bodies):
     return out, origin
 
 
-def migrate(root, target, lane=None, file=None, apply=False, full=False):
-    """Rewrite a former-grammar backlog (target `backlog`) to grammar v2, or a todo file's stamps (target `todo`).
+def migrate(root, target, lane=None, file=None, apply=False, full=False, author=AGENT):
+    """Rewrite a former-grammar backlog (target `backlog`) to grammar v2, or a todo file's stamps (target `todo`),
+    writing `author` on every entry line that has none; a file already at the current format gets the authors only.
     Without `apply` it prints the plan and writes nothing. (ok, message)."""
     try:
         root = os.path.realpath(os.path.abspath(_text(root, "the root", 1000)))
@@ -1921,8 +1942,15 @@ def migrate(root, target, lane=None, file=None, apply=False, full=False):
         path = _inside(path, root)
         bom, lines = _read_raw(path)
         bodies = [_split_cr(ln)[0] for ln in lines]
-        new, origin = (_migrate_backlog_lines if target == "backlog" else _migrate_todo_lines)(bodies)
-        new = _assign_ids(new)
+        current = _at_current(bodies)
+        if current:  # the format is already current: only the unauthored lines change
+            new, origin = list(bodies), list(range(1, len(bodies) + 1))
+        else:
+            new, origin = (_migrate_backlog_lines if target == "backlog" else _migrate_todo_lines)(bodies)
+            new = _assign_ids(new)
+        new = _assign_authors(new, author)
+        if current and new == bodies:
+            return True, "same: %s is at %s and every entry line has an author; nothing to migrate" % (rel(path, root), FORMAT)
         if target == "todo":
             ctx = lambda: _Ctx(Findings(), rel(path, root), (), os.path.dirname(path), root, "x")
             if len(todo_md.read_lane(bodies, ctx())[3]) != len(todo_md.read_lane(new, ctx())[3]):
@@ -1939,7 +1967,10 @@ def migrate(root, target, lane=None, file=None, apply=False, full=False):
                    for j in range(len(new)) if origin[j] and bodies[origin[j] - 1] != new[j]]
         kept = set(origin)
         removed = ["line %d: %s -> (removed)" % (n, clean(bodies[n - 1], 100)) for n in range(1, len(bodies) + 1) if n not in kept]
-        plan = ["plan: migrate %s (%s)" % (rp, "grammar %s, `format` key added, `structure` block dropped, ids" % FORMAT if target == "backlog" else "`format` key added, todo format comment dropped, stamps, ids")]
+        what = ("already %s: the author %s on every entry line that has none" % (FORMAT, _author_word(author)) if current
+                else "grammar %s, `format` key added, `structure` block dropped, ids, authors %s" % (FORMAT, _author_word(author)) if target == "backlog"
+                else "`format` key added, todo format comment dropped, stamps, ids, authors %s" % _author_word(author))
+        plan = ["plan: migrate %s (%s)" % (rp, what)]
         shown = removed + changes  # every deletion is listed first, so a cap never hides one before a change
         plan += ["plan: %s" % c for c in (shown if full else shown[:PREVIEW_CAP])]
         if not full and len(shown) > PREVIEW_CAP:
@@ -2187,7 +2218,7 @@ def _main(argv=None):
     pr.add_argument("--feature", required=True, help="the feature id, <PREFIX>-<NN>")
     pr.add_argument("--apply", action="store_true", help="write; without it the plan is printed and nothing is written")
     pr.add_argument("--asked", help=ASKED)
-    mg = sub.add_parser("migrate", help="rewrite a former-grammar backlog to grammar v2 (target backlog), or a todo file's stamps (target todo); plan without --apply")
+    mg = sub.add_parser("migrate", help="rewrite a former-grammar backlog to grammar v2 (target backlog), or a todo file's stamps (target todo), and write the operator's author on every unauthored entry line (a file at v2 gets the authors only); plan without --apply")
     mg.add_argument("target", choices=["backlog", "todo"], help="the file's kind; a file of the other kind is refused")
     mg.add_argument("--lane", help="the registry lane token whose todo file the todo target rewrites")
     mg.add_argument("--file", help="an absolute, physical path under the root, instead of the default file")
@@ -2204,7 +2235,7 @@ def _main(argv=None):
         print("refused: no operator ask; --asked quotes a /said:backlog command the operator typed that names this subcommand and its target")
         return 2
     author = AGENT
-    if gated and not (a.cmd == "set-priority" and a.record is not None):  # a typed write writes the operator's author
+    if a.cmd == "migrate" or gated and not (a.cmd == "set-priority" and a.record is not None):  # a typed write, and migrate's plan of it, write the operator's author
         try:
             author = operator_name(os.path.realpath(os.path.abspath(a.root)))
         except Refused as e:
@@ -2223,7 +2254,7 @@ def _main(argv=None):
         print(json.dumps(data, indent=1, ensure_ascii=True) if (a.json or a.lint_json) else render_lint(data))
         return code
     if a.cmd == "migrate":
-        ok, msg = migrate(a.root, a.target, lane=a.lane, file=a.file, apply=a.apply, full=a.full)
+        ok, msg = migrate(a.root, a.target, lane=a.lane, file=a.file, apply=a.apply, full=a.full, author=author)
         print(msg)
         return 0 if ok else 2
     if a.cmd in ("add", "record", "supersede", "promote"):
