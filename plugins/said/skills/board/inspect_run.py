@@ -17,7 +17,8 @@ task log is an error before any estimate:
      non-empty capture file in the working dir, never the gate record, or `none` on a feature with no capture) are needed
      for the read. A reply with no verdict line is not filed;
      a reply the writer refuses is not filed either, and is kept in a temp file outside the lane whose path is printed;
-     the reader then runs once more under the same yes, its brief ending with the writer's refusal line.
+     the reader then runs once more under the same yes, its brief ending with the writer's refusal line, unless the
+     refusal is one the reply did not cause (an uncommitted file outside the working dir, an unreadable verdict file).
   2. gate_recompute.sh over every unit (SAID_GATE_UNITS is never passed), writing the record.
   3. covers-read.py over the task log, its output in <working>/covers-<id>.txt (--ledger names the decision ledgers).
   4. gate_record.py round from that output, then check over every read; the report of the record is printed.
@@ -27,6 +28,7 @@ Exit 0 the record is current on every read, 1 something is owed, 2 an input or s
 import fcntl
 import hashlib
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -112,6 +114,10 @@ def git(root, *args):
     return r.stdout if r.returncode == 0 else None
 
 
+# a refusal the reply did not cause: a dirty tree, a verdict file that cannot be read
+STORE_SIDE = re.compile(r"feature review owed: (\d+ uncommitted file|no readable |the verdict file )")
+
+
 def feature_review(fid, opts, root):
     """Run the read when it is owed and the yes matches; print what was done. Never raises on a reader failure."""
     p = review_feature.prepare(fid, root, opts.get("base"), opts.get("capture-ref"), opts["ledgers"], opts["mount-base"])
@@ -148,8 +154,8 @@ def feature_review(fid, opts, root):
             return
         print("feature-review: the refused reply is kept at %s" % review_feature.keep_refused(fid, reply))  # never in the lane
         owed = next((ln for ln in lines if ln.startswith("feature review owed: ")), "")
-        if attempt == 2 or not lines[0].startswith("not filed (the writer refused") or not owed:
-            return
+        if attempt == 2 or not lines[0].startswith("not filed (the writer refused") or not owed or STORE_SIDE.match(owed):
+            return  # a refusal the reader cannot repair is not read again
         brief = p["brief"].rstrip("\n") + "\nYour last reply was refused by the row writer: %s. Keep the Output rules exactly.\n" % owed
 
 
