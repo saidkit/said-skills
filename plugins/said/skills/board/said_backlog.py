@@ -27,6 +27,7 @@ bounded plain text. Roots are made absolute before anything derives from them.
 import argparse
 from collections import Counter
 import datetime
+import glob
 import json
 import os
 import sys
@@ -1921,6 +1922,68 @@ def _makedirs_tracked(path, made):
         made.append(d)
 
 
+ASK_MIN = 12  # a quote shorter than this names no ask
+ASK_NOT_TYPED = ("<cross-session-message", "<agent-message", "<task-notification", "<system-reminder")
+
+
+def _typed_words(rec):
+    """The words of one transcript record when the operator typed them, else None: a tool result, a meta, peer,
+    notification or summary record, and anything an assistant wrote never count."""
+    if (not isinstance(rec, dict) or rec.get("type") != "user" or rec.get("isMeta") or rec.get("isSidechain")
+            or rec.get("isCompactSummary") or rec.get("toolUseResult") is not None):
+        return None
+    origin = rec.get("origin")
+    if origin is not None and (not isinstance(origin, dict) or origin.get("kind") != "human"):
+        return None
+    c = (rec.get("message") or {}).get("content")
+    if isinstance(c, list):
+        if not c or any(not isinstance(b, dict) or b.get("type") != "text" for b in c):
+            return None
+        c = "\n".join(str(b.get("text", "")) for b in c)
+    if not isinstance(c, str):
+        return None
+    while "<system-reminder>" in c and "</system-reminder>" in c.split("<system-reminder>", 1)[1]:  # a hook's note is not typed
+        head, rest = c.split("<system-reminder>", 1)
+        c = head + " " + rest.split("</system-reminder>", 1)[1]
+    return None if any(m in c for m in ASK_NOT_TYPED) else " ".join(c.split())
+
+
+def _slug(path):
+    return "".join(ch if ch.isascii() and ch.isalnum() else "-" for ch in os.path.realpath(os.path.abspath(path)))
+
+
+def operator_asked(root, quote):
+    """True when `quote` (whitespace folded, at least ASK_MIN characters) sits in a message the operator typed in this
+    project's Claude Code transcript store: <config>/projects/<slug>/*.jsonl, the slug of the root or of the cwd."""
+    q = " ".join((quote or "").split())
+    if len(q) < ASK_MIN:
+        return False
+    base = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+    words = "".join(ch if ch.isascii() and ch.isalnum() else " " for ch in q).split()
+    probe = max(words, key=len) if words else ""
+    slugs = []
+    for d in (root, os.getcwd()):
+        s = _slug(d)
+        if s not in slugs:
+            slugs.append(s)
+    for s in slugs:
+        for p in sorted(glob.glob(os.path.join(glob.escape(os.path.join(base, "projects", s)), "*.jsonl"))):
+            try:
+                with open(p, encoding="utf-8", errors="replace") as h:
+                    for line in h:
+                        if probe not in line:
+                            continue
+                        try:
+                            t = _typed_words(json.loads(line))
+                        except ValueError:
+                            continue
+                        if t and q in t:
+                            return True
+            except OSError:
+                continue
+    return False
+
+
 def main(argv=None):
     try:
         return _main(argv)
@@ -1955,6 +2018,8 @@ def _main(argv=None):
     rc.add_argument("--line", required=True, help="the entry's line position (from --json)")
     rc.add_argument("--kind", required=True, help="idea, handover or bugfix")
     rc.add_argument("--slug", required=True, help="the folder slug, lowercase words joined by -")
+    ASKED = "the operator's words asking for this write, as typed in this project's Claude Code session"
+    rc.add_argument("--asked", help=ASKED)
     ad = sub.add_parser("add", help="append one open, stamped entry at the end of a section, a topic or a subtopic")
     ad.add_argument("--section", required=True, help="the H1 section's title")
     ad.add_argument("--topic", help="the `##` topic's title, when the section holds topics")
@@ -1962,11 +2027,13 @@ def _main(argv=None):
     ad.add_argument("--text", required=True, help="the entry's words, one line")
     ad.add_argument("--today", required=True, help="the day, YYYY-MM-DD (the stamp)")
     ad.add_argument("--note", action="append", default=[], help="a note sub-bullet, one line; at most two")
+    ad.add_argument("--asked", help=ASKED)
     ss = sub.add_parser("supersede", help="replace an entry's line with one that names what it supersedes")
     ss.add_argument("--key", required=True, help="the entry's stable key (from --json)")
     ss.add_argument("--line", required=True, help="the entry's line position (from --json)")
     ss.add_argument("--text", required=True, help="the new words, one line")
     ss.add_argument("--today", required=True, help="the day, YYYY-MM-DD (the new stamp)")
+    ss.add_argument("--asked", help=ASKED)
     pr = sub.add_parser("promote", help="move an entry's record into a registry lane's working dir for a feature; plan without --apply")
     pr.add_argument("--key", required=True, help="the entry's stable key (from --json)")
     pr.add_argument("--line", required=True, help="the entry's line position (from --json)")
@@ -2000,6 +2067,9 @@ def _main(argv=None):
         ok, msg = migrate(a.root, a.target, lane=a.lane, file=a.file, apply=a.apply, full=a.full)
         print(msg)
         return 0 if ok else 2
+    if a.cmd in ("add", "record", "supersede") and not operator_asked(a.root, a.asked):
+        print("refused: no operator ask; --asked quotes words the operator typed in this project's Claude Code session")
+        return 2
     if a.cmd in ("add", "record", "supersede", "promote"):
         if a.cmd == "add":
             ok, msg, _ = add(a.root, a.section, a.topic, a.subtopic, a.text, a.today, a.note)
