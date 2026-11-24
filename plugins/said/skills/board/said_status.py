@@ -2121,7 +2121,7 @@ def feature_review_output(root, workdir, feature, decisions=()):
         def a_note(real):  # a top-level working file that is no decision source and no gate output
             base = os.path.basename(real)
             return (os.path.dirname(real) == wd and real not in sources and base not in ("rulings.md", "scope.md")
-                    and not base.startswith(("gate-", "review-", "covers-", "QA-", "doc-gate-")))
+                    and not base.startswith(("gate-", "review-", "accept-", "covers-", "QA-", "doc-gate-")))
 
         def in_log(ev):  # every cite in a record, and one beyond the spec: a spec line alone is a requirement's source
             hits = cite_check.text_paths(root, ev, dirs, strict=True)
