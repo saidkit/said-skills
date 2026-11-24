@@ -379,7 +379,7 @@ def board_row(e):
     return {"key": e["key"], "line": e["line"], "state": e["state"], "stamp": e["stamp"], "date": e["date"],
             "position": 0 if e.get("parent") else e.get("position") or 0,
             "priority": e["priority"], "section": e["section"], "group": e["group"], "subgroup": e["subgroup"], "text": e["text"], "tags": e["tags"],
-            "stage": e["stage"], "feature": e.get("feature") or "", "record": e.get("record") or "",
+            "author": e.get("author") or "", "stage": e["stage"], "feature": e.get("feature") or "", "record": e.get("record") or "",
             "trail": [{"kind": t["kind"], "path": t["path"], "exists": t["exists"], "date": t.get("date") or ""} for t in e["trail"]],
             "raw": e.get("raw", ""),
             "notes": [{"text": b["text"], "depth": b["depth"], "line": b["line"], "raw": b.get("raw", "")} for b in e["sub_bullets"]]}
@@ -419,8 +419,8 @@ def render_board_text(view):
 def board_line(r):
     mark = {"open": "[ ]", "wip": "[+]", "done": "[X]"}.get(r["state"], "[?]")
     prio = ("[#%s] " % r["priority"]) if r["priority"] else ""
-    return "%s %s%s%s%s" % (mark, ("[%s] " % r["date"]) if r["stamp"] else "", prio, r["text"][:80],
-                            (" -> " + r["feature"]) if r["feature"] else "")
+    return "%s %s%s%s%s%s" % (mark, ("[%s] " % r["date"]) if r["stamp"] else "", prio, r["text"][:80],
+                              (" -> " + r["feature"]) if r["feature"] else "", (" ~@" + r["author"]) if r.get("author") else "")
 
 
 # ---------------------------------------------------------------- the todo board's view model

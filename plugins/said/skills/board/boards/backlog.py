@@ -81,6 +81,11 @@ def who(row):
     return "[%s]" % row["date"] if row["date"] else '"%s"' % words(row)
 
 
+def author(row):
+    """The line's author as written, `~@name`, in its own span; nothing when the line has none."""
+    return ('<span class="au" title="the author of the line\'s last write">~@%s</span>' % esc(row["author"])) if row.get("author") else ""
+
+
 def next_step(row):
     """(command, what it does) for the entry sheet's Next row."""
     if row["state"] == "done":
@@ -112,7 +117,8 @@ def _sheet(row, path, today):
              % (stage_color(row["stage"]), esc(row["stage"]), esc(row["stage"]), esc(row["state"]), esc(STATE_WORD.get(row["state"], row["state"]))))
     crumb = " / ".join(esc(x) for x in (row["section"], row["group"], row["subgroup"]) if x)
     cmd, why = next_step(row)
-    dates = "raised %s%s" % (esc(row["date"] or "-"), (", age " + L.age(row["date"], today)) if row["date"] and L.age(row["date"], today) else "")
+    dates = "raised %s%s%s" % (esc(row["date"] or "-"), (", age " + L.age(row["date"], today)) if row["date"] and L.age(row["date"], today) else "",
+                               (", last written by " + author(row)) if row.get("author") else "")
     text, _ident = said_backlog.strip_id(row["text"])
     ed = L.editable(row["raw"])
     out = ['<div class="d-head">%s</div><div class="ecrumb">%s</div><div class="d-name%s"%s>%s</div>'
@@ -141,6 +147,7 @@ def _sheet(row, path, today):
 
 def _attrs(row, cid, path):
     q = " ".join([row["text"], row["section"], row["group"], row["subgroup"], row["record"], row["feature"], row["stamp"], row["stage"]]
+                 + (["~@" + row["author"]] if row.get("author") else [])
                  + ["#" + t for t in row["tags"]] + [n["text"] for n in row.get("notes") or []]).lower()
     return ('data-key="%s" data-line="%d" data-position="%d" data-cid="%s" data-state="%s" data-stage="%s" data-priority="%s" '
             'data-section="%s" data-formed="%d" data-done="%d" data-q="%s" tabindex="0" role="button" style="--sc:%s" aria-label="%s"'
@@ -154,8 +161,8 @@ def _subs(row):
 
 
 def _outline_card(row, cid, path, today):
-    right = "%s%s" % (('<span class="st">%s</span>' % esc(STATE_WORD.get(row["state"], row["state"]))) if row["state"] != "open" else "",
-                      ('<span class="dt">%s</span>' % esc(row["date"])) if row["date"] else "")
+    right = "%s%s%s" % (('<span class="st">%s</span>' % esc(STATE_WORD.get(row["state"], row["state"]))) if row["state"] != "open" else "",
+                        author(row), ('<span class="dt">%s</span>' % esc(row["date"])) if row["date"] else "")
     drag = row["position"] >= 1
     return ('<li class="bl-row ecard%s" %s><div class="er"><span class="lead">%s%s</span><span class="tx">%s</span>%s%s</div>%s%s</li>'
             % (" dnd" if drag else "", _attrs(row, cid, path), L.GRIP if drag else "", L.pslot(row["priority"]), L.inline(row["text"]),
@@ -164,9 +171,9 @@ def _outline_card(row, cid, path, today):
 
 def _card(row, path, today, drop):
     trail = ", ".join('<span class="%s">%s%s</span>' % ("ok" if t["exists"] else "miss", esc(t["kind"]), "" if t["exists"] else " (missing)") for t in row["trail"])
-    return ('<li class="bl-row bcard" %s%s><div class="h">%s<span>%s</span><span class="badge2">%s</span>%s%s</div><div class="t">%s</div>%s%s%s%s</li>'
+    return ('<li class="bl-row bcard" %s%s><div class="h">%s<span>%s</span><span class="badge2">%s</span>%s%s%s</div><div class="t">%s</div>%s%s%s%s</li>'
             % (_attrs(row, "", path), ' draggable="true"' if drop else "", L.pslot(row["priority"]), esc(row["stage"]), esc(row["section"]),
-               ('<span>%s</span>' % esc(row["date"])) if row["date"] else "",
+               ('<span>%s</span>' % esc(row["date"])) if row["date"] else "", author(row),
                ('<span class="wip">%s</span>' % esc(STATE_WORD[row["state"]])) if row["state"] == "wip" else "",
                L.inline(row["text"]), ('<div class="m">%s</div>' % esc(" / ".join(x for x in (row["group"], row["subgroup"]) if x))) if row["group"] else "",
                ('<div class="m">%s</div>' % trail) if trail else "", ('<div class="mkr"><span class="mk">%s</span></div>' % esc(mark(row))) if mark(row) else "",
