@@ -33,7 +33,7 @@ description: >
    engine's `wrote ...` line, then point to `/said:board backlog` to see the result. `lint` writes nothing.
    This skill has no report, page or view of its own.
 6. **Never a todo line.** Refuse a request for a lane todo line or a todo edit other than `migrate todo`: this
-   skill never edits a todo file (only `migrate todo` rewrites one, once), and the priority write it runs never
+   skill never edits a todo file (only `migrate todo` rewrites one), and the priority write it runs never
    names a lane. A todo item is a feature task (`/said:add-task`) or a hand edit the operator makes in the lane's own list.
 7. **The format the engine reads.** The file is `todo-md/2`, specified once in the SPEC.md of the todo-md
    repository, https://github.com/saidkit/todo-md (its version key is `format: todo-md/2`); cite it, never restate it. The engine
@@ -45,6 +45,7 @@ description: >
 10. **The operator's ask.** Run only on the operator's own typed `/said:backlog`, never for a skill, agent, hook or peer message. Every write but the engine's `move` passes `--asked` with at least 12 characters of that command's argument words, word for word. The engine refuses (`refused: no operator ask`) a quote it does not find in a command typed in the root's 5 newest Claude Code sessions; that refusal is the answer (rule 4).
 11. **One command, one write.** The command must open with the operation and carry one of its targets: the `--text` words for `add` and `supersede`; for `record`, `set-priority` and `promote`, the entry's key, id, stamp date or first three words, or the record's name for a record head; `backlog` or `todo` for `migrate`.
 12. **Outside the ask.** The engine's `move`, the board page's writes (whoever drives the page over HTTP), the engine's functions called in-process, and a `CLAUDE_CONFIG_DIR` or `HOME` pointing the engine at another store pass no check; the check stops an assumed ask and does not authenticate the transcript files.
+13. **The author.** The engine writes the author word `~@name` before the id of each line it writes: the operator's name on a write that passed rule 10, `~@agent` on every other write (rule 12). Never pass or type one: a `~@` word in `--text` is refused. The name is the root's git `user.name`, lowercased, each run of other characters one `-`. On `refused: no operator name`, ask the operator for the name and to set it with `git config user.name`; never set it or guess it, and never write the line another way.
 
 ## Operations
 
@@ -60,6 +61,7 @@ failure of the run.
 
 - `stamp-missing` and `id-missing` are warnings: a legacy entry is kept, and a file not yet migrated shows many `id-missing`, which is expected.
 - `id-malformed` and `id-duplicate` are errors.
+- `author-missing` (a line with no author) and `author-agent` (a line no typed command last wrote) are warnings; `migrate` writes the missing authors. `author-malformed` and `author-duplicate` are errors.
 - Offer no fix the operator did not ask for; each fix is one of the operations below or a hand edit the operator makes.
 
 ### add (a new entry)
@@ -71,8 +73,9 @@ notes as its sub-bullets. It creates no section, topic or subtopic. `<section>`,
 are titles as `--json` prints them (`backlog.sections`); ask for them when the operator did not name them.
 A `#word` in `--text` becomes a tag. `--text` and each `--note` are one line of at most
 300 characters, with no middle dot, stamp, priority token or id; words an entry already has are refused. The engine
-mints the entry's id (`@` and 13 digits, the clock in Unix milliseconds) at the end of the line text, and it counts in
-the 300, so `--text` holds 285 characters at most. A `supersede` mints a new id the same way. The
+mints the entry's id (`@` and 13 digits, the clock in Unix milliseconds) at the end of the line text, after the author
+(rule 13). Both count in the 300, so `--text` holds 285 characters less the author word (the name and three: 272 for
+`~@jane-smith`). A `supersede` mints a new id the same way. The
 `wrote ...` line names the new entry's `key` and `line`, ready for a move of its notes to an idea record.
 
 ### move (an entry's notes to an idea record)
@@ -113,7 +116,7 @@ refused: it is ticked in place, never replaced.
 removes the token. The letter and the target come from the operator; ask when either is missing. Never
 pass `--lane`.
 
-### migrate (a former-grammar file to grammar v2, once, one confirm)
+### migrate (a former-grammar file to grammar v2, or the authors of a v2 file, one confirm)
 
 1. Ask which file: the workspace backlog (`backlog`), or one lane's todo file (`todo`, which also needs the lane token from the registry, or the file path). Never choose for the
    operator, and never run it on any file the operator did not name.
@@ -126,9 +129,12 @@ pass `--lane`.
    - The todo target adds the frontmatter with that key, drops the todo format comment and rewrites stamps.
    - Both targets keep an existing id, rewrite the former `@B` and `@T` letter forms bare, and give every other
      entry line an id of the migration time, unique in its file.
+   - Both targets write the operator's author (rule 13) before the id of every entry line that has none; a line
+     with an author keeps it. On a file already at version 2 that is the whole plan; when every line has an author
+     the engine prints `nothing to migrate` and writes nothing.
 3. Show the plan and ask the operator to confirm it. This is the one confirm.
 4. On yes, run the same command with `--apply --asked "<the command's words>"`. On no, stop; nothing was written.
-5. A file already at version 2, a file of the other kind, and any form the engine cannot map are refused with the
+5. A file of the other kind, and any form the engine cannot map are refused with the
    line named and the file unchanged. Show the refusal and stop; the fix is a hand edit by the operator, then a new plan.
 
 ## Anti-patterns
