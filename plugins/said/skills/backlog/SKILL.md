@@ -42,7 +42,8 @@ description: >
 8. **One operation per call.** A bare `/said:backlog`, or an operation not listed below -> name the seven
    operations and stop; run nothing.
 9. **`--today`** (on `add` and `supersede`) is today's date in the operator's local time (`date +%Y-%m-%d`).
-10. **The operator's ask.** Run only on the operator's own typed `/said:backlog`, never for a skill, agent, hook or peer message. Every `add`, `record` and `supersede` passes `--asked` with at least 12 characters of the operator's words, word for word (for a typed `/said:backlog` command, its argument words only); the engine refuses (`refused: no operator ask`) a quote it does not find in a typed message of this project's Claude Code sessions that names the backlog, and that refusal is the answer (rule 4). The check catches an assumed ask; it does not authenticate the transcript files.
+10. **The operator's ask.** Run only on the operator's own typed `/said:backlog`, never for a skill, agent, hook or peer message. Every write but `move` (`add`, `record`, `supersede`, `set-priority`, `promote --apply`, `migrate --apply`) passes `--asked` with at least 12 characters of that command's argument words, word for word; the engine refuses (`refused: no operator ask`) a quote it does not find in a `/said:backlog` command typed in the root's 5 newest Claude Code sessions, and that refusal is the answer (rule 4).
+11. **Outside the ask.** `move`, the board page's own writes and the engine's functions called in-process write without `--asked`; the check stops an assumed ask and does not authenticate the transcript files.
 
 ## Operations
 
@@ -62,7 +63,7 @@ failure of the run.
 
 ### add (a new entry)
 
-`python3 $ENGINE --root ROOT add --section "<section>" [--topic "<topic>" [--subtopic "<subtopic>"]] --text "<words>" --today YYYY-MM-DD [--note "<note>"]... --asked "<the operator's words>"`.
+`python3 $ENGINE --root ROOT add --section "<section>" [--topic "<topic>" [--subtopic "<subtopic>"]] --text "<words>" --today YYYY-MM-DD [--note "<note>"]... --asked "<the command's words>"`.
 The engine appends one open entry, stamped today, at the end of the named section, topic or subtopic (a
 section that holds topics needs `--topic`, a topic that holds subtopics needs `--subtopic`), with at most two
 notes as its sub-bullets. It creates no section, topic or subtopic. `<section>`, `<topic>` and `<subtopic>`
@@ -78,7 +79,7 @@ the 300, so `--text` holds 285 characters at most. A `supersede` mints a new id 
 The skill's move is the engine's `record` subcommand. Never run the engine's `move`: that reorders an entry
 within its section, topic or subtopic and is the board page's write.
 
-`python3 $ENGINE --root ROOT record --key K --line N --kind idea|handover|bugfix --slug <slug> --asked "<the operator's words>"`.
+`python3 $ENGINE --root ROOT record --key K --line N --kind idea|handover|bugfix --slug <slug> --asked "<the command's words>"`.
 The engine makes `backlog/<YYMMDD>-<kind>-<slug>/idea.md` from `backlog/template-idea.md`, carries the
 entry's notes word for word, and leaves the entry its first line plus one link sub-bullet. Ask for the kind
 when the operator did not name it; derive the slug from the entry's words (lowercase, `-` between words, a
@@ -86,7 +87,7 @@ few words) and show it before running.
 
 ### supersede
 
-`python3 $ENGINE --root ROOT supersede --key K --line N --text "<new words>" --today YYYY-MM-DD --asked "<the operator's words>"`.
+`python3 $ENGINE --root ROOT supersede --key K --line N --text "<new words>" --today YYYY-MM-DD --asked "<the command's words>"`.
 The entry's line is replaced in place: open, stamped today, the new words, then ` - supersedes [<old stamp>]`
 (or the old text quoted when it had no stamp), then a new id (the old id is dropped); its sub-bullets stay. A done entry is
 refused: it is ticked in place, never replaced.
@@ -101,13 +102,13 @@ refused: it is ticked in place, never replaced.
    `**Priority:**` line the spec's head gets) and writes nothing. A spec that does not exist yet is not created; the
    plan says so, and the priority is set from the features board once it exists.
 2. Show the plan and ask the operator to confirm it. This is the one confirm.
-3. On yes, run the same command with `--apply`. One invocation writes in both roots (the backlog's and the
+3. On yes, run the same command with `--apply --asked "<the command's words>"`. One invocation writes in both roots (the backlog's and the
    lane's). On no, stop; nothing was written.
 
 ### set-priority
 
-`python3 $ENGINE --root ROOT set-priority --letter A|B|C|none --key K --line N` for an entry line, or
-`--letter A|B|C|none --record <YYMMDD>-<kind>-<slug>` for a record head's `**Priority:**` line. `none`
+`python3 $ENGINE --root ROOT set-priority --letter A|B|C|none --key K --line N --asked "<the command's words>"` for an entry line, or
+`--letter A|B|C|none --record <YYMMDD>-<kind>-<slug>` in place of `--key` and `--line` for a record head's `**Priority:**` line. `none`
 removes the token. The letter and the target come from the operator; ask when either is missing. Never
 pass `--lane`.
 
@@ -125,7 +126,7 @@ pass `--lane`.
    - Both targets keep an existing id, rewrite the former `@B` and `@T` letter forms bare, and give every other
      entry line an id of the migration time, unique in its file.
 3. Show the plan and ask the operator to confirm it. This is the one confirm.
-4. On yes, run the same command with `--apply`. On no, stop; nothing was written.
+4. On yes, run the same command with `--apply --asked "<the command's words>"`. On no, stop; nothing was written.
 5. A file already at version 2, a file of the other kind, and any form the engine cannot map are refused with the
    line named and the file unchanged. Show the refusal and stop; the fix is a hand edit by the operator, then a new plan.
 

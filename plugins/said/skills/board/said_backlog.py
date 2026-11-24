@@ -1927,9 +1927,13 @@ ASK_NOT_TYPED = ("<cross-session-message", "<agent-message", "<task-notification
 ASK_OUTPUT = ("<bash-stdout>", "<bash-stderr>", "<local-command-stdout>", "<local-command-stderr>", "<local-command-caveat>")
 
 
-def _typed_words(rec):
-    """The words of one transcript record when the operator typed them, else None: a tool result, a meta, peer,
-    notification or summary record, and anything an assistant wrote never count."""
+ASK_SESSIONS = 5  # an ask is read in the newest session files of the store only
+ASK_COMMAND = "/said:backlog"
+
+
+def _typed_text(rec):
+    """The text of one transcript record when the operator typed it, else None: a tool result, a meta, peer,
+    notification or summary record, a scripted or accepted-suggestion prompt and anything an assistant wrote never count."""
     if (not isinstance(rec, dict) or rec.get("type") != "user" or rec.get("isMeta") or rec.get("isSidechain")
             or rec.get("isCompactSummary") or rec.get("toolUseResult") is not None):
         return None
@@ -1952,6 +1956,31 @@ def _typed_words(rec):
         c = head + " " + rest.split("</system-reminder>", 1)[1]
     if any(m in c for m in ASK_NOT_TYPED) or c.lstrip().startswith(ASK_OUTPUT):
         return None
+    return c
+
+
+def _between(text, open_tag, close_tag):
+    if open_tag not in text:
+        return None
+    rest = text.split(open_tag, 1)[1]
+    return rest.split(close_tag, 1)[0] if close_tag in rest else None
+
+
+def _command_words(rec):
+    """The argument words of a `/said:backlog` command the operator typed, whitespace folded, else None."""
+    c = _typed_text(rec)
+    if c is None:
+        return None
+    name = _between(c, "<command-name>", "</command-name>")
+    if name is not None:
+        if name.strip() != ASK_COMMAND:
+            return None
+        c = _between(c, "<command-args>", "</command-args>") or ""
+    else:
+        c = c.strip()
+        if not (c == ASK_COMMAND or c.startswith(ASK_COMMAND + " ") or c.startswith(ASK_COMMAND + "\n")):
+            return None
+        c = c[len(ASK_COMMAND):]
     return " ".join(c.split())
 
 
@@ -1959,46 +1988,49 @@ def _slug(path):
     return "".join(ch if ch.isascii() and ch.isalnum() else "-" for ch in os.path.realpath(os.path.abspath(path)))
 
 
+def _store_folders(root):
+    """The root and the folders above it up to its git toplevel (the root alone outside git), physical."""
+    d = os.path.realpath(os.path.abspath(root))
+    out, up = [d], d
+    while not os.path.exists(os.path.join(up, ".git")):
+        nxt = os.path.dirname(up)
+        if nxt == up:
+            return [d]  # no git toplevel: the root alone
+        up = nxt
+        out.append(up)
+    return out
+
+
 def operator_asked(root, quote):
-    """True when `quote` (whitespace folded, at least ASK_MIN characters) sits in a message the operator typed in this
-    project's Claude Code transcript store: <config>/projects/<slug>/*.jsonl, the slug of the root, the cwd or a folder
-    above either short of the home folder (a session started there); the message must name the backlog."""
+    """True when `quote` (whitespace folded, at least ASK_MIN characters) sits in the argument words of a
+    `/said:backlog` command the operator typed, in one of the ASK_SESSIONS newest session files of the root's
+    Claude Code transcript store: <config>/projects/<slug>/*.jsonl, the slug of the root or of a folder above it up to
+    its git toplevel; the cwd never counts."""
     q = " ".join((quote or "").split())
     if len(q) < ASK_MIN:
         return False
     base = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
-    words = "".join(ch if ch.isascii() and ch.isalnum() else " " for ch in q).split()
-    probe = max(words, key=len) if words else ""
-    home = os.path.realpath(os.path.expanduser("~"))
-    slugs = []
-    for d in (root, os.getcwd()):
-        d = os.path.realpath(os.path.abspath(d))
-        while d != home and d not in slugs:
-            slugs.append(d)
-            up = os.path.dirname(d)
-            if up == d:
-                break
-            d = up
     files = []
-    for d in slugs:
+    for d in _store_folders(root):
         files += glob.glob(os.path.join(glob.escape(os.path.join(base, "projects", _slug(d))), "*.jsonl"))
+
     def age(x):
         try:
             return -os.path.getmtime(x)
         except OSError:
             return 0
 
-    for p in sorted(set(files), key=age):  # newest first: an ask is usually recent
+    for p in sorted(set(files), key=age)[:ASK_SESSIONS]:
         try:
             with open(p, encoding="utf-8", errors="replace") as h:
                 for line in h:
-                    if probe not in line:
+                    if ASK_COMMAND not in line:
                         continue
                     try:
-                        t = _typed_words(json.loads(line))
+                        w = _command_words(json.loads(line))
                     except ValueError:
                         continue
-                    if t and q in t and "backlog" in t.lower():
+                    if w and q in w:
                         return True
         except OSError:
             continue
@@ -2039,7 +2071,8 @@ def _main(argv=None):
     rc.add_argument("--line", required=True, help="the entry's line position (from --json)")
     rc.add_argument("--kind", required=True, help="idea, handover or bugfix")
     rc.add_argument("--slug", required=True, help="the folder slug, lowercase words joined by -")
-    ASKED = "the operator's words asking for this write, as typed in this project's Claude Code session"
+    ASKED = "the argument words of the /said:backlog command the operator typed for this write"
+    sp.add_argument("--asked", help=ASKED)
     rc.add_argument("--asked", help=ASKED)
     ad = sub.add_parser("add", help="append one open, stamped entry at the end of a section, a topic or a subtopic")
     ad.add_argument("--section", required=True, help="the H1 section's title")
@@ -2061,17 +2094,23 @@ def _main(argv=None):
     pr.add_argument("--target-lane", required=True, help="the registry token of the lane that owns the feature")
     pr.add_argument("--feature", required=True, help="the feature id, <PREFIX>-<NN>")
     pr.add_argument("--apply", action="store_true", help="write; without it the plan is printed and nothing is written")
+    pr.add_argument("--asked", help=ASKED)
     mg = sub.add_parser("migrate", help="rewrite a former-grammar backlog to grammar v2 (target backlog), or a todo file's stamps (target todo); plan without --apply")
     mg.add_argument("target", choices=["backlog", "todo"], help="the file's kind; a file of the other kind is refused")
     mg.add_argument("--lane", help="the registry lane token whose todo file the todo target rewrites")
     mg.add_argument("--file", help="an absolute, physical path under the root, instead of the default file")
     mg.add_argument("--apply", action="store_true", help="write; without it the plan is printed and nothing is written")
     mg.add_argument("--full", action="store_true", help="print the whole plan, not the first 40 rows")
+    mg.add_argument("--asked", help=ASKED)
     a = ap.parse_args(argv)
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
+    gated = a.cmd in ("add", "record", "supersede", "set-priority") or a.cmd in ("promote", "migrate") and a.apply
+    if gated and not operator_asked(a.root, a.asked):
+        print("refused: no operator ask; --asked quotes the words of a /said:backlog command the operator typed")
+        return 2
     if a.cmd == "set-priority":
         ok, msg = set_priority(a.root, a.letter, key=a.key, line=a.line, lane=a.lane, record=a.record)
         print(msg)
@@ -2088,9 +2127,6 @@ def _main(argv=None):
         ok, msg = migrate(a.root, a.target, lane=a.lane, file=a.file, apply=a.apply, full=a.full)
         print(msg)
         return 0 if ok else 2
-    if a.cmd in ("add", "record", "supersede") and not operator_asked(a.root, a.asked):
-        print("refused: no operator ask; --asked quotes words the operator typed in this project's Claude Code session")
-        return 2
     if a.cmd in ("add", "record", "supersede", "promote"):
         if a.cmd == "add":
             ok, msg, _ = add(a.root, a.section, a.topic, a.subtopic, a.text, a.today, a.note)
