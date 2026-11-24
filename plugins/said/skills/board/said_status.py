@@ -2010,8 +2010,8 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
     `dirty()` (the count of uncommitted files outside the working dir), a row per rule id and a Covers or Uncovered
     decisions row per decision id; rc 0 and the row lines, or rc 1 and the owed lines. cites(cell text) gives the
     failing cites of a row as [(cite, why)]: any of them, on a row of any status, refuses the reply.
-    record_cite(evidence) is True when every cite sits in a record (the task log, the spec, a file of the working
-    dir): the FAIL row is then the record class. feature_review_output reads the file, the store and the records, then calls this."""
+    record_cite(evidence) is True when every cite sits in a record (the task log, the spec, a working note) and
+    one sits beyond the spec: the FAIL row is then the record class. feature_review_output reads the file, the store and the records, then calls this."""
     import gate_record
     try:
         verdict, rows = _fr_parse(text, sha, workdir, verdict_path, doc, record_path)
@@ -2111,18 +2111,24 @@ def feature_review_output(root, workdir, feature, decisions=()):
         import cite_check  # the one cite check, shared with the scope chain
         dirs = _fr_cite_dirs(root, feature)  # a bare file name resolves in the feature's own folders
         routes = _fr_routes(root, feature)
-        records = []  # the feature's task log and spec, files by name; its working dir, any file under it
+        recs = {}  # the feature's task log and spec, by realpath
         for key in ("task-log", "feature-spec"):
             rec = (gate_record.lane_key(root, key) or "").strip().strip("`'\"").replace("<id>", feature)
             if rec:
-                records.append(os.path.realpath(os.path.join(root, rec)))
+                recs[os.path.realpath(os.path.join(root, rec))] = key
+        sources = {os.path.realpath(p) for p in decisions or ()}
 
-        def a_record(real):
-            return real in records or real.startswith(wd + os.sep)
+        def a_note(real):  # a top-level working file that is no decision source and no gate output
+            base = os.path.basename(real)
+            return (os.path.dirname(real) == wd and real not in sources and base not in ("rulings.md", "scope.md")
+                    and not base.startswith(("gate-", "review-", "covers-", "QA-", "doc-gate-")))
 
-        def in_log(ev):
+        def in_log(ev):  # every cite in a record, and one beyond the spec: a spec line alone is a requirement's source
             hits = cite_check.text_paths(root, ev, dirs, strict=True)
-            return bool(hits) and all(h and a_record(os.path.realpath(os.path.join(root, h))) for h in hits)
+            reals = [os.path.realpath(os.path.join(root, h)) for h in hits if h]
+            if not hits or len(reals) < len(hits) or not all(r in recs or a_note(r) for r in reals):
+                return False
+            return any(recs.get(r) == "task-log" or a_note(r) for r in reals)
 
         return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc,
                                     lambda cell: cite_check.text_faults(root, cell, dirs, routes, strict=True),  # a reader row holds no host and port
