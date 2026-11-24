@@ -78,7 +78,7 @@ A `#word` in `--text` becomes a tag. `--text` and each `--note` are one line of 
 300 characters, with no middle dot, stamp, priority token or id; words an entry already has are refused. The engine
 mints the entry's id (`@` and 13 digits, the clock in Unix milliseconds) at the end of the line text, after the author
 (rule 13). Both count in the 300, so `--text` holds 285 characters less the author word (and its space:
-272 for `~@jane-smith`). A `supersede` keeps the entry's id. The
+272 for `~@jane-smith`). The
 `wrote ...` line names the new entry's `key` and `line`, ready for a move of its notes to an idea record.
 
 ### move (an entry's notes to an idea record)
