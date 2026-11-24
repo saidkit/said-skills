@@ -17,8 +17,8 @@ before its first `### ` heading; its ids are separated by `, ` (`none` names non
                       the root names the one file of that name in --working, the declared `SAID.working:` folder of
                       the feature named by --working's last part, the `SAID.feature-spec:` folder (direct children)
                       or a `SAID.mounts:` folder (any depth); with none or two it is `missing`.
-                      Without --working only the mounts are searched, so a bare name that is not a file at the
-                      root is `missing`. A file is inside by declared route: spelled under a declared folder, whatever
+                      Without --working the root and the mounts are searched, and a bare name found in neither
+                      is `missing`. A file is inside by declared route: spelled under a declared folder, whatever
                       that folder links to, or with its real location in the lane. The id is `outside` when no file
                       inside the root or those folders is found and a candidate leaves it
 A store whose flag is not given leaves its ids `unchecked`; a given --rulings file that does not exist makes
