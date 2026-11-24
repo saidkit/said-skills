@@ -2009,31 +2009,49 @@ def _fold(text):
     return " ".join(str(text or "").split()).lower()
 
 
-def _ask_targets(root, a):
-    """The words that name this write's target, any one of which the typed command must carry: the new text for add and
-    supersede, the entry's key, id, stamp date or first three words (or the record's name or slug), the migrate target."""
-    if a.cmd in ("add", "supersede"):
-        return [a.text]
-    if a.cmd == "migrate":
-        return [a.target]
-    if getattr(a, "record", None):
-        return [a.record, a.record.split("-", 2)[-1]]
-    out = [a.key]
-    try:
-        e = next((e for e in read_all(root)["backlog"]["entries"] if e["key"] == a.key), None)
-    except Exception:
-        e = None
-    if e:
-        out += [e.get("id"), (e.get("id") or "").lstrip("@"), e.get("date"), " ".join(str(e.get("text", "")).split()[:3])]
-    return [t for t in out if t]
+def _ask_binding(root, a):
+    """What the typed command's words after its operation word must hold for this one write (folded, parts split at `;`):
+    the whole `--text` as a part (or the whole remainder) and every `--note` as a part; the entry's key or 13-digit id
+    as a word; a record head's name or slug as a word; the migrate target as a word."""
+    def words(rest):
+        return {w.strip(".,;:()[]\"'") for w in rest.split()}
+
+    def text_ok(rest, text):
+        x = _fold(text)
+        return bool(x) and (x == rest or x in [p.strip() for p in rest.split(";")])
+
+    entry = []
+    if a.cmd in ("supersede", "record", "promote") or a.cmd == "set-priority" and not getattr(a, "record", None):
+        entry = [_fold(a.key)]
+        try:
+            e = next((e for e in read_all(root)["backlog"]["entries"] if e["key"] == a.key), None)
+        except Exception:
+            e = None
+        if e and e.get("id"):
+            entry += [_fold(e["id"]), _fold(e["id"]).lstrip("@")]
+
+    def binds(rest):
+        w = words(rest)
+        if a.cmd in ("add", "supersede") and not text_ok(rest, a.text):
+            return False
+        if a.cmd == "add" and not all(text_ok(rest, n) for n in (a.note or [])):
+            return False
+        if entry and not any(x and x in w for x in entry):
+            return False
+        if a.cmd == "set-priority" and getattr(a, "record", None):
+            return _fold(a.record) in w or _fold(a.record.split("-", 2)[-1]) in w
+        if a.cmd == "migrate":
+            return a.target in w
+        return True
+    return binds
 
 
-def operator_asked(root, quote, verbs=None, targets=None):
+def operator_asked(root, quote, verbs=None, binds=None):
     """True when `quote` (whitespace folded, at least ASK_MIN characters) sits in the argument words of a
     `/said:backlog` command the operator typed, in one of the ASK_SESSIONS newest session files of the root's
     Claude Code transcript store: <config>/projects/<slug>/*.jsonl, the slug of the root or of a folder above it up to
-    its git toplevel; the cwd never counts. With `verbs` the command opens with one of them, and with `targets` it
-    carries one of them, so one typed command authorizes the one write it names."""
+    its git toplevel; the cwd never counts. With `verbs` the command opens with one of them, and `binds` must hold
+    on the words after it, so one typed command authorizes the one write it names."""
     q = " ".join((quote or "").split())
     if len(q) < ASK_MIN:
         return False
@@ -2060,9 +2078,10 @@ def operator_asked(root, quote, verbs=None, targets=None):
                         continue
                     if not (w and q in w):
                         continue
-                    if verbs and w.split()[0].lower() not in verbs:
+                    head, _, rest = w.partition(" ")
+                    if verbs and head.lower() not in verbs:
                         continue
-                    if targets is not None and not any(_fold(t) and _fold(t) in w.lower() for t in targets):
+                    if binds is not None and not binds(rest.lower()):
                         continue
                     return True
         except OSError:
@@ -2141,7 +2160,7 @@ def _main(argv=None):
     except Exception:
         pass
     gated = a.cmd in ("add", "record", "supersede", "set-priority") or a.cmd in ("promote", "migrate") and a.apply
-    if gated and not operator_asked(a.root, a.asked, ASK_VERBS[a.cmd], _ask_targets(a.root, a)):  # one typed command, one write
+    if gated and not operator_asked(a.root, a.asked, ASK_VERBS[a.cmd], _ask_binding(a.root, a)):  # one typed command, one write
         print("refused: no operator ask; --asked quotes a /said:backlog command the operator typed that names this subcommand and its target")
         return 2
     if a.cmd == "set-priority":
