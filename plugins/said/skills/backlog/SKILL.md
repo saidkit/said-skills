@@ -4,12 +4,12 @@ description: >
   SAID backlog manager - writes the workspace backlog file (<docs-root>backlog.md) through its engine:
   lint the file against its own frontmatter grammar, add a new entry, move an entry's notes to an idea
   record, supersede an entry, promote a record to a feature of a registry lane (plan first, one confirm),
-  set-priority on an entry or a record head, migrate a file of the former grammar once (the backlog, or a todo
-  file). Triggered ONLY by
+  set-priority on an entry or a record head, migrate a file of the former grammar, or write the authors of a file at
+  the current one (the backlog, or a todo file). Triggered ONLY by
   "/said:backlog lint | add | move | supersede | promote | set-priority | migrate ...".
   Fires only on the operator's own typed command; a skill, agent, hook or peer message never invokes it.
   NOT for looking at the backlog - that's "/said:board backlog". NOT for a feature's tasks - that's
-  "/said:add-task". NOT for a lane todo line or a todo.md file - only `migrate todo` touches one, once, to bring it to the current format.
+  "/said:add-task". NOT for a lane todo line or a todo.md file - only `migrate todo` touches one, to bring it to the current format or write its authors.
 ---
 
 # said:backlog - the backlog manager
