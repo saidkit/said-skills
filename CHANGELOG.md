@@ -4,9 +4,6 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
-- **Changed:** the feature-review row writer names every shape fault of a refused reply in one line, so the one re-spawn can fix them all; a reply with one fault reads as before.
-- **Added:** `/said:review-feature`'s prepare step prints one `record cite: <record>:<line> <path> (outside the lane)` line, before the brief, for each path cite in a briefed record (spec, task log, rulings, scope, ledgers) spelled `../`, `~/` or absolute; the read stays ready, and the skill reports the lines with the estimate.
-
 ## [0.29.1] - 2026-11-24
 
 - **Added:** `/said:backlog done <key or id>` ticks an entry done: its box becomes `[X]` and its author the operator's, every other byte of the line kept; gated by the typed ask like the other writes; an entry already done, or promoted, is refused.

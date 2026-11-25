@@ -12,9 +12,8 @@ prepare reads the record (`gate_record.py check --reads feature-review`) and pri
   review-feature: owed (no read: <why>)    the read is owed and cannot run (no --base, no HEAD, no capture file,
                                            the capture reference names the gate record, or a second record-class
                                            FAIL on this store waits for the operator)
-  review-feature: ready                    then `out: <verdict file>`, `estimate: ...`, one `record cite: <record>:<line>
-                                           <path> (outside the lane)` line per path cite of a briefed record spelled
-                                           `../`, `~/` or absolute, and the brief between `--- brief` and `--- end`
+  review-feature: ready                    then `out: <verdict file>`, `estimate: ...` and the brief between the
+                                           lines `--- brief` and `--- end`
 Exit 0 ready, 1 any other state, 2 an input error (`error: <why>`). The capture reference is a non-empty file in the
 working dir, named relative to it and never the gate record, or `none` on a feature with no capture; the decision
 records are the working dir's rulings.md and scope.md when they exist, then each --ledger (a file inside the lane
@@ -172,34 +171,6 @@ def out_path(root, working, fid):
     return os.path.join(working, "review-%s-%s.md" % ("doc-editorial" if doc else "feature", fid)), doc
 
 
-OUT_CITE = re.compile(r"(?<![\w./~:@-])((?:\.\./|~/|/)[^\s`'\"()<>|,;\[\]]+)")
-MAX_CITES = 40
-
-
-def record_cites(root, files):
-    """`<record>:<line> <path>` for each path cite in the records spelled `../`, `~/` or absolute (two parts at least)
-    that the lane's routes do not admit; at most MAX_CITES, then one `... <n> more` item."""
-    import said_status
-    import cite_check
-    routes, out = said_status._fr_routes(root), []
-    for f in files:
-        try:
-            with open(f, encoding="utf-8", errors="replace") as fh:
-                text = fh.read()
-        except OSError:
-            continue
-        rel = os.path.relpath(f, root)
-        for n, line in enumerate(text.split("\n"), 1):
-            for m in OUT_CITE.finditer(line):
-                path = m.group(1).rstrip(".:")
-                bare = re.sub(r":[0-9]+(-[0-9]+)?$", "", path)
-                if bare.startswith("/") and len([x for x in bare.split("/") if x]) < 2:
-                    continue  # a command such as /said:board, not a path
-                if bare.startswith("~") or not cite_check.admitted(root, bare, routes):  # ~ is the home, never the lane
-                    out.append("%s:%d %s" % (rel, n, path))
-    return out[:MAX_CITES] + (["... %d more" % (len(out) - MAX_CITES)] if len(out) > MAX_CITES else [])
-
-
 def prepare(fid, root, base, ref, spec_ledgers, mount_bases=None):
     """{state: current | FAIL | owed | ready, why, ...}; on ready also base, head, records, out, doc, brief, chars,
     tokens. An Error when the lane's keys, the spec or the task log are missing."""
@@ -238,8 +209,7 @@ def prepare(fid, root, base, ref, spec_ledgers, mount_bases=None):
         raise Error("the feature has no spec or no task log (%s)" % os.path.relpath(spec, root))
     chars, tokens = estimate(root, base_sha, head, records, spec, mounts)
     out, doc = out_path(root, working, fid)
-    cites = record_cites(root, [spec, lane_path(root, "task-log", fid)] + records)
-    return {"state": "ready", "cites": cites, "why": "ready", "base": base_sha, "head": head, "records": records, "out": out,
+    return {"state": "ready", "why": "ready", "base": base_sha, "head": head, "records": records, "out": out,
             "doc": doc, "chars": chars, "tokens": tokens, "mounts": " ".join(m["base"] + ":" + m["head"] for m in mounts),
             "brief": brief(fid, root, working, base_sha, head, ref, records, doc, mounts, no_lane)}
 
@@ -341,8 +311,6 @@ def main(argv):
                 return 1
             print("review-feature: ready\nout: %s" % p["out"])
             print("estimate: at least %d input tokens (%d characters read once, divided by 4)" % (p["tokens"], p["chars"]))
-            for c in p["cites"]:  # seen before the spawn: the reader would copy them into its rows
-                print("record cite: %s" % c if c.startswith("... ") else "record cite: %s (outside the lane)" % c)
             print("--- brief\n%s--- end" % p["brief"])
             return 0
         with open(opts["reply"], encoding="utf-8", errors="replace") as fh:
