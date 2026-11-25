@@ -1990,13 +1990,19 @@ def _fr_cite_dirs(root, feature=None):
 
 
 def _fr_routes(root, feature=None):
-    """The lane's declared routes, lane-relative: the bare-name folders and the docs root. The one inside policy."""
+    """The lane's declared routes, lane-relative: the bare-name folders, the docs root and the record stores
+    (`SAID.record-stores:`, read whole; an entry absolute or with a `..` part is no route). The one inside policy:
+    every caller that judges a record's or a reply's cites reads its routes here."""
     import gate_record
     import cite_check
     out = [d[:-3] if d.endswith("/**") else d for d in _fr_cite_dirs(root, feature)]
     docs = (gate_record.lane_key(root, "docs-root") or "").strip().strip("`'\"").strip("/")
     if docs and cite_check.inside(docs):
         out.append(docs)
+    for s in gate_record.mount_list(gate_record.lane_key(root, "record-stores")):  # the list read whole; none adds nothing
+        s = s.strip("`'\"")
+        if s.strip("/") and cite_check.inside(s):  # judged before the slashes go: /x/ is absolute
+            out.append(s.strip("/"))
     return tuple(out)
 
 
