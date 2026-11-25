@@ -37,7 +37,7 @@ Run `python3 ${CLAUDE_SKILL_DIR}/review_feature.py prepare <feature-id> --root <
 - `review-feature: FAIL recorded (not read again)` -> end with `review-feature: FAIL`.
 - `review-feature: owed (no read: <why>)` -> end with `review-feature: owed: no read: <why>`.
 - `error: <why>` (exit 2) -> end with `review-feature: error: <why>`.
-- `review-feature: ready` -> report its `estimate:` line, then Step 2.
+- `review-feature: ready` -> report its `estimate:` line together with each `record cite:` line it printed (a briefed record citing a path outside the lane, which the reader would copy into a row the writer refuses), then Step 2.
 
 ## Step 2 - Spawn the reader
 
