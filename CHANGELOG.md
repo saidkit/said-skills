@@ -5,6 +5,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 ## [Unreleased]
 
 - **Added:** the optional lane key `SAID.record-stores: [<folder>/, ...]` names lane folders that hold records the lane's records cite, such as run records kept in a linked store. A cite spelled under a declared store is inside when its target stays under the store's target, in the feature-review rows, the covers read and the debrief's placing; a `..` or absolute spelling, an absolute or `..` store entry and a store file that links out again stay outside. `/said:setup` reports the key with its count and flags an entry outside the lane or naming no folder.
+
 ## [0.29.1] - 2026-11-24
 
 - **Added:** `/said:backlog done <key or id>` ticks an entry done: its box becomes `[X]` and its author the operator's, every other byte of the line kept; gated by the typed ask like the other writes; an entry already done, or promoted, is refused.
