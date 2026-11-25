@@ -6,7 +6,7 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 - **Changed:** the feature-review row writer names every shape fault of a refused reply in one line, so the one re-spawn can fix them all; a reply with one fault reads as before.
 - **Added:** `/said:review-feature`'s prepare step prints one `record cite: <record>:<line> <path> (outside the lane)` line, before the brief, for each path cite in a briefed record (spec, task log, rulings, scope, ledgers) spelled `../`, `~/` or absolute; the read stays ready, and the skill reports the lines with the estimate.
-- **Added:** the optional lane key `SAID.record-stores: [<folder>/, ...]` names lane folders that hold records the lane's records cite, such as run records kept in a linked store. A cite spelled under a declared store is inside when its target stays under the store's target, in the feature-review rows, the covers read and the debrief's placing; a `..` or absolute spelling, an absolute or `..` store entry and a store file that links out again stay outside. `/said:setup` reports the key with its count and flags an entry outside the lane or naming no folder.
+
 ## [0.29.1] - 2026-11-24
 
 - **Added:** `/said:backlog done <key or id>` ticks an entry done: its box becomes `[X]` and its author the operator's, every other byte of the line kept; gated by the typed ask like the other writes; an entry already done, or promoted, is refused.

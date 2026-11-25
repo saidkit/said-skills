@@ -528,23 +528,6 @@ def check_lane_paths(lane_root, key, val, keys):
     return ("unresolvable", "BLOCKER", "%s: %s; scope-refine stops on it" % (key, "; ".join(bad)))
 
 
-def check_store_paths(lane_root, key, val):
-    """Judge the entries of a record-stores list: each is spelled inside the lane (not absolute, no .. part) and names
-    a folder of the lane; a store may link out of the lane, so its target is not judged here. None when all hold."""
-    r = read_path_list(val)
-    if r["form"] == "bare-none":
-        return None
-    bad = []
-    for p in r["paths"] or []:
-        if os.path.isabs(p) or p.startswith("~") or ".." in p.replace("\\", "/").split("/"):
-            bad.append("%s is outside the lane" % p)
-        elif not os.path.isdir(os.path.join(os.path.abspath(lane_root), p)):
-            bad.append("%s is no folder of the lane" % p)
-    if not bad:
-        return None
-    return ("unresolvable", "ADVISORY", "%s: %s; the cite check takes no route from such an entry" % (key, "; ".join(bad)))
-
-
 def check_lane(lane_root, schema, claude_md=None):
     """Evaluate the lane at lane_root against schema. Return a list of findings:
     dicts {item, verdict, severity, remediation}. verdict in ok/stale/missing/unresolvable."""
@@ -594,8 +577,6 @@ def check_lane(lane_root, schema, claude_md=None):
         problem = check_path_list(ax["key"], val) if present and ax.get("value") == "path-list" else None
         if not problem and present and ax.get("resolve") == "lane-paths":
             problem = check_lane_paths(lane_root, ax["key"], val, keys)
-        if not problem and present and ax.get("resolve") == "record-stores":
-            problem = check_store_paths(lane_root, ax["key"], val)
         if present and ax.get("value") == "positive-integer" and not re.fullmatch(r"[1-9][0-9]*", cut_aside(val.strip())):
             shown = cut_aside(val.strip()).encode("unicode_escape").decode("ascii")
             shown = shown if len(shown) <= 40 else shown[:37] + "..."
@@ -609,11 +590,7 @@ def check_lane(lane_root, schema, claude_md=None):
         if problem:
             findings.append({"item": ax["key"], "verdict": problem[0], "severity": problem[1], "remediation": problem[2]})
         elif present:
-            counted = ""
-            if ax.get("count"):  # a list read whole reports its count
-                n = len(read_path_list(val)["paths"] or [])
-                counted = "read whole: %d %s" % (n, ax["count"] if n != 1 else ax["count"].rstrip("s"))
-            findings.append({"item": ax["key"], "verdict": "ok", "severity": "OK", "remediation": counted})
+            findings.append({"item": ax["key"], "verdict": "ok", "severity": "OK", "remediation": ""})
         elif required:
             findings.append({"item": ax["key"], "verdict": "missing", "severity": ax["severity_if_missing"],
                              "remediation": ax["remediation"]})
