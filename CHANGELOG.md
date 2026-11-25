@@ -4,7 +4,8 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
-- **Changed:** the supervisor agent sends back a close whose Fix lacks the worker's self-check, and at a feature's close moves run output, aborted copies and duplicates out of the feature's working folder under a dated name, keeping what a later read cites and reporting counts, never asking; the worker agent writes a self-check into the Fix before a close: each Acceptance bullet mapped to the file:line that does it, a guard per bullet with its negative case, a cold read-only review before a paid feature read, and all of it again after a FAIL.
+- **Changed:** the worker agent writes a self-check into a task's Fix section before it closes the task: each Acceptance bullet and named spec line mapped to the file:line that does it, a guard per bullet with its negative case and per new branch and per caller of a message it formats, a cold read-only review of the task's words against its diff before a paid feature read, and all of it again after a FAIL.
+- **Changed:** the supervisor agent sends back a close whose Fix lacks that self-check, and at a feature's close moves run output, aborted copies and duplicates out of the feature's working folder under a dated name, keeping what a later read cites and reporting counts, never asking.
 
 ## [0.29.1] - 2026-11-24
 
