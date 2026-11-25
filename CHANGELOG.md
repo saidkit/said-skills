@@ -4,8 +4,6 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
-- **Changed:** the supervisor agent sends back a close whose Fix lacks the worker's self-check, and at a feature's close moves run output, aborted copies and duplicates out of the feature's working folder under a dated name, keeping what a later read cites and reporting counts, never asking; the worker agent writes a self-check into the Fix before a close: each Acceptance bullet mapped to the file:line that does it, a guard per bullet with its negative case, a cold read-only review before a paid feature read, and all of it again after a FAIL.
-
 ## [0.29.1] - 2026-11-24
 
 - **Added:** `/said:backlog done <key or id>` ticks an entry done: its box becomes `[X]` and its author the operator's, every other byte of the line kept; gated by the typed ask like the other writes; an entry already done, or promoted, is refused.
