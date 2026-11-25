@@ -104,8 +104,7 @@ def physical(path):
 def lane_place(top, spelled):
     """(physical path, None) for the file a lane-relative spelling names, else (None, why). The spelling is tried at
     the lane root, then at the lane's docs root; it is inside when cite_check admits it (the lane's own files, its
-    declared routes: the docs root, the mounts and the record stores, the lane CLAUDE.md wherever it links). `..` or
-    absolute: outside."""
+    declared routes: the docs root and the mounts, the lane CLAUDE.md wherever it links). `..` or absolute: outside."""
     cc, gr = _board("cite_check"), _board("gate_record")
     if "\0" in spelled:  # isfile() would read it as absent
         raise Fail("not a path: %s" % shown(spelled, 80))
@@ -113,7 +112,7 @@ def lane_place(top, spelled):
         return None, "outside the lane root"
     docs = (gr.lane_key(top, "docs-root") or "").strip().strip("`'\"").strip("/")
     docs = docs if docs and cc.inside(docs) else ""
-    routes = _board("said_status")._fr_routes(top)  # the one routes function
+    routes = gr.mount_list(gr.lane_key(top, "mounts")) + ([docs] if docs else [])
     found = False
     for rel in [spelled] + ([docs + "/" + spelled] if docs else []):
         full = os.path.join(top, rel)
