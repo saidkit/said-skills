@@ -4,6 +4,12 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
+## [0.29.2] - 2026-11-26
+
+- **Fixed:** the feature-review row writer counts a Covers or Uncovered decisions row for a decision id that starts its first cell and is followed by words (`WR-1, the ruling row`, `DL-1. words`); a longer or prefixed id (`WR-12`, `XWR-1`, `DL-1.2`) still does not count, and a reply missing a row for an id is still refused.
+- **Fixed:** a refused feature-review reply names every shape fault the writer can read past in one line, in reply order, joined by `; `; a header key out of place, a heading out of order or text before the first group ends the scan and is named after the faults before it; a reply with one fault gives the line it gave before.
+- **Fixed:** a faulty cite on a PASS, N/A or NOT-READ row no longer refuses the whole reply: that row files NOT-READ with its id cell kept and `cite fault: <cite> <reason>` ahead of its evidence, and counts in `not-read=`; the reply's verdict stands. A faulty cite on a FAIL row still refuses the reply, naming every refused cite of the FAIL rows.
+
 ## [0.29.1] - 2026-11-24
 
 - **Added:** `/said:backlog done <key or id>` ticks an entry done: its box becomes `[X]` and its author the operator's, every other byte of the line kept; gated by the typed ask like the other writes; an entry already done, or promoted, is refused.
