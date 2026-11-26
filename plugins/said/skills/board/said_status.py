@@ -2000,6 +2000,15 @@ def _fr_routes(root, feature=None):
     return tuple(out)
 
 
+def _fr_names(cell, did):
+    """True when the stripped cell starts with the decision id and no id character follows it: a letter, digit, `-`,
+    `_`, or a `.` before a letter or digit (a ledger id continues past it)."""
+    rest = cell[len(did):] if cell.startswith(did) else None
+    if rest is None:
+        return False
+    return not rest or not (rest[0].isalnum() or rest[0] in "-_" or rest[0] == "." and rest[1:2].isalnum())
+
+
 def _fr_owed(why):
     return 1, ["feature-review: header | FAIL | %s" % why, "feature review owed: %s" % why]
 
@@ -2022,8 +2031,8 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
         missing = [r for r in rule_ids if r not in have]
         if missing:
             raise FeatureReviewRefused("Earned rules has no row for %s" % ", ".join(missing[:8]))
-        named = {c[0].strip().strip("`*").strip() for g, c in rows if g in ("Covers", gate_record.FR_DECISIONS)}
-        missing = [d for d in decision_ids if d not in named]
+        named = [c[0].strip().strip("`*").strip() for g, c in rows if g in ("Covers", gate_record.FR_DECISIONS)]
+        missing = [d for d in decision_ids if not any(_fr_names(n, d) for n in named)]
         if missing:
             raise FeatureReviewRefused("no row in Covers or %s for %s" % (gate_record.FR_DECISIONS, ", ".join(missing[:8])))
     except FeatureReviewRefused as e:
