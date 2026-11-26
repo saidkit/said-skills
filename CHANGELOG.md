@@ -4,6 +4,14 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
+## [0.29.3] - 2026-11-26
+
+- **Fixed:** the feature-review row writer counts a decision id or a rule id as a whole token anywhere in a row's first cell, every id of the cell counting (`scope.md Q-1 (depth)`, `D answered 1 (Q-1)`); a longer or prefixed id (`Q-10`, `XQ-1`, `Q-1a`, `R-X-01a`) still does not count, and the missing-row refusal says each row names its id in its first cell.
+- **Fixed:** a table whose column line is right and whose separator row is missing is read; under a wrong column line it is still refused.
+- **Fixed:** one refusal line names every fault the reply caused: its shape faults in reply order, its missing rule and decision rows and its FAIL-row cite faults, joined by `; `; a fault that ends the scan skips the id checks.
+- **Fixed:** a fault the reply did not cause ends the writer with an `error:` line and exit 2, never a re-spawn: an uncommitted file in the lane's own paths (checked first), an unreadable verdict file, a verdict file outside the working dir, and a `target-sha` that HEAD moved past after the brief.
+- **Fixed:** the feature read covers the lane's own paths only: the lane root less nested registered lane roots, declared mounts that are their own git repo, and the working root. The brief gives the one `lane diff paths:` command for that diff, the estimate sizes it, and the writer's uncommitted-file count uses the same paths.
+
 ## [0.29.2] - 2026-11-26
 
 - **Fixed:** the feature-review row writer counts a Covers or Uncovered decisions row for a decision id that starts its first cell and is followed by words (`WR-1, the ruling row`, `DL-1. words`); a longer or prefixed id (`WR-12`, `XWR-1`, `DL-1.2`) still does not count, and a reply missing a row for an id is still refused.
