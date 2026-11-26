@@ -1778,50 +1778,58 @@ def _fr_cells(line):
 
 def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False, record_path=""):
     """(verdict, [(group, cells)]) of a reviewer's verdict text, or raise FeatureReviewRefused(why); doc: a doc lane's
-    verdict, checker-id doc-editorial and the seventh group Editorial."""
+    verdict, checker-id doc-editorial and the seventh group Editorial. Every fault the text can be followed past is
+    named, joined by `; `; a heading out of order or text before the first group ends the scan."""
     import gate_record  # the verdict's groups and columns, one place; lazy: the analyzer runs without it
     FR_GROUPS = gate_record.fr_groups(doc)
     checker = "doc-editorial" if doc else "feature-reviewer"
+    faults = []
+
+    def stop(why):
+        raise FeatureReviewRefused("; ".join(faults + [why]))
+
     lines = text.split("\n")
     if len(lines) < 7:
-        raise FeatureReviewRefused("the header is shorter than five lines and a blank line")
+        stop("the header is shorter than five lines and a blank line")
     head = {}
     for i, key in enumerate(FR_KEYS):
         k, sep, v = lines[i].partition(":")
-        if not sep or k != key:
-            raise FeatureReviewRefused("header line %d is not `%s:` (keys in order: %s)" % (i + 1, key, ", ".join(FR_KEYS)))
+        if not sep or k != key:  # a wrong key may shift every line after it: the scan ends here
+            stop("header line %d is not `%s:` (keys in order: %s)" % (i + 1, key, ", ".join(FR_KEYS)))
         head[key] = v.strip()
     if lines[5].strip():
-        raise FeatureReviewRefused("no blank line after the five header lines")
+        faults.append("no blank line after the five header lines")
     if head["checker-id"] != checker:
-        raise FeatureReviewRefused("checker-id is not %s" % checker)
+        faults.append("checker-id is not %s" % checker)
     if not head_sha or head["target-sha"] != head_sha:
-        raise FeatureReviewRefused("target-sha is not the current head")
+        faults.append("target-sha is not the current head")
     ref = head["capture-evidence-ref"]
     wd = os.path.realpath(workdir)
     full = os.path.realpath(os.path.join(wd, ref)) if ref and "\x00" not in ref else ""
     if ref == "none":
         pass  # no capture: the Captures group must be the single line `none`, checked after the rows
     elif not ref or os.path.isabs(ref) or not full.startswith(wd + os.sep) or not os.path.isfile(full):
-        raise FeatureReviewRefused("capture-evidence-ref is not a relative regular file inside the working dir")
+        faults.append("capture-evidence-ref is not a relative regular file inside the working dir")
     elif os.path.getsize(full) == 0:
-        raise FeatureReviewRefused("capture-evidence-ref names an empty file")
+        faults.append("capture-evidence-ref names an empty file")
     elif verdict_path and (full == os.path.realpath(verdict_path) or os.path.exists(verdict_path) and os.path.samefile(full, verdict_path)):
-        raise FeatureReviewRefused("capture-evidence-ref names the verdict file itself, not a capture")
+        faults.append("capture-evidence-ref names the verdict file itself, not a capture")
     elif record_path and os.path.exists(record_path) and os.path.samefile(full, record_path):
-        raise FeatureReviewRefused("capture-evidence-ref names the gate record, not a capture")
+        faults.append("capture-evidence-ref names the gate record, not a capture")
     if head["verdict"] not in ("PASS", "FAIL"):
-        raise FeatureReviewRefused("verdict is neither PASS nor FAIL")
-    rows, group, cols, state, want, got = [], None, (), "", 0, 0
-    for raw in lines[6:]:
+        faults.append("verdict is neither PASS nor FAIL")
+    rows, group, cols, state, want, got, fails, beyond, width = [], None, (), "", 0, 0, 0, set(), 0
+    body = len(faults)  # a fault of the body hides rows: the verdict-to-rows checks then add nothing
+    for raw in lines[5 if lines[5].strip().startswith("#") else 6:]:  # a heading in the blank line's place is read
         line = raw.strip()
         if line.startswith("#"):
-            if state in ("open", "head") or state in ("rows", "closed") and not got:
-                raise FeatureReviewRefused("group %s has no rows and no `none` line" % group)
+            if group not in beyond and (state in ("open", "head") or state in ("rows", "closed") and not got):
+                faults.append("group %s has no rows and no `none` line" % group)
             got = 0
             if want >= len(FR_GROUPS) or line != "## " + FR_GROUPS[want][0]:
-                raise FeatureReviewRefused("heading `%s` is not the next of the %d groups" % (_fr_clean(line, 40), len(FR_GROUPS)))
+                stop("heading `%s` is not the next of the %d groups" % (_fr_clean(line, 40), len(FR_GROUPS)))
             group, cols = FR_GROUPS[want]
+            width = len(cols)
             state = "open"
             want += 1
             continue
@@ -1830,45 +1838,64 @@ def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False, record_path="
                 state = "closed"
             continue
         if group is None:
-            raise FeatureReviewRefused("text before the first group")
+            stop("text before the first group")
         if line == "none" and state == "open":
             state = "none"
             continue
         cells = _fr_cells(line)
         if cells is None or state in ("none", "closed"):
-            raise FeatureReviewRefused("group %s holds text or a second table beyond its one table" % group)
+            if group not in beyond:  # once a group: the lines after it are skipped
+                faults.append("group %s holds text or a second table beyond its one table" % group)
+                beyond.add(group)
+            if state in ("open", "head"):
+                state = "none" if state == "open" else "rows"  # the text stands in for the answer or the separator
+            continue
         if state == "open":
-            if tuple(cells) != cols:
-                raise FeatureReviewRefused("group %s table columns are not: %s" % (group, " | ".join(cols)))
             state = "head"
-        elif state == "head":
-            if len(cells) != len(cols) or not all(c and set(c) <= set("-: ") for c in cells):
-                raise FeatureReviewRefused("group %s table has no separator row" % group)
+            if tuple(cells) != cols:
+                faults.append("group %s table columns are not: %s" % (group, " | ".join(cols)))
+                if all(c and set(c) <= set("-: ") for c in cells):
+                    state = "rows"  # the line is the separator: the column row is missing
+                else:
+                    width = len(cells)  # the table is read at its own width: one fault, not one per row
+            continue
+        if state == "head":
             state = "rows"
+            if len(cells) == width and all(c and set(c) <= set("-: ") for c in cells):
+                continue
+            faults.append("group %s table has no separator row" % group)
+            if set(line) <= set("-:| "):
+                continue  # a separator of the wrong shape, not a row
+            # else the line is read as a row
+        got += 1
+        fails += cells[-1] == "FAIL"
+        if width != len(cols) and len(cells) == width:
+            continue  # rows of a table whose column row is faulty are not read against the group's columns
+        if len(cells) != width:
+            more = ": a cell holds a pipe: write [pipe]" if len(cells) > width else ""  # a quoted pipe splits the cell
+            faults.append("group %s row has %d cells, not %d%s" % (group, len(cells), width, more))
+            continue
+        ok = ("PASS", "FAIL", "NOT-READ") + (("N/A",) if group == "Earned rules" else ())
+        if not all(cells):
+            faults.append("group %s row has an empty cell" % group)
+        elif cells[0].strip().lower() == "none":  # a group with no rows is the single line `none`
+            faults.append("group %s has a `none` row; write the single line `none` instead" % group)
+        elif cells[-1] not in ok:
+            faults.append("group %s verdict cell is not one of %s" % (group, ", ".join(ok)))
         else:
-            if len(cells) != len(cols):
-                more = ": a cell holds a pipe: write [pipe]" if len(cells) > len(cols) else ""  # a quoted pipe splits the cell
-                raise FeatureReviewRefused("group %s row has %d cells, not %d%s" % (group, len(cells), len(cols), more))
-            ok = ("PASS", "FAIL", "NOT-READ") + (("N/A",) if group == "Earned rules" else ())
-            if not all(cells):
-                raise FeatureReviewRefused("group %s row has an empty cell" % group)
-            if cells[0].strip().lower() == "none":  # a group with no rows is the single line `none`
-                raise FeatureReviewRefused("group %s has a `none` row; write the single line `none` instead" % group)
-            if cells[-1] not in ok:
-                raise FeatureReviewRefused("group %s verdict cell is not one of %s" % (group, ", ".join(ok)))
             rows.append((group, cells))
-            got += 1
-    if state in ("open", "head") or state in ("rows", "closed") and not got:
-        raise FeatureReviewRefused("group %s has no rows and no `none` line" % group)
+    if group not in beyond and (state in ("open", "head") or state in ("rows", "closed") and not got):
+        faults.append("group %s has no rows and no `none` line" % group)
     if want != len(FR_GROUPS):
-        raise FeatureReviewRefused("only %d of the %d groups are present" % (want, len(FR_GROUPS)))
+        faults.append("only %d of the %d groups are present" % (want, len(FR_GROUPS)))
     if ref == "none" and any(g == "Captures" for g, _ in rows):
-        raise FeatureReviewRefused("capture-evidence-ref is `none` over a Captures row")
-    fails = sum(1 for _, c in rows if c[-1] == "FAIL")
-    if head["verdict"] == "PASS" and fails:
-        raise FeatureReviewRefused("verdict PASS with %d FAIL row(s)" % fails)
-    if head["verdict"] == "FAIL" and not fails:
-        raise FeatureReviewRefused("verdict FAIL with no FAIL row")
+        faults.append("capture-evidence-ref is `none` over a Captures row")
+    if len(faults) == body and head["verdict"] == "PASS" and fails:
+        faults.append("verdict PASS with %d FAIL row(s)" % fails)
+    if len(faults) == body and head["verdict"] == "FAIL" and not fails:
+        faults.append("verdict FAIL with no FAIL row")
+    if faults:
+        raise FeatureReviewRefused("; ".join(faults))
     return head["verdict"], rows
 
 
