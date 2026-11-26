@@ -1777,21 +1777,41 @@ def _fr_cells(line):
 
 
 def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False, record_path=""):
-    """(verdict, [(group, cells)]) of a reviewer's verdict text, or raise FeatureReviewRefused(why); doc: a doc lane's
-    verdict, checker-id doc-editorial and the seventh group Editorial. Every fault the text can be followed past is
-    named, joined by `; `; a heading out of order or text before the first group ends the scan."""
+    """(verdict, [(group, cells)]) of a reviewer's verdict text, or raise FeatureReviewRefused(why) naming every shape
+    fault, joined by `; `; doc: a doc lane's verdict, checker-id doc-editorial and the seventh group Editorial."""
+    verdict, rows, faults, _ = _fr_scan(text, head_sha, workdir, verdict_path, doc, record_path)
+    if faults:
+        raise FeatureReviewRefused("; ".join(faults))
+    return verdict, rows
+
+
+class _FrStop(Exception):
+    pass
+
+
+def _fr_scan(text, head_sha, workdir, verdict_path="", doc=False, record_path=""):
+    """(verdict, rows read, shape faults, stopped) of a reviewer's verdict text: every fault the text can be followed
+    past, in reply order; a header key out of place, a heading out of order or text before the first group ends the
+    scan (stopped True), the rows after it unread."""
     import gate_record  # the verdict's groups and columns, one place; lazy: the analyzer runs without it
     FR_GROUPS = gate_record.fr_groups(doc)
     checker = "doc-editorial" if doc else "feature-reviewer"
-    faults = []
+    faults, rows, head = [], [], {}
 
     def stop(why):
-        raise FeatureReviewRefused("; ".join(faults + [why]))
+        faults.append(why)
+        raise _FrStop()
 
+    try:
+        return _fr_scan_body(text, head_sha, workdir, verdict_path, record_path, FR_GROUPS, checker, faults, rows, head, stop)
+    except _FrStop:
+        return head.get("verdict"), rows, faults, True
+
+
+def _fr_scan_body(text, head_sha, workdir, verdict_path, record_path, FR_GROUPS, checker, faults, rows, head, stop):
     lines = text.split("\n")
     if len(lines) < 7:
         stop("the header is shorter than five lines and a blank line")
-    head = {}
     for i, key in enumerate(FR_KEYS):
         k, sep, v = lines[i].partition(":")
         if not sep or k != key:  # a wrong key may shift every line after it: the scan ends here
@@ -1818,7 +1838,7 @@ def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False, record_path="
         faults.append("capture-evidence-ref names the gate record, not a capture")
     if head["verdict"] not in ("PASS", "FAIL"):
         faults.append("verdict is neither PASS nor FAIL")
-    rows, group, cols, state, want, got, fails, beyond, width = [], None, (), "", 0, 0, 0, set(), 0
+    group, cols, state, want, got, fails, beyond, width, colbad = None, (), "", 0, 0, 0, set(), 0, False
     body = len(faults)  # a fault of the body hides rows: the verdict-to-rows checks then add nothing
     for raw in lines[5 if lines[5].strip().startswith("#") else 6:]:  # a heading in the blank line's place is read
         line = raw.strip()
@@ -1852,7 +1872,8 @@ def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False, record_path="
             continue
         if state == "open":
             state = "head"
-            if tuple(cells) != cols:
+            colbad = tuple(cells) != cols
+            if colbad:
                 faults.append("group %s table columns are not: %s" % (group, " | ".join(cols)))
                 if all(c and set(c) <= set("-: ") for c in cells):
                     state = "rows"  # the line is the separator: the column row is missing
@@ -1863,10 +1884,11 @@ def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False, record_path="
             state = "rows"
             if len(cells) == width and all(c and set(c) <= set("-: ") for c in cells):
                 continue
-            faults.append("group %s table has no separator row" % group)
+            if colbad or set(line) <= set("-:| "):
+                faults.append("group %s table has no separator row" % group)
             if set(line) <= set("-:| "):
                 continue  # a separator of the wrong shape, not a row
-            # else the line is read as a row
+            # else the line is read as a row: under a right column line the missing separator is no fault
         got += 1
         fails += cells[-1] == "FAIL"
         if width != len(cols) and len(cells) == width:
@@ -1894,9 +1916,7 @@ def _fr_parse(text, head_sha, workdir, verdict_path="", doc=False, record_path="
         faults.append("verdict PASS with %d FAIL row(s)" % fails)
     if len(faults) == body and head["verdict"] == "FAIL" and not fails:
         faults.append("verdict FAIL with no FAIL row")
-    if faults:
-        raise FeatureReviewRefused("; ".join(faults))
-    return head["verdict"], rows
+    return head["verdict"], rows, faults, False
 
 
 FR_RULE_ID = re.compile(r"(?<![A-Za-z])R-[A-Z]+-[A-Z0-9-]+")  # the earned-rules id token
@@ -2028,12 +2048,17 @@ def _fr_routes(root, feature=None):
 
 
 def _fr_names(cell, did):
-    """True when the stripped cell starts with the decision id and no id character follows it: a letter, digit, `-`,
-    `_`, or a `.` before a letter or digit (a ledger id continues past it)."""
-    rest = cell[len(did):] if cell.startswith(did) else None
-    if rest is None:
-        return False
-    return not rest or not (rest[0].isalnum() or rest[0] in "-_" or rest[0] == "." and rest[1:2].isalnum())
+    """True when the cell holds the id as a whole token, case as written: neither the character before nor the one
+    after is an id character (a letter, digit, `-`, `_`, or a `.` with a letter or digit on its other side)."""
+    def idc(ch, beyond):
+        return ch.isalnum() or ch in "-_" or ch == "." and beyond.isalnum()
+    at = cell.find(did)
+    while at >= 0 and did:
+        end = at + len(did)
+        if not (at and idc(cell[at - 1], cell[at - 2:at - 1])) and not (end < len(cell) and idc(cell[end], cell[end + 1:end + 2])):
+            return True
+        at = cell.find(did, at + 1)
+    return False
 
 
 def _fr_owed(why):
@@ -2050,28 +2075,29 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
     record_cite(evidence) is True when every cite sits in a record (the task log, the spec, a working note) and
     one sits beyond the spec: the FAIL row is then the record class. feature_review_output reads the file, the store and the records, then calls this."""
     import gate_record
-    try:
-        verdict, rows = _fr_parse(text, sha, workdir, verdict_path, doc, record_path)
+    verdict, rows, faults, stopped = _fr_scan(text, sha, workdir, verdict_path, doc, record_path)
+    if not faults:
         n = dirty()
         if n:
-            raise FeatureReviewRefused("%d uncommitted file(s) outside the working dir" % n)
-        have = {m.group(0) for g, c in rows if g == "Earned rules" for m in [FR_RULE_ID.search(c[0])] if m}
-        missing = [r for r in rule_ids if r not in have]
+            return _fr_owed("%d uncommitted file(s) outside the working dir" % n)
+    if not stopped:  # the rows after a scan-ending fault are unread: their ids are not counted
+        missing = [r for r in rule_ids if not any(_fr_names(c[0], r) for g, c in rows if g == "Earned rules")]
         if missing:
-            raise FeatureReviewRefused("Earned rules has no row for %s" % ", ".join(missing[:8]))
-        named = [c[0].strip().strip("`*").strip() for g, c in rows if g in ("Covers", gate_record.FR_DECISIONS)]
+            faults.append("Earned rules has no row for %s; each rule row names its rule id in its first cell"
+                          % ", ".join(missing[:8]))
+        named = [c[0] for g, c in rows if g in ("Covers", gate_record.FR_DECISIONS)]
         missing = [d for d in decision_ids if not any(_fr_names(n, d) for n in named)]
         if missing:
-            raise FeatureReviewRefused("no row in Covers or %s for %s" % (gate_record.FR_DECISIONS, ", ".join(missing[:8])))
-    except FeatureReviewRefused as e:
-        return _fr_owed(e)
+            faults.append("no row in Covers or %s for %s; each decision row names its decision id in its first cell"
+                          % (gate_record.FR_DECISIONS, ", ".join(missing[:8])))
+    found = [(g, c, cites(" | ".join(c[:-1]))) for g, c in rows] if cites else []
+    bad = [(c, x, why) for _, c, fs in found if c[-1] == "FAIL" for x, why in fs]
+    if bad:  # every refused cite of a FAIL row named
+        hint = "; name the path in full, or where the missing file is the finding, drop the line number" if any(w == "no such file" for _, _, w in bad) else ""
+        faults.append("cite fault: " + "; ".join("%s %s %s" % (_fr_clean(c[0], 40), _fr_clean(x, 200), why) for c, x, why in bad) + hint)
+    if faults:
+        return _fr_owed("; ".join(faults))
     if cites:
-        found = [(g, c, cites(" | ".join(c[:-1]))) for g, c in rows]
-        faults = [(c, x, why) for _, c, fs in found if c[-1] == "FAIL" for x, why in fs]
-        if faults:
-            bad = ["%s %s %s" % (_fr_clean(c[0], 40), _fr_clean(x, 200), why) for c, x, why in faults]
-            hint = "; name the path in full, or where the missing file is the finding, drop the line number" if any(w == "no such file" for _, _, w in faults) else ""
-            return _fr_owed("cite fault: " + "; ".join(bad) + hint)  # every refused cite named
         rows = [(g, _fr_unread(g, c, fs) if fs else c) for g, c, fs in found]
         rows = [(g, _fr_class_row(g, c, bool(c[-1] == "FAIL" and record_cite and record_cite(" | ".join(c[:-1]))))) for g, c in rows]
         verdict = "FAIL" if any(c[-1] == "FAIL" for _, c in rows) else verdict
@@ -2140,21 +2166,31 @@ def feature_review_output(root, workdir, feature, decisions=()):
     toks = ident.split()
     head_sha = gate_record.git_sha(os.path.realpath(os.path.abspath(root)))
     sha = head_sha or (toks[1] if len(toks) > 1 else "")  # the verdict names a commit, the store does not
+    wd = os.path.realpath(workdir)
+    try:  # the lane's own paths: a nested lane, a mount repo and the working root are not counted
+        n = len(gate_record.git_dirty(root, ["."], wd, set(), gate_record.lane_leave(gate_record.lane_scope(root)))) if head_sha else 0
+    except gate_record.Error as e:
+        return 2, ["error: %s" % e]
     try:
         real = os.path.realpath(path)
-        if not real.startswith(os.path.realpath(workdir) + os.sep):
-            return _fr_owed("the verdict file resolves outside the working dir")
+        if not real.startswith(os.path.realpath(workdir) + os.sep):  # a fault the reply did not cause: no re-spawn
+            return 2, ["error: the verdict file resolves outside the working dir"]
         if not os.path.isfile(real):
-            return _fr_owed("no readable %s in the working dir" % name)
+            return 2, ["error: no readable %s in the working dir" % name]
         with open(real, "rb") as fh:
             raw = fh.read(FR_FILE_CAP + 1)
         if len(raw) > FR_FILE_CAP:
             return _fr_owed("the verdict file is too large (over %d bytes)" % FR_FILE_CAP)
         text = raw.decode("utf-8")
     except (OSError, UnicodeError):
-        return _fr_owed("no readable %s in the working dir" % name)
-    wd = os.path.realpath(workdir)
-    dirty = (lambda: len(gate_record.git_dirty(root, ["."], wd, set()))) if head_sha else (lambda: 0)
+        return 2, ["error: no readable %s in the working dir" % name]
+    if n:
+        return 2, ["error: %d uncommitted file(s) outside the working dir" % n]
+    said = re.match(r"target-sha:[ \t]*([0-9a-f]{40})[ \t\r]*$", (text.split("\n") + ["", ""])[1])
+    if head_sha and said and said.group(1) != head_sha and subprocess.run(
+            ["git", "-C", root, "merge-base", "--is-ancestor", said.group(1), head_sha], capture_output=True).returncode == 0:
+        return 2, ["error: HEAD moved after the brief: target-sha %s is behind HEAD %s; prepare the read again"
+                   % (said.group(1), head_sha)]
     try:
         import cite_check  # the one cite check, shared with the scope chain
         dirs = _fr_cite_dirs(root, feature)  # a bare file name resolves in the feature's own folders
@@ -2178,7 +2214,7 @@ def feature_review_output(root, workdir, feature, decisions=()):
                 return False
             return any(recs.get(r) == "task-log" or a_note(r) for r in reals)
 
-        return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, dirty, doc,
+        return feature_review_check(text, sha, workdir, path, _fr_rule_ids(root), dec, lambda: 0, doc,
                                     lambda cell: cite_check.text_faults(root, cell, dirs, routes, strict=True),  # a reader row holds no host and port
                                     os.path.join(workdir, "gate-%s.md" % feature), in_log)
     except gate_record.Error as e:

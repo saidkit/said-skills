@@ -28,6 +28,7 @@ verdict line, or the writer refused and wrote nothing), 2 an error. Pass file th
 """
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -137,18 +138,19 @@ def mount_reads(root, base, given):
     return reads, None
 
 
-def estimate(root, base, head, records, spec, mounts=()):
-    """(characters, tokens) of what the reader reads once: the diffs, every file they touch at HEAD, the spec, the
-    decision records, the task log and the lane's CLAUDE.md."""
-    diff = git(root, "diff", "%s..%s" % (base, head)) or ""
-    touched = [p for p in (git(root, "diff", "-z", "--name-only", "%s..%s" % (base, head)) or "").split("\0") if p]
+def estimate(root, base, head, records, spec, mounts=(), scope=()):
+    """(characters, tokens) of what the reader reads once: the lane's own diff and the mount diffs, every file they
+    touch at HEAD, the spec, the decision records, the task log and the lane's CLAUDE.md."""
+    paths = ["--"] + gate_record.lane_pathspec(scope)
+    diff = git(root, "diff", "--relative", "%s..%s" % (base, head), *paths) or ""
+    touched = [p for p in (git(root, "diff", "--relative", "-z", "--name-only", "%s..%s" % (base, head), *paths) or "").split("\0") if p]
     chars = len(diff) + sum(size(os.path.join(root, p)) for p in touched)
     chars += sum(size(p) for p in [spec, os.path.join(root, "CLAUDE.md")] + records)
     chars += sum(len(m["diff"]) + sum(size(os.path.join(m["path"], p)) for p in m["files"]) for m in mounts)
     return chars, chars // 4
 
 
-def brief(fid, root, working, base, head, ref, records, doc, mounts=(), no_lane=False):
+def brief(fid, root, working, base, head, ref, records, doc, mounts=(), no_lane=False, scope=()):
     lines = ["feature id: %s" % fid, "lane root: %s" % root, "working dir: %s" % working, "base commit: %s" % base,
              "target commit: %s" % head, "capture reference: %s" % ref]
     lines += ["decision record: %s" % p for p in records]
@@ -156,6 +158,10 @@ def brief(fid, root, working, base, head, ref, records, doc, mounts=(), no_lane=
         lines.append("surface: doc")
     if no_lane:
         lines.append("lane diff: none (--base is a commit of a mount repo only; the lane's own changes are not in this read)")
+    else:
+        cmd = ["git", "-C", root, "diff", "%s..%s" % (base, head), "--relative", "--"] + gate_record.lane_pathspec(scope)
+        lines.append("lane diff paths: %s (read only that diff and the files it touches, and the decision records whole)"
+                     % " ".join(shlex.quote(c) for c in cmd))
     for m in mounts:
         lines.append("mount repo: %s base %s target %s" % (m["name"], m["base"], m["head"]))
         lines += ["mount commit: %s" % c for c in m["commits"]]
@@ -207,11 +213,12 @@ def prepare(fid, root, base, ref, spec_ledgers, mount_bases=None):
     spec = lane_path(root, "feature-spec", fid)
     if not os.path.isfile(spec) or not os.path.isfile(lane_path(root, "task-log", fid)):
         raise Error("the feature has no spec or no task log (%s)" % os.path.relpath(spec, root))
-    chars, tokens = estimate(root, base_sha, head, records, spec, mounts)
+    scope = gate_record.lane_scope(root)
+    chars, tokens = estimate(root, base_sha, head, records, spec, mounts, scope)
     out, doc = out_path(root, working, fid)
     return {"state": "ready", "why": "ready", "base": base_sha, "head": head, "records": records, "out": out,
             "doc": doc, "chars": chars, "tokens": tokens, "mounts": " ".join(m["base"] + ":" + m["head"] for m in mounts),
-            "brief": brief(fid, root, working, base_sha, head, ref, records, doc, mounts, no_lane)}
+            "brief": brief(fid, root, working, base_sha, head, ref, records, doc, mounts, no_lane, scope)}
 
 
 def file_reply(fid, root, reply, spec_ledgers):

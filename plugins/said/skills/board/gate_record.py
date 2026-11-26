@@ -404,6 +404,52 @@ def git_top(phys):
     return os.path.realpath(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else None
 
 
+def lane_scope(root):
+    """Sorted lane-relative paths left out of the lane's own diff: each registered lane root nested under the lane root
+    (the SAID.lanes: registries of the lane root and each folder above it up to the git top), each declared mount that
+    is its own git repo, and the SAID.working: root. An Error when a registry line is refused."""
+    import said_status  # the one registry reader; lazy: said_status imports this module
+    phys = os.path.realpath(os.path.abspath(root))
+    top = git_top(phys) or phys
+    out, d = set(), phys
+    while True:
+        try:
+            rows, _ = said_status.read_lane_registry(d)
+        except said_status.RegistryRefused as e:
+            raise Error("the SAID.lanes: line of %s is refused: %s" % (os.path.join(d, "CLAUDE.md"), e))
+        for _tok, r in rows:
+            p = os.path.realpath(os.path.join(d, r.strip()))
+            if p != phys and inside(p, phys):
+                out.add(os.path.relpath(p, phys))
+        parent = os.path.dirname(d)  # walk up to the git top
+        if d == top or parent == d or not inside(d, top):
+            break
+        d = parent
+    for m in mount_list(lane_key(phys, "mounts")):
+        p = os.path.realpath(os.path.join(phys, m.strip("`'\"").rstrip("/")))
+        mine = git_top(p) if os.path.isdir(p) else None
+        if mine and mine != top and p != phys and inside(p, phys):  # a mount repo is read as its own mount diff
+            out.add(os.path.relpath(p, phys))
+    work = (lane_key(phys, "working") or "").strip("`'\"").split("<", 1)[0].rstrip("/")  # `<id>` or a named token
+    p = os.path.realpath(os.path.join(phys, work)) if work else phys
+    if p != phys and inside(p, phys):
+        out.add(os.path.relpath(p, phys))
+    bad = [x for x in out if any(unicodedata.category(c)[0] == "C" for c in x)]
+    if bad:  # a path that would split the brief's command line
+        raise Error("a path left out of the lane diff holds a control character: %r" % bad[0])
+    return sorted(out)
+
+
+def lane_pathspec(scope):
+    """The git pathspec of the lane's own paths, relative to the lane root."""
+    return ["."] + [":(exclude,literal)%s" % x for x in scope]
+
+
+def lane_leave(scope):
+    """The git_dirty `leave` test of a lane-relative path outside the lane's own paths."""
+    return lambda rel: any(rel == x or rel.startswith(x + os.sep) for x in scope)
+
+
 def sources_digest(root, files):
     """sha256 over each source file's lane-relative path and bytes: a feature spec or task log without debrief's
     sections, the lane CLAUDE.md by its `## Lane` and `## Earned rules` sections; an unreadable file counts as missing."""
