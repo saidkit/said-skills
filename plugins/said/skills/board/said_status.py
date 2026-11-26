@@ -2045,7 +2045,8 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
     """(rc, lines) of a verdict text with no file or git read of its own: parse it against the head sha, then
     `dirty()` (the count of uncommitted files outside the working dir), a row per rule id and a Covers or Uncovered
     decisions row per decision id; rc 0 and the row lines, or rc 1 and the owed lines. cites(cell text) gives the
-    failing cites of a row as [(cite, why)]: any of them, on a row of any status, refuses the reply.
+    failing cites of a row as [(cite, why)]: any of them on a FAIL row refuses the reply, naming every such cite; a row
+    of another status with one is filed NOT-READ, the faults named in its evidence.
     record_cite(evidence) is True when every cite sits in a record (the task log, the spec, a working note) and
     one sits beyond the spec: the FAIL row is then the record class. feature_review_output reads the file, the store and the records, then calls this."""
     import gate_record
@@ -2065,11 +2066,13 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
     except FeatureReviewRefused as e:
         return _fr_owed(e)
     if cites:
-        faults = [(c, x, why) for _, c in rows for x, why in cites(" | ".join(c[:-1]))]
+        found = [(g, c, cites(" | ".join(c[:-1]))) for g, c in rows]
+        faults = [(c, x, why) for _, c, fs in found if c[-1] == "FAIL" for x, why in fs]
         if faults:
             bad = ["%s %s %s" % (_fr_clean(c[0], 40), _fr_clean(x, 200), why) for c, x, why in faults]
             hint = "; name the path in full, or where the missing file is the finding, drop the line number" if any(w == "no such file" for _, _, w in faults) else ""
             return _fr_owed("cite fault: " + "; ".join(bad) + hint)  # every refused cite named
+        rows = [(g, _fr_unread(g, c, fs) if fs else c) for g, c, fs in found]
         rows = [(g, _fr_class_row(g, c, bool(c[-1] == "FAIL" and record_cite and record_cite(" | ".join(c[:-1]))))) for g, c in rows]
         verdict = "FAIL" if any(c[-1] == "FAIL" for _, c in rows) else verdict
     out = ["feature-review: verdict | %s | not-read=%d" % (verdict, sum(1 for _, c in rows if c[-1] == "NOT-READ"))]
@@ -2082,6 +2085,15 @@ def feature_review_check(text, sha, workdir, verdict_path="", rule_ids=(), decis
                 ev = cells[_fr_evidence_at(group, cells)]
                 out.append("feature-review: %s | %s | %s | %s" % (group, _fr_clean(cells[0], 40), cells[-1], _fr_clean(ev, 80)))
     return 0, out
+
+
+def _fr_unread(group, cells, faults):
+    """A row of a status other than FAIL whose cites fail: NOT-READ, the faults ahead of its evidence; its id cell kept."""
+    out = list(cells)
+    at = _fr_evidence_at(group, out)
+    out[at] = "cite fault: %s - %s" % ("; ".join("%s %s" % (x, why) for x, why in faults), out[at])
+    out[-1] = "NOT-READ"
+    return out
 
 
 def _fr_evidence_at(group, cells):
