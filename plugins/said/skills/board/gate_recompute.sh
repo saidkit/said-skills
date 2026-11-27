@@ -6,7 +6,7 @@
 # below a folder under evaluation/ that holds a harness.sh: that unit's subtree is its data) from its own directory,
 # reached through the logical lane path, each under a timeout (a timeout is an undeclared failure).
 # A unittest unit -- a folder with __init__.py and test_*.py files, no harness.sh, not below another unit -- is
-# not run alone: every such unit runs in one python3 interpreter (each discovered from its folder with the
+# not run alone: every such unit runs in one interpreter, the one below (each discovered from its folder with the
 # evaluation folder as top level, so its load_tests applies), under REQUIRE_BROWSER=1, with a timeout of the
 # per-harness seconds times the number of such units. Its row is PASS, EXPECTED with the ids of its expected
 # failures, or FAIL with the ids of its failing tests (an unexpected success fails); an id is the test's
@@ -17,8 +17,8 @@
 # in <docs-root>/evaluation/EXPECTED-FAIL -- one "<unit-path> <id> <reason> [until <version>]" per line,
 # exact token match, a line past its version counts as undeclared. Nothing is inferred from wording.
 # Prints one "gate-recompute: <unit-path> exit=<n> <PASS|EXPECTED|FAIL> [ids]" row per harness.
-# Exit 0 iff the command line passes and no harness fails undeclared; 2 = a missing lane key, or the record
-# could not be written (`error: <why>`); 3 = a nested run
+# Exit 0 iff the command line passes and no harness fails undeclared; 2 = a missing lane key, a Makefile PYTHON
+# not found, or the record could not be written (`error: <why>`); 3 = a nested run
 # of the same lane (a harness that recomputes another lane, e.g. a fixture, is allowed).
 # "until" compares with the lane's own plugin version (its validate target, else <lane>/.claude-plugin).
 # SAID_GATE_OUT=<file>: also write the run's record there through gate_record.py -- the store identity of the
@@ -29,6 +29,10 @@
 # Env: SAID_ROOT (lane root), SAID_PLUGIN_ROOT (this plugin),
 #      SAID_RECOMPUTE_TIMEOUT (seconds per harness, default 120), SAID_GATE_OUT (record file, optional)
 #      Every unit run gets LANE_ROOT = the physical lane root, replacing any value the caller held.
+# Interpreter: the first line of the lane root's Makefile that assigns PYTHON (`:=`, `=` or `?=`, at the line's
+# start, one word as its value; no make evaluation) names the interpreter this script and its unittest units run
+# on; with no Makefile or no such line it is python3. A value naming no command halts: one `gate-recompute:
+# refused -- Makefile PYTHON <value> not found` line, exit 2, no record.
 #      SAID_GATE_UNITS (optional): the unit paths to run, relative to the lane root, separated by spaces or
 #      newlines; every other unit prints `gate-recompute: <unit-path> skipped (not selected)` and is not run.
 #      Unset runs every unit; a name that is no unit is a halt (exit 2). A skipped row is not a pass: a record
@@ -44,7 +48,27 @@ case ":${SAID_GATE_RECOMPUTE_ACTIVE:-}:" in
 esac
 export SAID_GATE_RECOMPUTE_ACTIVE="${SAID_GATE_RECOMPUTE_ACTIVE:+$SAID_GATE_RECOMPUTE_ACTIVE:}$lane_root"
 here="$(cd "$(dirname "$0")" && pwd)"
-exec python3 - "${SAID_ROOT:-$PWD}" "${SAID_PLUGIN_ROOT:-$here/../..}" "${SAID_RECOMPUTE_TIMEOUT:-120}" <<'PY'
+py=python3  # the lane's Makefile PYTHON, else python3; never passed through a shell
+if [ -n "$lane_root" ] && [ -f "$lane_root/Makefile" ]; then
+  mk="$(LC_ALL=C grep -m1 -E '^PYTHON[[:space:]]*(:=|[?]=|=)[[:space:]]*[^[:space:]]+[[:space:]]*$' "$lane_root/Makefile")"
+  if [ -n "$mk" ]; then
+    val="${mk#*=}"
+    val="${val#"${val%%[![:space:]]*}"}"
+    val="${val%"${val##*[![:space:]]}"}"
+    found="$(cd "$lane_root" && command -v -- "$val" 2>/dev/null)"
+    case "$found" in
+      /*) ;;
+      */*) found="$lane_root/$found" ;;
+      *) found="" ;;
+    esac
+    if [ -z "$found" ] || [ ! -f "$found" ] || [ ! -x "$found" ]; then
+      printf 'gate-recompute: refused -- Makefile PYTHON %s not found\n' "$val"
+      exit 2
+    fi
+    py="$found"
+  fi
+fi
+exec "$py" - "${SAID_ROOT:-$PWD}" "${SAID_PLUGIN_ROOT:-$here/../..}" "${SAID_RECOMPUTE_TIMEOUT:-120}" <<'PY'
 import ast, json, os, re, signal, subprocess, sys
 
 root, plugin_root, timeout = os.path.abspath(sys.argv[1]), sys.argv[2], int(sys.argv[3])  # relative SAID_ROOT
