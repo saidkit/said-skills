@@ -4,6 +4,13 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
+## [0.29.5] - 2026-11-27
+
+- **Fixed:** the feature-reviewer reads the lane diff paths its brief names, not the whole diff from the base commit to HEAD, so a nested lane's or a mount repository's change no longer enters its read.
+- **Fixed:** the feature-reviewer's verdict templates show a separator row under each table's column line, as the row writer requires.
+- **Fixed:** the gate recompute exports `LANE_ROOT`, the physical absolute lane root, to every unit it runs, whatever the caller's environment held; a `harness.sh` unit still runs from the logical working directory.
+- **Added:** the gate recompute runs, and runs its units, on the interpreter the lane's `Makefile` names in one plain `PYTHON` assignment (`:=`, `=` or `?=` at the start of a line, one word as its value), read without running make; with no Makefile or no such line it runs on `python3`. A value that names no interpreter is refused with one `refused --` line and exit 2, and no record is written.
+
 ## [0.29.4] - 2026-11-27
 
 - **Added:** the supervisor role has a Close line. At a feature's close the supervisor has the worker move what no record cites (run output, aborted copies, duplicates) out of the working folder to a dated folder beside it, and nothing is deleted. A file the operator wrote stays and is reported. The supervisor reports the counts and does not put the sort to the operator.
