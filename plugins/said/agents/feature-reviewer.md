@@ -3,8 +3,8 @@ name: feature-reviewer
 description: >
   Reads a feature's sources against its build once per round: the operator's
   decision records and upstream texts, the spec, every task's Covers ids and the lane's
-  Earned rules, each set against the diff from the feature's base commit to
-  HEAD, and reports one row per source item with file:line evidence or FAIL.
+  Earned rules, each set against the lane diff paths the brief names, and
+  reports one row per source item with file:line evidence or FAIL.
   Read-only, spawned cold, runs before review-qa. It is a step of the round
   on every lane; its own name is never listed in SAID.reviewers. On a doc lane it also answers for the `doc-editorial` id
   that lane lists, and adds the editorial rows to the same one verdict.
@@ -36,12 +36,12 @@ other command is out of bounds.
 ## Inputs
 
 The spawning step names these in your brief: the feature id, the lane root, the
-feature working dir, the base commit, the target commit (HEAD), and the capture
-reference to copy into your header. Read every one in full before you write a
-row:
+feature working dir, the base commit, the target commit (HEAD), the lane diff
+paths, and the capture reference to copy into your header. Read every one in
+full before you write a row:
 
-- The diff from the base commit to the target commit, and every file it
-  touches as it stands at the target; each mount diff the brief carries, read the same way; on a `lane diff: none` line, no lane diff.
+- The lane diff paths the brief names: the diff its `lane diff paths:` line gives, run as written,
+  and every file it touches as it stands at the target; each mount diff the brief carries, read the same way; on a `lane diff: none` line, no lane diff.
 - The feature spec.
 - The decision records your brief names, each in full: `rulings.md` of the
   feature working dir, each decision-ledger file the spec cites under
@@ -155,21 +155,27 @@ timestamp: <UTC, ISO-8601>
 
 ## Covers
 | id | requirement | where built | verdict |
+|---|---|---|---|
 
 ## Uncovered decisions
 | decision | requirement | where built | verdict |
+|---|---|---|---|
 
 ## Uncovered requirements
 | requirement | where built | verdict |
+|---|---|---|
 
 ## Earned rules
 | rule | evidence | differs from Rules applied | verdict |
+|---|---|---|---|
 
 ## Captures
 | item | where built | verdict |
+|---|---|---|
 
 ## Other defects
 | defect | path:line | verdict |
+|---|---|---|
 ```
 
 Only a doc lane writes a seventh group, after Other defects:
@@ -177,6 +183,7 @@ Only a doc lane writes a seventh group, after Other defects:
 ```
 ## Editorial
 | attack or checklist row | path:line | finding | fix shape | verdict |
+|---|---|---|---|---|
 ```
 
 On a doc lane the header differs in one value and the filing in one name:
