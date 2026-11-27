@@ -28,6 +28,7 @@
 # dropped at a moved one; the round and matrix lines are always kept; the gate-recompute rows are replaced whole.
 # Env: SAID_ROOT (lane root), SAID_PLUGIN_ROOT (this plugin),
 #      SAID_RECOMPUTE_TIMEOUT (seconds per harness, default 120), SAID_GATE_OUT (record file, optional)
+#      Every unit run gets LANE_ROOT = the physical lane root, replacing any value the caller held.
 #      SAID_GATE_UNITS (optional): the unit paths to run, relative to the lane root, separated by spaces or
 #      newlines; every other unit prints `gate-recompute: <unit-path> skipped (not selected)` and is not run.
 #      Unset runs every unit; a name that is no unit is a halt (exit 2). A skipped row is not a pass: a record
@@ -293,6 +294,7 @@ if run_units:
     os.close(fd)
     env = {k: v for k, v in os.environ.items() if k not in ("SAID_GATE_OUT", "SAID_GATE_UNITS", "HARNESS_ONLY", "UPDATE_GOLDENS")}
     env["REQUIRE_BROWSER"] = "1"  # a gate with no browser fails the browser checks, never skips them
+    env["LANE_ROOT"] = os.path.realpath(root)  # the physical lane root, whatever the caller held
     budget = timeout * len(run_units)
     p = subprocess.Popen([sys.executable, "-I", "-B", "-c", RUNNER, evaluation, res] + [d + ("\x1f" + ",".join(ran_slices[d]) if d in ran_slices else "") for d in run_units], cwd=evaluation, env=env,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -341,6 +343,7 @@ for d in sorted(units + test_units):
         continue
     env = {k: v for k, v in os.environ.items() if k not in ("SAID_GATE_OUT", "SAID_GATE_UNITS")}  # the record is this run's, never a child's
     env["PWD"] = d  # keep the logical path: harnesses resolve their root from it
+    env["LANE_ROOT"] = os.path.realpath(root)  # the physical lane root, whatever the caller held
     try:
         p = subprocess.Popen(["bash", "./harness.sh"], cwd=d, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT, start_new_session=True)
