@@ -445,13 +445,25 @@ def decision_rows(path):
         out.append((c + [None])[:4])
     return out
 
+def piece_parts(folder, pieces):
+    """(parts, unit -> part): the parts of portions.tsv and the part of each unit, from the per-part unit lists
+    portion-r<n>.tsv; a document split across parts has a row per part, so the unit is the key, never the path"""
+    parts = sorted({c[0] for c in tsv(os.path.join(folder, 'portions.tsv'), 4)}, key=lambda r: (len(r), r))
+    seen = {}
+    for r in parts:
+        for c in tsv(os.path.join(folder, 'portion-%s.tsv' % r), 5):
+            if c[0] not in pieces:
+                raise Refused('refused: unit %s of portion-%s.tsv is not a unit of pieces.tsv' % (c[0], r))
+            seen.setdefault(c[0], []).append(r)
+    for p in sorted(pieces):
+        if len(seen.get(p, [])) != 1:
+            raise Refused('refused: unit %s is in %d parts (%s)' % (p, len(seen.get(p, [])), ', '.join(seen.get(p, [])) or 'none'))
+    return set(parts), {p: v[0] for p, v in seen.items()}
+
 def coverage(lane, folder, only=None):
     pieces = read_pieces(os.path.join(folder, 'pieces.tsv'))
     decs = {c[0] for c in decision_rows(os.path.join(folder, 'decisions.tsv'))}
-    portion = {}
-    for c in tsv(os.path.join(folder, 'portions.tsv'), 4):
-        portion[c[1]] = c[0]
-    check_deal(pieces, [(v, k) for k, v in portion.items()])
+    parts, part = piece_parts(folder, pieces)
     files = []
     for f in sorted(os.listdir(folder)):
         m = ROUND.match(f)
@@ -471,7 +483,7 @@ def coverage(lane, folder, only=None):
             why, piece = (None, c[0] if c else '')
             if len(c) != 5:
                 why = '%d fields, not 5' % len(c)
-            elif piece not in pieces or portion.get(pieces[piece][0]) != r:
+            elif piece not in pieces or part[piece] != r:
                 why = 'piece %s is not in portion %s' % (piece, r)
             elif c[1] not in CLASSES:
                 why = 'class %s' % c[1]
@@ -508,13 +520,13 @@ def coverage(lane, folder, only=None):
             if c[0] not in pieces:
                 raise Refused('refused: marked unit %s is not a unit of pieces.tsv' % c[0])
             marked.add(c[0])
-    if only is not None and only not in portion.values():
+    if only is not None and only not in parts:
         raise Refused('refused: portion %s is not in portions.tsv' % only)
     for pid, (path, a, b) in pieces.items():
-        if only is not None and portion[path] != only:
+        if only is not None and part[pid] != only:
             continue
         if pid not in marked and (not any((g[2] == pid for g in good))):
-            gaps.append((portion[path], pid, 'no good row for %s:%d-%d' % (path, a, b)))
+            gaps.append((part[pid], pid, 'no good row for %s:%d-%d' % (path, a, b)))
     withdrawn = []
     for r, k, piece, where, why, line, quote in bad:
         later = {g[2] for g in good if g[0] == r and g[1] > k}
@@ -523,7 +535,7 @@ def coverage(lane, folder, only=None):
         if piece in pieces:
             closed = bool(mine & later)
         else:
-            closed = all((p in later for p, v in pieces.items() if portion.get(v[0]) == r))
+            closed = all((p in later for p in pieces if part[p] == r))
         if not closed:
             gaps.append((r, where, why))
             continue
