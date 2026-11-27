@@ -29,10 +29,6 @@
 # Env: SAID_ROOT (lane root), SAID_PLUGIN_ROOT (this plugin),
 #      SAID_RECOMPUTE_TIMEOUT (seconds per harness, default 120), SAID_GATE_OUT (record file, optional)
 #      Every unit run gets LANE_ROOT = the physical lane root, replacing any value the caller held.
-# Interpreter: the first line of the lane root's Makefile that assigns PYTHON (`:=`, `=` or `?=`, at the line's
-# start, one word as its value; no make evaluation) names the interpreter this script and its unittest units run
-# on; with no Makefile or no such line it is python3. A value naming no command halts: one `gate-recompute:
-# refused -- Makefile PYTHON <value> not found` line, exit 2, no record.
 #      SAID_GATE_UNITS (optional): the unit paths to run, relative to the lane root, separated by spaces or
 #      newlines; every other unit prints `gate-recompute: <unit-path> skipped (not selected)` and is not run.
 #      Unset runs every unit; a name that is no unit is a halt (exit 2). A skipped row is not a pass: a record
@@ -40,6 +36,10 @@
 #      An entry may be `<unit-path>:<slice>,<slice>` for a unit that declares SLICES in its __init__.py: only those
 #      slices run (a bare entry is the whole unit), the unit's row reads `<unit-path>:<slices> exit=...` and each
 #      left-out slice prints `<unit-path>:<slice> skipped (not selected)`. An undeclared slice is a halt (exit 2).
+# Interpreter: the first line of the lane root's Makefile that assigns PYTHON (`:=`, `=` or `?=`, at the line's
+# start, one word as its value; no make evaluation) names the interpreter this script and its unittest units run
+# on; with no Makefile or no such line it is python3. A value naming no command halts: one `gate-recompute:
+# refused -- Makefile PYTHON <value> not found` line, exit 2, no record.
 lane_root="$(cd "${SAID_ROOT:-$PWD}" 2>/dev/null && pwd -P)"
 case ":${SAID_GATE_RECOMPUTE_ACTIVE:-}:" in
   *":$lane_root:"*)
