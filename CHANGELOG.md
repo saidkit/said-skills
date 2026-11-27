@@ -4,6 +4,11 @@ All notable changes to the SAID plugin are documented here. Format follows [Keep
 
 ## [Unreleased]
 
+## [0.29.4] - 2026-11-27
+
+- **Added:** the supervisor role has a Close line. At a feature's close the supervisor has the worker move what no record cites (run output, aborted copies, duplicates) out of the working folder to a dated folder beside it, and nothing is deleted. A file the operator wrote stays and is reported. The supervisor reports the counts and does not put the sort to the operator.
+- **Fixed:** the scope-refine rule chain's `coverage` reads each unit's part from the per-part unit lists. A document that the zone budget splits across parts is now read and proven whole: a good row for a unit of an earlier part counts, and a gap is filed under its own part. A unit listed in no part or in two parts is refused, with a line naming it.
+
 ## [0.29.3] - 2026-11-26
 
 - **Fixed:** the feature-review row writer counts a decision id or a rule id as a whole token anywhere in a row's first cell, every id of the cell counting (`scope.md Q-1 (depth)`, `D answered 1 (Q-1)`); a longer or prefixed id (`Q-10`, `XQ-1`, `Q-1a`, `R-X-01a`) still does not count, and the missing-row refusal says each row names its id in its first cell.
